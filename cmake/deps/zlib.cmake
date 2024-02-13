@@ -1,0 +1,1 @@
+target_compile_definitions (zlib PRIVATE ZLIB_DLL ZLIB_INTERNAL)

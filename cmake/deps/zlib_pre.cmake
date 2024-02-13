@@ -1,0 +1,1 @@
+option (ZLIB_BUILD_EXAMPLES "" OFF)
