@@ -29,5 +29,5 @@ target_include_directories (REPENTOGONLauncher PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
 target_compile_definitions (REPENTOGONLauncher PRIVATE UNICODE INI_SHARED_LIB ZLIB_DLL)
-target_link_libraries (REPENTOGONLauncher wxbase wxcore bcrypt inih libcurl)
+target_link_libraries (REPENTOGONLauncher wxbase wxcore bcrypt inih libcurl zlib)
 add_custom_command (TARGET REPENTOGONLauncher POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS)
