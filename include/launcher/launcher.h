@@ -10,6 +10,7 @@ struct IsaacOptions {
 
 	// Repentogon options
 	bool console;
+	bool update;
 
 	// Game options
 	bool lua_debug;

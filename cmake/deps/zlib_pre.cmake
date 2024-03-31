@@ -1,1 +1,2 @@
 option (ZLIB_BUILD_EXAMPLES "" OFF)
+option (RENAME_ZCONF "" OFF)

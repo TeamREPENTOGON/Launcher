@@ -1,5 +1,9 @@
 #include <cstdio>
+#include <future>
+#include <mutex>
 #include <regex>
+#include <set>
+#include <thread>
 
 #include "inih/ini.h"
 #include "inih/cpp/INIReader.h"
@@ -10,6 +14,13 @@
 #include "curl/curl.h"
 #include "launcher/window.h"
 
+#include "zip.h"
+#include "zipint.h"
+
+#ifdef min
+#undef min
+#endif
+
 wxBEGIN_EVENT_TABLE(IsaacLauncher::MainFrame, wxFrame)
 	EVT_COMBOBOX(IsaacLauncher::WINDOW_COMBOBOX_LEVEL, IsaacLauncher::MainFrame::OnLevelSelect)
 	EVT_COMBOBOX(IsaacLauncher::WINDOW_COMBOBOX_LAUNCH_MODE, IsaacLauncher::MainFrame::OnLauchModeSelect)
@@ -18,21 +29,15 @@ wxBEGIN_EVENT_TABLE(IsaacLauncher::MainFrame, wxFrame)
 	EVT_CHECKBOX(IsaacLauncher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, IsaacLauncher::MainFrame::OnOptionSelected)
 	EVT_TEXT(IsaacLauncher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, IsaacLauncher::MainFrame::OnCharacterWritten)
 	EVT_BUTTON(IsaacLauncher::WINDOW_BUTTON_LAUNCH_BUTTON, IsaacLauncher::MainFrame::Launch)
+	EVT_BUTTON(IsaacLauncher::WINDOW_BUTTON_FORCE_UPDATE, IsaacLauncher::MainFrame::ForceUpdate)
 wxEND_EVENT_TABLE()
 
 namespace IsaacLauncher {
 	static std::tuple<wxFont, wxFont> MakeBoldFont(wxFrame* frame);
 	static wxComboBox* CreateLevelsComboBox(wxFrame* frame);
 
-	/* RAII-style class to automatically clean the CURL session. */
-	class ScopedCURL {
-	public:
-		ScopedCURL(CURL* curl) : _curl(curl) { }
-		~ScopedCURL() { curl_easy_cleanup(_curl); }
-
-	private:
-		CURL* _curl;
-	};
+	// Read chunks of 1MB in the zip stream of REPENTOGON.zip
+	static constexpr size_t StreamChunkSize = 1 << 20; 
 
 	namespace Defaults {
 		bool console = false;
@@ -40,6 +45,7 @@ namespace IsaacLauncher {
 		int stageType = 0;
 		bool luaDebug = false;
 		int luaHeapSize = 1024;
+		bool update = true;
 	}
 
 	namespace Sections {
@@ -55,6 +61,7 @@ namespace IsaacLauncher {
 		std::string luaHeapSize("LuaHeapSize");
 		std::string stageType("StageType");
 		std::string launchMode("LaunchMode");
+		std::string update("Update");
 	}
 
 	namespace IsaacInterface {
@@ -106,62 +113,13 @@ namespace IsaacLauncher {
 		NULL
 	};
 
-	static const char* mandatoryFileNames[] = {
-		"libzhl.dll",
-		"zhlRepentogon.dll",
-		"freetype.dll",
-		NULL
-	};
-
-	Version const knownVersions[] = {
-		{ "04469d0c3d3581936fcf85bea5f9f4f3a65b2ccf96b36310456c9626bac36dc6", "v1.7.9b.J835 (Steam)", true },
-		{ NULL, NULL, false }
-	};
-
-	Version const* const validVersions[] = {
-		NULL
-	};
-
-	/* Function called by cURL when it gets a response from a request. 
-	 * userp is a pointer to a std::string.
-	 */
-	static size_t OnCurlResponse(void* contents, size_t size, size_t nmemb, void* userp) {
-		std::string* result = (std::string*)userp;
-		result->append((char*)contents, nmemb * size);
-		return nmemb * size;
-	}
-
-	Version const* MainFrame::GetVersion(const char* hash) {
-		Version const* version = knownVersions;
-		while (version->version) {
-			if (!strcmp(hash, version->hash)) {
-				return version;
-			}
-
-			++version;
-		}
-
-		return NULL;
-	}
-
-	bool MainFrame::FileExists(const char* name) {
-		WIN32_FIND_DATAA data;
-		memset(&data, 0, sizeof(data));
-		HANDLE result = FindFirstFileA(name, &data);
-		bool ret = result != INVALID_HANDLE_VALUE;
-		if (ret) {
-			FindClose(result);
-		}
-
-		return ret;
-	}
-
 	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher") {
 		memset(&_options, 0, sizeof(_options));
 		_grid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
 		_luaHeapSize = nullptr;
-		_enabledRepentogon = false;
+		_hasRepentogon = false;
+		_hasIsaac = false;
 		_repentogonVersion = nullptr;
 
 		SetSize(1024, 650);
@@ -206,6 +164,9 @@ namespace IsaacLauncher {
 
 		wxButton* launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game");
 		_grid->Add(launchButton, wxGBPosition(2, 2), wxDefaultSpan, wxEXPAND);
+
+		wxButton* updateButton = new wxButton(this, WINDOW_BUTTON_FORCE_UPDATE, "Update (force)");
+		_grid->Add(updateButton, wxGBPosition(3, 2), wxDefaultSpan, wxEXPAND);
 	}
 
 	void MainFrame::AddRepentogonOptions() {
@@ -333,176 +294,130 @@ namespace IsaacLauncher {
 
 	void MainFrame::PostInit() {
 		Log("Welcome to the REPENTOGON Launcher version %s", IsaacLauncher::version);
-		CheckVersionsAndInstallation();
+		_hasIsaac = CheckIsaacVersion();
+
+		if (!_hasIsaac) {
+			return;
+		}
+
+		_hasRepentogon = CheckRepentogonInstallation();
+		bool checkUpdates = true;
+		if (!_hasRepentogon) {
+			if (PromptRepentogonInstallation()) {
+				DownloadAndInstallRepentogon(true);
+				checkUpdates = false;
+				_hasRepentogon = CheckRepentogonInstallation();
+			}
+		}
+
 		InitializeOptions();
+
+		rapidjson::Document launcherResponse;
+		if (_updater.CheckLauncherUpdates(launcherResponse)) {
+			DoSelfUpdate(launcherResponse);
+		}
+
+		if (checkUpdates && _options.update) {
+			DownloadAndInstallRepentogon(false);
+		}
+	}
+
+	bool MainFrame::PromptRepentogonInstallation() {
+		wxMessageDialog dialog(this, "No valid REPENTOGON installation found.\nDo you want to install now ?", "REPENTOGON Installation", wxYES_NO | wxCANCEL);
+		int result = dialog.ShowModal();
+		return result == wxID_OK || result == wxID_YES;
 	}
 
 	bool MainFrame::CheckIsaacVersion() {
 		Log("Checking Isaac version...");
-		WIN32_FIND_DATAA isaac;
-		memset(&isaac, 0, sizeof(isaac));
-		HANDLE isaacFile = FindFirstFileA("isaac-ng.exe", &isaac);
-		if (isaacFile == INVALID_HANDLE_VALUE) {
+		if (!_updater.CheckIsaacInstallation()) {
 			LogError("Unable to find isaac-ng.exe");
 			return false;
 		}
-		FindClose(isaacFile);
 
-		DWORD size = isaac.nFileSizeLow;
-		char* content = (char*)malloc(size + 2);
-		if (!content) {
-			LogError("Unable to allocate memory to read game's executable, aborting");
-			return false;
-		}
-
-		FILE* exe = fopen(isaac.cFileName, "rb");
-		fread(content, 1, size, exe);
-		content[size] = '\0';
-		/* std::string sha256Str;
-		CryptoPP::SHA256 sha256;
-		CryptoPP::StringSource(content, true,
-			new CryptoPP::HashFilter(sha256,
-				new CryptoPP::HexEncoder(
-					new CryptoPP::StringSink(sha256Str)
-				)
-			)
-		); */
-		BCRYPT_ALG_HANDLE alg;
-		NTSTATUS err = BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
-		DWORD buffSize;
-		DWORD dummy;
-		err = BCryptGetProperty(alg, BCRYPT_OBJECT_LENGTH, (unsigned char*)&buffSize, sizeof(buffSize), &dummy, 0);
-		BCRYPT_HASH_HANDLE hashHandle;
-		unsigned char* hashBuffer = (unsigned char*)malloc(buffSize);
-		err = BCryptCreateHash(alg, &hashHandle, hashBuffer, buffSize, NULL, 0, 0);
-		err = BCryptHashData(hashHandle, (unsigned char*)content, size, 0);
-		DWORD hashSize;
-		err = BCryptGetProperty(alg, BCRYPT_HASH_LENGTH, (unsigned char*)&hashSize, sizeof(hashSize), &dummy, 0);
-		unsigned char* hash = (unsigned char*)malloc(hashSize);
-		char* hashHex = (char*)malloc(hashSize * 2 + 1);
-		err = BCryptFinishHash(hashHandle, hash, hashSize, 0);
-		free(hashBuffer);
-		err = BCryptCloseAlgorithmProvider(&alg, 0);
-
-		for (int i = 0; i < hashSize; ++i) {
-			sprintf(hashHex + 2 * i, "%02hhx", hash[i]);
-		}
-
-		// const char* sha256p = sha256Str.c_str();
-		Log("\tFound isaac-ng.exe. Hash: %s", hashHex);
-		Version const* version = GetVersion(hashHex);
+		Version const* version = _updater.GetIsaacVersion();
 		if (!version) {
-			LogError("Unknown version. REPENTOGON will not launch.");
-			return false;
-		}
-		else if (!version->valid) {
-			LogError("This version of the game does not support REPENTOGON.");
+			LogError("Unknown Isaac version. REPENTOGON will not launch.");
 			return false;
 		}
 
-		free(hash);
+		Log("Identified Isaac version %s: ", version->version);
+		if (!version->valid) {
+			LogError("this version of the game does not support REPENTOGON.");
+		}
+		else {
+			Log("this version of the game is compatible with REPENTOGON.");
+		}
 
-		Log("\tIdentified REPENTOGON compatible version %s", version->version);
-
-		return true;
+		return version->valid;
 	}
 
 	bool MainFrame::CheckRepentogonInstallation() {
 		Log("Checking Repentogon installation...");
-		const char** file = mandatoryFileNames;
-		bool ok = true;
-		while (*file) {
-			if (FileExists(*file)) {
-				Log("\t%s: found", *file);
+		if (_updater.CheckRepentogonInstallation()) {
+			Log("Found a valid Repentogon installation: ");
+			Log("\tZHL version: %s", _updater.GetZHLVersion().c_str());
+			Log("\tRepentogon version: %s", _updater.GetRepentogonVersion().c_str());
+
+			if (_updater.GetRepentogonInstallationState() == REPENTOGON_INSTALLATION_STATE_LEGACY) {
+				LogWarn("\tFound legacy dsound.dll");
+
 			}
-			else {
-				ok = false;
-				LogError("\t%s: not found", *file);
-			}
 
-			++file;
-		}
-
-		if (FileExists("dsound.dll")) {
-			wxMessageDialog dialog(NULL, wxT("Found dsound.dll from a previous Repentogon version. This file needs to be deleted. Do you want the launcher to do it?"),
-				"Warning", wxYES_NO | wxYES_DEFAULT | wxICON_WARNING);
-			// Weirdly, if these methods are not called, the constructor alone is not enough to set the style and title.
-			// dialog.SetTitle("Warning");
-			// dialog.SetMessageDialogStyle(wxYES_NO | wxYES_DEFAULT | wxICON_WARNING);
-
-			int result = dialog.ShowModal();
-			if (result == wxID_YES) {
-				DeleteFileA("dsound.dll");
-			}
-			else {
-				LogWarn("Found dsound.dll from a previous Repentogon version. Keeping this file may cause Repentogon to crash");
-			}
-		}
-
-		return ok;
-	}
-
-	bool MainFrame::CheckRepentogonVersion() {
-		Log("Checking Repentogon version...");
-		HMODULE repentogon = LoadLibraryExA("zhlRepentogon.dll", NULL, DONT_RESOLVE_DLL_REFERENCES);
-		if (!repentogon) {
-			LogError("Unable to open zhlRepentogon.dll");
-			return false;
-		}
-
-		HMODULE zhl = LoadLibraryExA("libzhl.dll", NULL, DONT_RESOLVE_DLL_REFERENCES);
-		if (!zhl) {
-			FreeLibrary(repentogon);
-			LogError("Unable to open libzhl.dll");
-			return false;
-		}
-
-		bool result = false;
-		FARPROC repentogonVersion = GetProcAddress(repentogon, "__REPENTOGON_VERSION");
-		FARPROC zhlVersion = GetProcAddress(zhl, "__ZHL_VERSION");
-
-		const char* repentogonVersionStr = nullptr;
-		const char* zhlVersionStr = nullptr;
-
-		if (!repentogonVersion) {
-			LogError("Unable to get Repentogon's version (%d)", GetLastError());
-			result = false;
-			goto end;
-		}
-
-		if (!zhlVersion) {
-			LogError("Unable to get ZHL's version");
-			result = false;
-			goto end;
-		}
-
-		repentogonVersionStr = *(const char**)repentogonVersion;
-		zhlVersionStr = *(const char**)zhlVersion;
-
-		Log("\tFound Repentogon version %s", repentogonVersionStr);
-		Log("\tFound ZHL version %s", zhlVersionStr);
-
-		if (strcmp(repentogonVersionStr, zhlVersionStr)) {
-			LogError("Repentogon/ZHL version mismatch");
-			result = false;
-			goto end;
-		}
-
-		Log("\tRepentogon and ZHL versions match");
-
-		_repentogonVersion = (char*)malloc(strlen(zhlVersionStr) + 1);
-		if (!_repentogonVersion) {
-			LogError("Unable to allocate memory to store version of Repentogon. Update checking will not work");
+			return true;
 		}
 		else {
-			strcpy(_repentogonVersion, zhlVersionStr);
-		}
-		result = true;
+			Log("Found no valid installation of Repentogon: ");
+			std::vector<FoundFile> const& files = _updater.GetRepentogonInstallationFilesState();
+			for (FoundFile const& file : files) {
+				if (file.found) {
+					Log("\t%s: found", file.filename.c_str());
+				}
+				else {
+					Log("\t%s: not found", file.filename.c_str());
+				}
+			}
 
-	end:
-		FreeLibrary(repentogon);
-		FreeLibrary(zhl);
-		return result;
+			bool zhlVersionAvailable = false, repentogonVersionAvailable = false;
+			if (_updater.WasLibraryLoaded(LOADABLE_DLL_ZHL)) {
+				std::string const& zhlVersion = _updater.GetZHLVersion();
+				if (zhlVersion.empty()) {
+					Log("\tlibzhl.dll: unable to find version");
+				}
+				else {
+					zhlVersionAvailable = true;
+					Log("\tlibzhl.dll: found version %s", zhlVersion.c_str());
+				}
+			}
+			else {
+				Log("\tlibzhl.dll: Unable to load");
+			}
+
+			if (_updater.WasLibraryLoaded(LOADABLE_DLL_REPENTOGON)) {
+				std::string const& repentogonVersion = _updater.GetRepentogonVersion();
+				if (repentogonVersion.empty()) {
+					Log("\tzhlRepentogon.dll: unable to find version");
+				}
+				else {
+					repentogonVersionAvailable = true;
+					Log("\tzhlRepentogon.dll: found version %s", repentogonVersion.c_str());
+				}
+			}
+			else {
+				Log("\tzhlRepentogon.dll: Unable to load");
+			}
+
+			if (zhlVersionAvailable && repentogonVersionAvailable) {
+				if (_updater.RepentogonZHLVersionMatch()) {
+					Log("\tZHL / Repentogon version match");
+				}
+				else {
+					Log("\tZHL / Repentogon version mismatch");
+				}
+			}
+
+			return false;
+		}
 	}
 
 	void MainFrame::Log(const char* fmt, ...) {
@@ -512,12 +427,29 @@ namespace IsaacLauncher {
 		int count = vsnprintf(buffer, 4096, fmt, va);
 		va_end(va);
 
-		if (count == 0)
+		if (count <= 0)
 			return;
 
 		wxString text(buffer);
-		if (buffer[count] != '\n')
+		if (buffer[count - 1] != '\n')
 			text += '\n';
+
+		std::unique_lock<std::mutex> lck(_logMutex);
+		_logWindow->AppendText(text);
+	}
+
+	void MainFrame::LogNoNL(const char* fmt, ...) {
+		char buffer[4096];
+		va_list va;
+		va_start(va, fmt);
+		int count = vsnprintf(buffer, 4096, fmt, va);
+		va_end(va);
+
+		if (count <= 0)
+			return;
+
+		wxString text(buffer);
+		std::unique_lock<std::mutex> lck(_logMutex);
 		_logWindow->AppendText(text);
 	}
 
@@ -528,17 +460,19 @@ namespace IsaacLauncher {
 		int count = vsnprintf(buffer, 4096, fmt, va);
 		va_end(va);
 
-		if (count == 0)
+		if (count <= 0)
 			return;
 
 		wxString text(buffer);
 		text.Prepend("[WARN] ");
-		if (buffer[count] != '\n')
+		if (buffer[count - 1] != '\n')
 			text += '\n';
 
 		wxTextAttr attr = _logWindow->GetDefaultStyle();
 		wxColour color;
 		color.Set(235, 119, 52);
+
+		std::unique_lock<std::mutex> lck(_logMutex);
 		_logWindow->SetDefaultStyle(wxTextAttr(color));
 		_logWindow->AppendText(text);
 		_logWindow->SetDefaultStyle(attr);
@@ -551,14 +485,16 @@ namespace IsaacLauncher {
 		int count = vsnprintf(buffer, 4096, fmt, va);
 		va_end(va);
 
-		if (count == 0)
+		if (count <= 0)
 			return;
 
 		wxString text(buffer);
 		text.Prepend("[ERROR] ");
-		if (buffer[count] != '\n')
+		if (buffer[count - 1] != '\n')
 			text += '\n';
+
 		wxTextAttr attr = _logWindow->GetDefaultStyle();
+		std::unique_lock<std::mutex> lck(_logMutex);
 		_logWindow->SetDefaultStyle(wxTextAttr(*wxRED));
 		_logWindow->AppendText(text);
 		_logWindow->SetDefaultStyle(attr);
@@ -599,22 +535,6 @@ namespace IsaacLauncher {
 		return box;
 	}
 
-	void MainFrame::CheckVersionsAndInstallation() {
-		if (!CheckIsaacVersion()) {
-			return;
-		}
-
-		if (!CheckRepentogonInstallation()) {
-			return;
-		}
-
-		if (!CheckRepentogonVersion()) {
-			return;
-		}
-
-		_enabledRepentogon = true;
-	}
-
 	void MainFrame::InitializeOptions() {
 		INIReader reader(std::string("launcher.ini"));
 		if (reader.ParseError() == -1) {
@@ -623,8 +543,9 @@ namespace IsaacLauncher {
 			_options.level_stage = Defaults::levelStage;
 			_options.lua_debug = Defaults::luaDebug;
 			_options.lua_heap_size = Defaults::luaHeapSize;
-			_options.mode = _enabledRepentogon ? LAUNCH_MODE_REPENTOGON : LAUNCH_MODE_VANILLA;
+			_options.mode = _hasRepentogon ? LAUNCH_MODE_REPENTOGON : LAUNCH_MODE_VANILLA;
 			_options.stage_type = Defaults::stageType;
+			_options.update = Defaults::update;
 		}
 		else {
 			Log("Found configuration file launcher.ini");
@@ -634,10 +555,11 @@ namespace IsaacLauncher {
 			_options.lua_heap_size = reader.GetInteger(Sections::vanilla, Keys::luaHeapSize, Defaults::luaHeapSize);
 			_options.stage_type = reader.GetInteger(Sections::vanilla, Keys::stageType, Defaults::stageType);
 			_options.mode = (LaunchMode)reader.GetInteger(Sections::shared, Keys::launchMode, LAUNCH_MODE_REPENTOGON);
+			_options.update = reader.GetBoolean(Sections::repentogon, Keys::update, Defaults::update);
 
 			if (_options.mode != LAUNCH_MODE_REPENTOGON && _options.mode != LAUNCH_MODE_VANILLA) {
 				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.mode, Keys::launchMode);
-				if (_enabledRepentogon) {
+				if (_hasRepentogon) {
 					_options.mode = LAUNCH_MODE_REPENTOGON;
 				}
 				else {
@@ -773,86 +695,79 @@ namespace IsaacLauncher {
 		fclose(f);
 	}
 
-	bool MainFrame::CheckRepentogonUpdates() {
-		return CheckUpdates("https://api.github.com/repos/TeamREPENTOGON/REPENTOGON/releases/latest", _repentogonVersion);
+	bool MainFrame::DoRepentogonUpdate(rapidjson::Document& response) {
+		RepentogonUpdateResult result = _updater.UpdateRepentogon(response);
+		RepentogonUpdateState const& state = _updater.GetRepentogonUpdateState();
+		switch (result) {
+		case REPENTOGON_UPDATE_RESULT_MISSING_ASSET:
+			LogError("Could not install Repentogon: bad assets in release information\n");
+			LogError("Found hash.txt: %s\n", state.hashOk ? "yes" : "no");
+			LogError("Found REPENTOGON.zip: %s\n", state.zipOk ? "yes" : "no");
+			break;
+
+		case REPENTOGON_UPDATE_RESULT_DOWNLOAD_ERROR:
+			LogError("Could not install Repentogon: download error\n");
+			LogError("Downloaded hash.txt: %s\n", state.hashFile ? "yes" : "no");
+			LogError("Downloaded REPENTOGON.zip: %s\n", state.zipFile ? "yes" : "no");
+			break;
+
+		case REPENTOGON_UPDATE_RESULT_BAD_HASH:
+			LogError("Could not install Repentogon: bad archive hash\n");
+			LogError("Expected hash \"%s\", got \"%s\"\n", state.hash.c_str(), state.zipHash.c_str());
+			break;
+
+		case REPENTOGON_UPDATE_RESULT_EXTRACT_FAILED:
+		{
+			int i = 0;
+			LogError("Could not install Repentogon: error while extracting archive\n");
+			for (auto const& [filename, success] : state.unzipedFiles) {
+				if (filename.empty()) {
+					LogError("Could not extract file %d from the archive\n", i);
+				}
+				else {
+					LogError("Extracted %s: %s\n", filename.c_str(), success ? "yes" : "no");
+				}
+			}
+			break;
+		}
+
+		case REPENTOGON_UPDATE_RESULT_OK:
+			Log("Successfully installed latest Repentogon release\n");
+			break;
+
+		default:
+			LogError("Unknown error code from Updater::UpdateRepentogon: %d\n", result);
+		}
+
+		return result == REPENTOGON_UPDATE_RESULT_OK;
 	}
 
-	bool MainFrame::CheckSelfUpdates() {
-		return CheckUpdates("", "dev");
+	bool MainFrame::DoSelfUpdate(rapidjson::Document& response) {
+		return false;
 	}
 
-	bool MainFrame::CheckUpdates(const char* url, const char* currentVersion) {
-		if (!strcmp(currentVersion, "nightly") || !strcmp(currentVersion, "dev")) {
-			Log("Skipping updates checks: nightly version detected");
+	void MainFrame::ForceUpdate(wxCommandEvent& event) { 
+		DownloadAndInstallRepentogon(true);
+	}
+
+	void MainFrame::DownloadAndInstallRepentogon(bool force) {
+		rapidjson::Document document;
+		if (!DoCheckRepentogonUpdates(document, force)) {
+			return;
 		}
 
-		Log("Checking updates of %s at %s. Currently installed version is %s", _currentUpdate.c_str(), url, currentVersion);
-		CURL* curl;
-		CURLcode curlResult; 
+		DoRepentogonUpdate(document);
+	}
 
-		curl = curl_easy_init();
-		if (!curl) {
-			LogError("Error while initializing cURL session", _currentUpdate.c_str());
-			return false;
-		}
-		else {
-			Log("\tInitialized cURL session");
-		}
-
-		ScopedCURL session(curl);
-
-		struct curl_slist* curlHeaders = NULL;
-		const char* headers[] = {
-			"Accept: application/vnd.github+json",
-			"X-GitHub-Api-Version: 2022-11-28",
-			"User-Agent: REPENTOGON",
-			NULL
-		};
-
-		for (const char* header : headers) {
-			curlHeaders = curl_slist_append(curlHeaders, header);
-		}
-
-		std::string response;
-		curl_easy_setopt(curl, CURLOPT_URL, url);
-		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, OnCurlResponse);
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, curlHeaders);
-
-		curl_easy_setopt(curl, CURLOPT_SERVER_RESPONSE_TIMEOUT, 5);
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30);
-
-		Log("\tPerforming HTTP request at %s", url);
-		curlResult = curl_easy_perform(curl);
-		if (curlResult != CURLE_OK) {
-			LogError("Error while performing HTTP request to retrieve version information about %s\ncURL error: %s", _currentUpdate.c_str(), curl_easy_strerror(curlResult));
-			return false;
-		}
-
-		Log("\tSucessfully received HTTP response");
-
-		rapidjson::Document doc;
-		doc.Parse(response.c_str());
-
-		if (doc.HasParseError()) {
-			LogError("Error while parsing HTTP response. rapidjson error code %d", doc.GetParseError());
-			return false;
-		}
-
-		if (!doc.HasMember("name")) {
-			LogError("Malformed HTTP response: no field called \"name\"");
-			return false;
-		}
-
-		const char* remoteVersion = doc["name"].GetString();
-		if (strcmp(remoteVersion, currentVersion)) {
-			Log("\tNew version available: %s", remoteVersion);
+	bool MainFrame::DoCheckRepentogonUpdates(rapidjson::Document& document, 
+		bool force) {
+		VersionCheckResult result = _updater.CheckRepentogonUpdates(document);
+		if (result == VERSION_CHECK_NEW)
 			return true;
-		}
-		else {
-			Log("\t%s is up-to-date", _currentUpdate.c_str());
-			return false;
-		}
+
+		if (result == VERSION_CHECK_UTD)
+			return force;
+
+		return false;
 	}
 }

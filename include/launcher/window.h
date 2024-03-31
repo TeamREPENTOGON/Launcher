@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include <wx/wxprec.h>
 
 #ifndef WX_PRECOMP
@@ -7,19 +9,13 @@
 	#include <wx/gbsizer.h>
 #endif
 
+#include "curl/curl.h"
 #include "launcher/launcher.h"
+#include "launcher/updater.h"
 #include "rapidjson/document.h"
 
 namespace IsaacLauncher {
-	static constexpr const char* version = "alpha";
-
-	struct Version {
-		const char* hash;
-		const char* version;
-		bool valid;
-	};
-
-	extern Version const knownVersions[];
+	class MainFrame;
 
 	enum Windows {
 		WINDOW_COMBOBOX_LEVEL,
@@ -28,7 +24,8 @@ namespace IsaacLauncher {
 		WINDOW_CHECKBOX_REPENTOGON_UPDATES,
 		WINDOW_CHECKBOX_VANILLA_LUADEBUG,
 		WINDOW_TEXT_VANILLA_LUAHEAPSIZE,
-		WINDOW_BUTTON_LAUNCH_BUTTON
+		WINDOW_BUTTON_LAUNCH_BUTTON,
+		WINDOW_BUTTON_FORCE_UPDATE
 	};
 
 	class App : public wxApp {
@@ -40,6 +37,7 @@ namespace IsaacLauncher {
 	public:
 		MainFrame();
 
+		void LogNoNL(const char* fmt, ...);
 		void Log(const char* fmt, ...);
 		void LogWarn(const char* fmt, ...);
 		void LogError(const char* fmt, ...);
@@ -49,6 +47,8 @@ namespace IsaacLauncher {
 		static bool FileExists(const char* name);
 
 	private:
+		Updater _updater;
+
 		/* Window building. */
 		void AddLaunchOptions();
 		void AddRepentogonOptions();
@@ -67,22 +67,28 @@ namespace IsaacLauncher {
 		 * by comparing the "name" field of the latest release on GitHub with the 
 		 * version global of ZHL / Repentogon.
 		 */
-		bool CheckRepentogonUpdates();
+		std::optional<rapidjson::Document> CheckRepentogonUpdates();
 
 		/* Check if there is a launcher update available. This check is performed 
 		 * by comparing the "name" field of the latest release on GitHub with the 
 		 * version global of the launcher.
 		 */
-		bool CheckSelfUpdates();
+		std::optional<rapidjson::Document> CheckSelfUpdates();
 
 		/* Check for the availability of updates. This check is performed by 
 		 * comparing the "name" field of the latest release at the given url with
 		 * the currentVersion.
 		 */
-		bool CheckUpdates(const char* url, const char* currentVersion);
+		std::optional<rapidjson::Document> CheckUpdates(const char* url, const char* currentVersion);
 
-		void DoRepentogonUpdate(const char* url, const char* currentVersion, rapidjson::Document& document);
-		void DoSelfUpdate(const char* url, const char* currentVersion, rapidjson::Document& document);
+		bool DoRepentogonUpdate(rapidjson::Document& document);
+		bool DoSelfUpdate(rapidjson::Document& document);
+
+		/* Function to be run in a thread in order to download the latest Repentogon 
+		 * release when checking for updates. The main thread will block but the log
+		 * window will still update.
+		 */
+		void DownloadLatestRelease();
 
 		/* Initialize the IsaacOptions structure. */
 		void InitializeOptions();
@@ -100,13 +106,45 @@ namespace IsaacLauncher {
 		void OnLauchModeSelect(wxCommandEvent& event);
 		void OnCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
+		void ForceUpdate(wxCommandEvent& event);
 		void Launch(wxCommandEvent& event);
 		void Inject();
 
 		/* Post init stuff. */
 		bool CheckIsaacVersion();
 		bool CheckRepentogonInstallation();
-		bool CheckRepentogonVersion();
+
+		/* Prompt the user for a Repentogon installation. This is useful if we 
+		 * don't detect a valid Repentogon installation. 
+		 * 
+		 * Return true if the user wants a download, false otherwise.
+		 */
+		bool PromptRepentogonInstallation();
+
+		/* Download and install the latest release of Repentogon.
+		 * 
+		 * Parameter force indicates whether the function will download and 
+		 * install the latest release even if the installation is up-to-date.
+		 * 
+		 * If a Repentogon installation has been detected, the function will 
+		 * check for the presence of dsound.dll, asking the user if they want 
+		 * that file deleted should it be found.
+		 */
+		void DownloadAndInstallRepentogon(bool force);
+
+		/* Check if an update is available. 
+		 * 
+		 * Parameter force will cause the function to consider that an update is
+		 * available even if the installation is up-to-date.
+		 * 
+		 * Return false if the request for up-to-dateness fails in any way.
+		 * Return true if there is an update available.
+		 * Return false if the request succeeds, and the installation is up-to-date
+		 * and force is false.
+		 * Return true if the request succeeds, and the installation is up-to-date
+		 * and force is true.
+		 */
+		bool DoCheckRepentogonUpdates(rapidjson::Document& document, bool force);
 
 		IsaacOptions _options;
 		wxGridBagSizer* _grid;
@@ -115,12 +153,15 @@ namespace IsaacLauncher {
 		wxComboBox* _levelSelect;
 		wxComboBox* _launchMode;
 		wxTextCtrl* _luaHeapSize;
+
+		std::mutex _logMutex;
 		wxTextCtrl* _logWindow;
 		char* _repentogonVersion;
 		/* Log string used in CheckUpdates to indicate which tool is being checked. */
 		std::string _currentUpdate;
 
-		bool _enabledRepentogon;
+		bool _hasIsaac = false;
+		bool _hasRepentogon = false;
 
 		wxDECLARE_EVENT_TABLE();
 	};

@@ -1,3 +1,7 @@
+#include <WinSock2.h>
+#include <Windows.h>
+#include <ImageHlp.h>
+
 #include <cstdio>
 #include <cstring>
 #include <ctime>
@@ -7,6 +11,7 @@
 #include <wx/wx.h>
 
 #include "launcher/launcher.h"
+#include "launcher/logger.h"
 #include "launcher/window.h"
 
 /* Perform the early setup for the injection: create the Isaac process, 
@@ -54,6 +59,58 @@ void GenerateCLI(const struct IsaacOptions* options, char cli[256]) {
 	}
 }
 
+#pragma code_seg(push, r1, ".trampo")
+DWORD WINAPI LoadDLLs(LPVOID) {
+	HMODULE zhl = LoadLibraryA("libzhl.dll");
+	if (!zhl) {
+		Log("[ERROR] Unable to load ZHL\n");
+		return -1;
+	}
+
+	FARPROC init = GetProcAddress(zhl, "InitZHL");
+	if (!init) {
+		Log("[ERROR] \"Init\" function not found in libzhl.dll\n");
+		FreeLibrary(zhl);
+		return -1;
+	}
+
+	if (init()) {
+		Log("[ERROR] Error while loading ZHL. Check zhl.log / libzhl.log\n");
+		return -1;
+	}
+
+	WIN32_FIND_DATAA data;
+	memset(&data, 0, sizeof(data));
+	HANDLE files = FindFirstFileA("zhl*.dll", &data);
+	BOOL ok = (files != INVALID_HANDLE_VALUE);
+	while (ok) {
+		if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+			HMODULE mod = LoadLibraryA(data.cFileName);
+			if (!mod) {
+				Log("[ERROR] Error while loading mod %s\n", data.cFileName);
+			}
+			else {
+				init = GetProcAddress(mod, "ModInit");
+				if (!init) {
+					Log("[ERROR] \"ModInit\" function not found in mod %s\n", data.cFileName);
+					FreeLibrary(mod);
+				}
+				else {
+					if (init()) {
+						Log("[ERROR] Error while loading mod %s\n", data.cFileName);
+						FreeLibrary(mod);
+					}
+				}
+			}
+		}
+		ok = FindNextFileA(files, &data);
+	}
+
+	FindClose(files);
+	return 0;
+}
+#pragma code_seg(pop, r1)
+
 DWORD CreateIsaac(struct IsaacOptions const* options, PROCESS_INFORMATION* processInfo) {
 	STARTUPINFOA startupInfo;
 	memset(&startupInfo, 0, sizeof(startupInfo));
@@ -76,100 +133,50 @@ DWORD CreateIsaac(struct IsaacOptions const* options, PROCESS_INFORMATION* proce
 }
 
 int UpdateMemory(HANDLE process, PROCESS_INFORMATION const* processInfo, void** page, size_t* functionOffset) {
-	void* remotePage = VirtualAllocEx(process, NULL, 4096, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+	HMODULE self = GetModuleHandle(NULL);
+	PIMAGE_NT_HEADERS ntHeaders = ImageNtHeader(self);
+	char* base = (char*)&(ntHeaders->OptionalHeader);
+	base += ntHeaders->FileHeader.SizeOfOptionalHeader;
+	IMAGE_SECTION_HEADER* headers = (IMAGE_SECTION_HEADER*)base;
+	bool found = false;
+	for (int i = 0; i < ntHeaders->FileHeader.NumberOfSections; ++i) {
+		if (!strcmp((char*)headers->Name, ".trampo")) {
+			found = true;
+			break;
+		}
+		++headers;
+	}
+
+	if (!found) {
+		Log("[ERROR] Unable to find section \".trampo\"\n");
+		return -1;
+	}
+
+	void* remotePage = VirtualAllocEx(process, NULL, headers->Misc.VirtualSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 	if (!remotePage) {
-		Log("Failed to allocate memory in isaac-ng.exe to load the dsound DLL: %d\n", GetLastError());
+		Log("[ERROR] Failed to allocate memory in isaac-ng.exe to load the dsound DLL: %d\n", GetLastError());
 		return -1;
 	}
 	else {
-		Log("Allocated memory for remote thread at %p\n", remotePage);
+		Log("[INFO] Allocated memory for remote thread at %p\n", remotePage);
 	}
 
 	SIZE_T bytesWritten = 0;
-	char zeroBuffer[4096];
-	memset(zeroBuffer, 0, sizeof(zeroBuffer));
-	WriteProcessMemory(process, remotePage, zeroBuffer, 4096, &bytesWritten);
-
-	HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
-	if (!kernel32) {
-		Log("Unable to find kernel32.dll, WTF\n");
-		return -1;
-	}
-	else {
-		Log("Acquired kernel32.dll at %p\n", kernel32);
-	}
-
-	FARPROC getProcAddress = GetProcAddress(kernel32, "GetProcAddress");
-	FARPROC loadLibraryA = GetProcAddress(kernel32, "LoadLibraryA");
-
-	if (!getProcAddress) {
-		Log("Unable to find GetProcAddress\n");
+	BOOL ok = WriteProcessMemory(process, remotePage, (char*)self + headers->VirtualAddress, headers->Misc.VirtualSize, &bytesWritten);
+	if (!ok) {
+		Log("[ERROR] Unable to write content of .trampo into the Isaac process: %d\n", GetLastError());
+		VirtualFreeEx(process, remotePage, 0, MEM_RELEASE);
 		return -1;
 	}
 
-	if (!loadLibraryA) {
-		Log("Unable to find LoadLibraryA\n");
-		return -1;
+	DWORD dummy;
+	ok = VirtualProtectEx(process, NULL, headers->Misc.VirtualSize, PAGE_EXECUTE_READ, &dummy);
+	if (!ok) {
+		Log("[WARN] Unable to change protection on pages to RX (from RWX): %d\n", GetLastError());
 	}
-
-	Log("Acquired GetProcAddress at %p, LoadLibraryA at %p\n", getProcAddress, loadLibraryA);
-
-	const char* dllName = "launcher.dll";
-	const char* functionName = "LaunchZHL";
-	size_t offset = 0;
-	// 0x0
-	WriteProcessMemory(process, remotePage, &getProcAddress, sizeof(getProcAddress), &bytesWritten);
-	offset += bytesWritten;
-	// 0x4
-	WriteProcessMemory(process, (char*)remotePage + offset, &loadLibraryA, sizeof(loadLibraryA), &bytesWritten);
-	offset += bytesWritten;
-	// 0x8
-	WriteProcessMemory(process, (char*)remotePage + offset, dllName, strlen(dllName), &bytesWritten);
-	offset += (bytesWritten + 1);
-	// 0x16 (0x15 is a '\0')
-	WriteProcessMemory(process, (char*)remotePage + offset, functionName, strlen(functionName), &bytesWritten);
-	offset += (bytesWritten + 1);
-
-	*functionOffset = offset;
-
-	/* 0x21 (0x20 is a '\0')
-	 * Call LoadLibraryA in the remote thread.
-	 * The thread will push the name of the DLL from its stack.
-	 * It will then call LoadLibraryA.
-	 *
-	 * This function is a THREAD_START_ROUTINE, with the following signature :
-	 * DWORD WINAPI(LPVOID);
-	 *
-	 * WINAPI is __stdcall: arguments are pushed in reverse order on the stack and callee cleans the stack.
-	 */
-	char hook[128] = {
-		"\x55" // push ebp
-		"\x89\xe5" // mov ebp, esp
-		"\x53" // push ebx
-		"\x56" // push esi
-		"\x57" // push edi
-		"\x3e\x8b\x5d\x08" // mov ebx, dword ptr ds:[ebp+8], put parameter in ebx
-		"\x8b\x73\x04" // mov esi, dword ptr ds:[ebx+4], put LoadLibraryA in esi
-		"\x8d\x7b\x08" // lea edi, [ebx+8], put dllname in edi
-		"\x57" // push edi, push dllname on stack
-		"\xff\xd6" // call esi, call LoadLibraryA("launcher.dll")
-		"\x8d\x7b\x15" // lea edi, [ebx + 0x15], put function name in edi
-		"\x57" // push edi, put function name on stack
-		"\x50" // push eax, put library on stack
-		"\x8b\x33" // mov esi, dword ptr ds:[ebx], put GetProcAddress in esi
-		"\xff\xd6" // call esi, call GetProcAddress(lib, "LaunchZHL")
-		"\xff\xd0" // call eax, call LaunchZHL()
-		"\x5f" // pop edi
-		"\x5e" // pop esi
-		"\x5b" // pop ebx
-		"\x89\xec" // mov esp, ebp
-		"\xb8\x01\x00\x00\x00" // mov eax, 1
-		"\x5d" // pop ebp
-		"\xc2\x04\x00" // ret 4
-	};
-	WriteProcessMemory(process, (char*)remotePage + offset, hook, 128, &bytesWritten);
 
 	*page = remotePage;
+	*functionOffset = 0;
 	return 0;
 }
 
@@ -295,6 +302,7 @@ int InjectIsaac(int updates, int console, int lua_debug, int level_stage, int st
 }
 
 bool IsaacLauncher::App::OnInit() {
+	Logger::Init();
 	MainFrame* frame = new MainFrame();
 	frame->Show();
 	frame->PostInit();

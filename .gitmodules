@@ -13,3 +13,6 @@
 [submodule "deps/rapidjson"]
 	path = deps/rapidjson
 	url = git@github.com:Tencent/rapidjson.git
+[submodule "deps/libzip"]
+	path = deps/libzip
+	url = git@github.com:nih-at/libzip.git
