@@ -12,6 +12,7 @@
 #include "rapidjson/document.h"
 
 #include "curl/curl.h"
+#include "launcher/filesystem.h"
 #include "launcher/window.h"
 
 #include "zip.h"
@@ -21,18 +22,18 @@
 #undef min
 #endif
 
-wxBEGIN_EVENT_TABLE(IsaacLauncher::MainFrame, wxFrame)
-	EVT_COMBOBOX(IsaacLauncher::WINDOW_COMBOBOX_LEVEL, IsaacLauncher::MainFrame::OnLevelSelect)
-	EVT_COMBOBOX(IsaacLauncher::WINDOW_COMBOBOX_LAUNCH_MODE, IsaacLauncher::MainFrame::OnLauchModeSelect)
-	EVT_CHECKBOX(IsaacLauncher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, IsaacLauncher::MainFrame::OnOptionSelected)
-	EVT_CHECKBOX(IsaacLauncher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, IsaacLauncher::MainFrame::OnOptionSelected)
-	EVT_CHECKBOX(IsaacLauncher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, IsaacLauncher::MainFrame::OnOptionSelected)
-	EVT_TEXT(IsaacLauncher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, IsaacLauncher::MainFrame::OnCharacterWritten)
-	EVT_BUTTON(IsaacLauncher::WINDOW_BUTTON_LAUNCH_BUTTON, IsaacLauncher::MainFrame::Launch)
-	EVT_BUTTON(IsaacLauncher::WINDOW_BUTTON_FORCE_UPDATE, IsaacLauncher::MainFrame::ForceUpdate)
+wxBEGIN_EVENT_TABLE(Launcher::MainFrame, wxFrame)
+	EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::MainFrame::OnLevelSelect)
+	EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLauchModeSelect)
+	EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::MainFrame::OnOptionSelected)
+	EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::MainFrame::OnOptionSelected)
+	EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::MainFrame::OnOptionSelected)
+	EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnCharacterWritten)
+	EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::MainFrame::Launch)
+	EVT_BUTTON(Launcher::WINDOW_BUTTON_FORCE_UPDATE, Launcher::MainFrame::ForceUpdate)
 wxEND_EVENT_TABLE()
 
-namespace IsaacLauncher {
+namespace Launcher {
 	static std::tuple<wxFont, wxFont> MakeBoldFont(wxFrame* frame);
 	static wxComboBox* CreateLevelsComboBox(wxFrame* frame);
 
@@ -225,11 +226,11 @@ namespace IsaacLauncher {
 		if (std::regex_search(text, match, std::basic_regex("([0-9])\\.([0-9])"))) {
 			int stage = std::stoi(match[1].str(), NULL, 0);
 			int type = std::stoi(match[2].str(), NULL, 0);
-			_options.level_stage = stage;
-			_options.stage_type = type;
+			_options.levelStage = stage;
+			_options.stageType = type;
 		}
 		else if (!strcmp(text, "--")) {
-			_options.level_stage = _options.stage_type = 0;
+			_options.levelStage = _options.stageType = 0;
 		}
 	}
 
@@ -247,7 +248,7 @@ namespace IsaacLauncher {
 
 	void MainFrame::OnCharacterWritten(wxCommandEvent& event) {
 		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(event.GetEventObject());
-		_options.lua_heap_size = std::stoi(ctrl->GetValue().c_str().AsChar());
+		_options.luaHeapSize = std::stoi(ctrl->GetValue().c_str().AsChar());
 	}
 
 	void MainFrame::OnOptionSelected(wxCommandEvent& event) {
@@ -262,7 +263,7 @@ namespace IsaacLauncher {
 			break;
 
 		case WINDOW_CHECKBOX_VANILLA_LUADEBUG:
-			_options.lua_debug = box->GetValue();
+			_options.luaDebug = box->GetValue();
 			break;
 
 		default:
@@ -280,23 +281,81 @@ namespace IsaacLauncher {
 			Log("\t\tEnable Repentogon console window: %s", _options.console ? "yes" : "no");
 		}
 		Log("\tVanilla:");
-		if (_options.level_stage) {
-			Log("\t\tStarting stage: %d.%d", _options.level_stage, _options.stage_type);
+		if (_options.levelStage) {
+			Log("\t\tStarting stage: %d.%d", _options.levelStage, _options.stageType);
 		}
 		else {
 			Log("\t\tStarting stage: not selected");
 		}
-		Log("\t\tLua debug: %s", _options.lua_debug ? "yes" : "no");
-		Log("\t\tLua heap size: %dM", _options.lua_heap_size);
+		Log("\t\tLua debug: %s", _options.luaDebug ? "yes" : "no");
+		Log("\t\tLua heap size: %dM", _options.luaHeapSize);
 
 		WriteLauncherConfiguration();
+		::Launch(_options);
 	}
 
 	void MainFrame::PostInit() {
-		Log("Welcome to the REPENTOGON Launcher version %s", IsaacLauncher::version);
-		_hasIsaac = CheckIsaacVersion();
+		Log("Welcome to the REPENTOGON Launcher version %s", Launcher::version);
+		Log("Loading configuration...");
 
+		Launcher::fs::IsaacInstallationPathInitResult initState = _installation.InitFolders();
+		bool needConfigurationFileInput = false;
+		switch (initState) {
+		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_PROFILE_DIR:
+			LogError("No configuration file found in current dir and unable to access the Repentance save folder");
+			needConfigurationFileInput = true;
+			break;
+
+		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR:
+			LogError("No configuration file found in current dir and no Repentance save folder found");
+			needConfigurationFileInput = true;
+			break;
+
+		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_NO_CONFIG:
+			LogError("No configuration file found in current dir and none found in the Repentance save folder");
+			needConfigurationFileInput = true;
+			break;
+
+		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_OPEN_CONFIG:
+			LogError("Error while opening configuration file %s", _installation.GetLauncherConfigurationPath().c_str());
+			needConfigurationFileInput = true;
+			break;
+
+		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_PARSE_CONFIG:
+			LogError("Error while processing configuration file %s, syntax error on line %d\n",
+				_installation.GetLauncherConfigurationPath().c_str(),
+				_installation.GetConfigurationFileSyntaxErrorLine());
+			needConfigurationFileInput = true;
+			break;
+
+		default:
+			break;
+		}
+		
+		if (!needConfigurationFileInput) {
+			Log("Found configuration file %s", _installation.GetLauncherConfigurationPath().c_str());
+		}
+		else {
+			Launcher::fs::ConfigurationFileLocation location = PromptConfigurationFileLocation();
+			_installation.SetLauncherConfigurationPath(location);
+		}
+
+		_hasIsaac = CheckIsaacInstallation();
 		if (!_hasIsaac) {
+			std::string path;
+			bool repeat = false;
+			do {
+				path = PromptIsaacInstallation(repeat);
+				if (path.empty()) {
+					Log("Abandonning attempts at finding the Isaac installation folder\n");
+					return;
+				}
+				repeat = true;
+
+			} while (!_installation.SetIsaacInstallationFolder(path));
+		}
+
+		if (!CheckIsaacVersion()) {
 			return;
 		}
 
@@ -307,6 +366,9 @@ namespace IsaacLauncher {
 				DownloadAndInstallRepentogon(true);
 				checkUpdates = false;
 				_hasRepentogon = CheckRepentogonInstallation();
+			}
+			else {
+				checkUpdates = false;
 			}
 		}
 
@@ -328,14 +390,19 @@ namespace IsaacLauncher {
 		return result == wxID_OK || result == wxID_YES;
 	}
 
-	bool MainFrame::CheckIsaacVersion() {
-		Log("Checking Isaac version...");
-		if (!_updater.CheckIsaacInstallation()) {
+	bool MainFrame::CheckIsaacInstallation() {
+		Log("Checking Isaac installation...");
+		if (!_installation.CheckIsaacInstallation()) {
 			LogError("Unable to find isaac-ng.exe");
 			return false;
 		}
 
-		Version const* version = _updater.GetIsaacVersion();
+		return true;
+	}
+
+	bool MainFrame::CheckIsaacVersion() {
+		Log("Checking Isaac version...");
+		fs::Version const* version = _installation.GetIsaacVersion();
 		if (!version) {
 			LogError("Unknown Isaac version. REPENTOGON will not launch.");
 			return false;
@@ -354,12 +421,12 @@ namespace IsaacLauncher {
 
 	bool MainFrame::CheckRepentogonInstallation() {
 		Log("Checking Repentogon installation...");
-		if (_updater.CheckRepentogonInstallation()) {
+		if (_installation.CheckRepentogonInstallation()) {
 			Log("Found a valid Repentogon installation: ");
-			Log("\tZHL version: %s", _updater.GetZHLVersion().c_str());
-			Log("\tRepentogon version: %s", _updater.GetRepentogonVersion().c_str());
+			Log("\tZHL version: %s", _installation.GetZHLVersion().c_str());
+			Log("\tRepentogon version: %s", _installation.GetRepentogonVersion().c_str());
 
-			if (_updater.GetRepentogonInstallationState() == REPENTOGON_INSTALLATION_STATE_LEGACY) {
+			if (_installation.GetRepentogonInstallationState() == fs::REPENTOGON_INSTALLATION_STATE_LEGACY) {
 				LogWarn("\tFound legacy dsound.dll");
 
 			}
@@ -368,8 +435,8 @@ namespace IsaacLauncher {
 		}
 		else {
 			Log("Found no valid installation of Repentogon: ");
-			std::vector<FoundFile> const& files = _updater.GetRepentogonInstallationFilesState();
-			for (FoundFile const& file : files) {
+			std::vector<fs::FoundFile> const& files = _installation.GetRepentogonInstallationFilesState();
+			for (fs::FoundFile const& file : files) {
 				if (file.found) {
 					Log("\t%s: found", file.filename.c_str());
 				}
@@ -379,8 +446,8 @@ namespace IsaacLauncher {
 			}
 
 			bool zhlVersionAvailable = false, repentogonVersionAvailable = false;
-			if (_updater.WasLibraryLoaded(LOADABLE_DLL_ZHL)) {
-				std::string const& zhlVersion = _updater.GetZHLVersion();
+			if (_installation.WasLibraryLoaded(fs::LOADABLE_DLL_ZHL)) {
+				std::string const& zhlVersion = _installation.GetZHLVersion();
 				if (zhlVersion.empty()) {
 					Log("\tlibzhl.dll: unable to find version");
 				}
@@ -393,8 +460,8 @@ namespace IsaacLauncher {
 				Log("\tlibzhl.dll: Unable to load");
 			}
 
-			if (_updater.WasLibraryLoaded(LOADABLE_DLL_REPENTOGON)) {
-				std::string const& repentogonVersion = _updater.GetRepentogonVersion();
+			if (_installation.WasLibraryLoaded(fs::LOADABLE_DLL_REPENTOGON)) {
+				std::string const& repentogonVersion = _installation.GetRepentogonVersion();
 				if (repentogonVersion.empty()) {
 					Log("\tzhlRepentogon.dll: unable to find version");
 				}
@@ -408,7 +475,7 @@ namespace IsaacLauncher {
 			}
 
 			if (zhlVersionAvailable && repentogonVersionAvailable) {
-				if (_updater.RepentogonZHLVersionMatch()) {
+				if (_installation.RepentogonZHLVersionMatch()) {
 					Log("\tZHL / Repentogon version match");
 				}
 				else {
@@ -540,20 +607,24 @@ namespace IsaacLauncher {
 		if (reader.ParseError() == -1) {
 			Log("No configuration file found, using defaults");
 			_options.console = Defaults::console;
-			_options.level_stage = Defaults::levelStage;
-			_options.lua_debug = Defaults::luaDebug;
-			_options.lua_heap_size = Defaults::luaHeapSize;
+			_options.levelStage = Defaults::levelStage;
+			_options.luaDebug = Defaults::luaDebug;
+			_options.luaHeapSize = Defaults::luaHeapSize;
 			_options.mode = _hasRepentogon ? LAUNCH_MODE_REPENTOGON : LAUNCH_MODE_VANILLA;
-			_options.stage_type = Defaults::stageType;
-			_options.update = Defaults::update;
+			_options.stageType = Defaults::stageType;
+			// _options.update = Defaults::update;
+
+			wxMessageDialog dialog(this, "Do you want to have the launcher automatically update Repentogon?\n(Warning: this will be applied **immediately**)", "Auto-updates", wxYES_NO | wxCANCEL);
+			int result = dialog.ShowModal();
+			_options.update = (result == wxID_OK || result == wxID_YES);
 		}
 		else {
 			Log("Found configuration file launcher.ini");
 			_options.console = reader.GetBoolean(Sections::repentogon, Keys::console, Defaults::console);
-			_options.level_stage = reader.GetInteger(Sections::vanilla, Keys::levelStage, Defaults::levelStage);
-			_options.lua_debug = reader.GetBoolean(Sections::vanilla, Keys::luaDebug, Defaults::luaDebug);
-			_options.lua_heap_size = reader.GetInteger(Sections::vanilla, Keys::luaHeapSize, Defaults::luaHeapSize);
-			_options.stage_type = reader.GetInteger(Sections::vanilla, Keys::stageType, Defaults::stageType);
+			_options.levelStage = reader.GetInteger(Sections::vanilla, Keys::levelStage, Defaults::levelStage);
+			_options.luaDebug = reader.GetBoolean(Sections::vanilla, Keys::luaDebug, Defaults::luaDebug);
+			_options.luaHeapSize = reader.GetInteger(Sections::vanilla, Keys::luaHeapSize, Defaults::luaHeapSize);
+			_options.stageType = reader.GetInteger(Sections::vanilla, Keys::stageType, Defaults::stageType);
 			_options.mode = (LaunchMode)reader.GetInteger(Sections::shared, Keys::launchMode, LAUNCH_MODE_REPENTOGON);
 			_options.update = reader.GetBoolean(Sections::repentogon, Keys::update, Defaults::update);
 
@@ -567,45 +638,45 @@ namespace IsaacLauncher {
 				}
 			}
 
-			if (_options.lua_heap_size < 0) {
-				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.lua_heap_size, Keys::luaHeapSize.c_str());
-				_options.lua_heap_size = Defaults::luaHeapSize;
+			if (_options.luaHeapSize < 0) {
+				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.luaHeapSize, Keys::luaHeapSize.c_str());
+				_options.luaHeapSize = Defaults::luaHeapSize;
 			}
 
-			if (_options.level_stage < IsaacInterface::STAGE_NULL || _options.level_stage > IsaacInterface::STAGE8) {
-				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.level_stage, Keys::levelStage.c_str());
-				_options.level_stage = Defaults::levelStage;
-				_options.stage_type = Defaults::stageType;
+			if (_options.levelStage < IsaacInterface::STAGE_NULL || _options.levelStage > IsaacInterface::STAGE8) {
+				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.levelStage, Keys::levelStage.c_str());
+				_options.levelStage = Defaults::levelStage;
+				_options.stageType = Defaults::stageType;
 			}
 
-			if (_options.stage_type < IsaacInterface::STAGETYPE_ORIGINAL || _options.stage_type > IsaacInterface::STAGETYPE_REPENTANCE_B) {
-				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.stage_type, Keys::stageType.c_str());
-				_options.stage_type = Defaults::stageType;
+			if (_options.stageType < IsaacInterface::STAGETYPE_ORIGINAL || _options.stageType > IsaacInterface::STAGETYPE_REPENTANCE_B) {
+				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.stageType, Keys::stageType.c_str());
+				_options.stageType = Defaults::stageType;
 			}
 
-			if (_options.stage_type == IsaacInterface::STAGETYPE_GREEDMODE) {
+			if (_options.stageType == IsaacInterface::STAGETYPE_GREEDMODE) {
 				LogWarn("Value 3 (Greed mode) for %s field in launcher.ini is deprecated since Repentance."
 						"Overriding with default", Keys::stageType.c_str());
-				_options.stage_type = Defaults::stageType;
+				_options.stageType = Defaults::stageType;
 			}
 
 			// Validate stage type for Chapter 4.
-			if (_options.level_stage == IsaacInterface::STAGE4_1 || _options.level_stage == IsaacInterface::STAGE4_2) {
-				if (_options.stage_type == IsaacInterface::STAGETYPE_REPENTANCE_B) {
+			if (_options.levelStage == IsaacInterface::STAGE4_1 || _options.levelStage == IsaacInterface::STAGE4_2) {
+				if (_options.stageType == IsaacInterface::STAGETYPE_REPENTANCE_B) {
 					LogWarn("Invalid value %d for %s field associated with value %d "
-							"for %s field in launcher.ini. Overriding with default", _options.level_stage, Keys::levelStage.c_str(),
-							_options.stage_type, Keys::stageType.c_str());
-					_options.stage_type = Defaults::stageType;
+							"for %s field in launcher.ini. Overriding with default", _options.stageType, Keys::levelStage.c_str(),
+							_options.stageType, Keys::stageType.c_str());
+					_options.stageType = Defaults::stageType;
 				}
 			}
 
 			// Validate stage type for Chapters > 4.
-			if (_options.level_stage >= IsaacInterface::STAGE4_3 && _options.level_stage <= IsaacInterface::STAGE8) {
-				if (_options.stage_type != IsaacInterface::STAGETYPE_ORIGINAL) {
+			if (_options.levelStage >= IsaacInterface::STAGE4_3 && _options.levelStage <= IsaacInterface::STAGE8) {
+				if (_options.stageType != IsaacInterface::STAGETYPE_ORIGINAL) {
 					LogWarn("Invalid value %d for %s field associated with value %d "
-							"for %s field in launcher.ini. Overriding with default", _options.level_stage, Keys::levelStage.c_str(),
-							_options.stage_type, Keys::stageType.c_str());
-					_options.stage_type = Defaults::stageType;
+							"for %s field in launcher.ini. Overriding with default", _options.levelStage, Keys::levelStage.c_str(),
+							_options.stageType, Keys::stageType.c_str());
+					_options.stageType = Defaults::stageType;
 				}
 			}
 		}
@@ -618,10 +689,10 @@ namespace IsaacLauncher {
 
 		// stringstream sucks
 		char buffer[11];
-		sprintf(buffer, "%d", _options.lua_heap_size);
+		sprintf(buffer, "%d", _options.luaHeapSize);
 		_luaHeapSize->SetValue(wxString(buffer));
 
-		_luaDebug->SetValue(_options.lua_debug);
+		_luaDebug->SetValue(_options.luaDebug);
 		InitializeLevelSelectFromOptions();
 		if (_options.mode == LAUNCH_MODE_REPENTOGON) {
 			_launchMode->SetValue("Repentogon");
@@ -634,7 +705,7 @@ namespace IsaacLauncher {
 	}
 
 	void MainFrame::InitializeLevelSelectFromOptions() {
-		int level = _options.level_stage, type = _options.stage_type;
+		int level = _options.levelStage, type = _options.stageType;
 		std::string value;
 		if (level == 0) {
 			value = "--";
@@ -682,12 +753,13 @@ namespace IsaacLauncher {
 
 		fprintf(f, "[%s]\n", Sections::repentogon.c_str());
 		fprintf(f, "%s = %d\n", Keys::console.c_str(), _options.console);
+		fprintf(f, "%s = %d\n", Keys::update.c_str(), _options.update);
 
 		fprintf(f, "[%s]\n", Sections::vanilla.c_str());
-		fprintf(f, "%s = %d\n", Keys::levelStage.c_str(), _options.level_stage);
-		fprintf(f, "%s = %d\n", Keys::stageType.c_str(), _options.stage_type);
-		fprintf(f, "%s = %d\n", Keys::luaHeapSize.c_str(), _options.lua_heap_size);
-		fprintf(f, "%s = %d\n", Keys::luaDebug.c_str(), _options.lua_debug);
+		fprintf(f, "%s = %d\n", Keys::levelStage.c_str(), _options.levelStage);
+		fprintf(f, "%s = %d\n", Keys::stageType.c_str(), _options.stageType);
+		fprintf(f, "%s = %d\n", Keys::luaHeapSize.c_str(), _options.luaHeapSize);
+		fprintf(f, "%s = %d\n", Keys::luaDebug.c_str(), _options.luaDebug);
 		
 		fprintf(f, "[%s]\n", Sections::shared.c_str());
 		fprintf(f, "%s = %d\n", Keys::launchMode.c_str(), _options.mode);
@@ -761,7 +833,7 @@ namespace IsaacLauncher {
 
 	bool MainFrame::DoCheckRepentogonUpdates(rapidjson::Document& document, 
 		bool force) {
-		VersionCheckResult result = _updater.CheckRepentogonUpdates(document);
+		VersionCheckResult result = _updater.CheckRepentogonUpdates(document, _installation);
 		if (result == VERSION_CHECK_NEW)
 			return true;
 
@@ -769,5 +841,48 @@ namespace IsaacLauncher {
 			return force;
 
 		return false;
+	}
+
+	Launcher::fs::ConfigurationFileLocation MainFrame::PromptConfigurationFileLocation() {
+		wxString message("The launcher was not able to find a configuration file. If this is your first run, it is normal.\n");
+		std::string saveFolder = _installation.GetSaveFolder();
+		if (saveFolder.empty()) {
+			message += "The launcher was not able to find your user profile directory. As such, the configuration fille will be created next to the launcher.";
+			wxMessageDialog dialog(this, message, "Information", wxOK);
+			dialog.ShowModal();
+			return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
+		}
+		else {
+			message += "The launcher will proceed to create its configuration file.\n\n"
+				"You can decide whether you want that file to be installed next to the launcher, or in the same folder as the Repentance save files\n"
+				"The launcher identified your Repentance save folder as: ";
+			message += _installation.GetSaveFolder();
+			wxString options[] = {
+				"Install next to launcher",
+				"Install in Repentance save folder"
+			};
+			wxSingleChoiceDialog dialog(this, message, "Create the configuration file", 2, options);
+			dialog.ShowModal();
+
+			if (dialog.GetSelection() == 0) {
+				return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
+			}
+			else {
+				return Launcher::fs::CONFIG_FILE_LOCATION_SAVE;
+			}
+		}
+
+		return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
+	}
+
+	std::string MainFrame::PromptIsaacInstallation(bool repeat) {
+		wxString message("No Isaac installation found ");
+		if (repeat) {
+			message += "and previously selected folder does not contain isaac-ng.exe";
+		}
+		message += ", please select the folder containing isaac-ng.exe";
+		wxDirDialog dialog(this, message, wxEmptyString, wxDD_DIR_MUST_EXIST, wxDefaultPosition, wxDefaultSize, "Select Isaac folder");
+		dialog.ShowModal();
+		return dialog.GetPath().ToStdString();
 	}
 }

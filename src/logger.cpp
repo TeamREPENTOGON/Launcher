@@ -55,8 +55,19 @@ void Logger::Log(const char* prefix, const char* fmt, va_list va) {
 	char timeBuffer[4096];
 	strftime(timeBuffer, 4095, "[%Y-%m-%d %H:%M:%S] ", nowTm);
 	
-	fprintf(_file, prefix);
-	fprintf(_file, timeBuffer);
+	fprintf(_file, "%s", prefix);
+	fprintf(_file, "%s", timeBuffer);
 	vfprintf(_file, fmt, va);
 	fflush(_file);
+}
+
+static const char* MemoryError = "[FATAL] Out of memory: ";
+
+void Logger::Memory(const char* ctx) {
+	if (!Logger::_file) {
+		return;
+	}
+
+	fputs(MemoryError, _file);
+	fputs(ctx, _file);
 }

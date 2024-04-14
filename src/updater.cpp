@@ -9,27 +9,13 @@
 #include <curl/curl.h>
 
 #include "launcher/curl_handler.h"
+#include "launcher/filesystem.h"
 #include "launcher/logger.h"
 #include "launcher/updater.h"
 
 #include "zip.h"
 
-namespace IsaacLauncher {
-	/* Array of all the names of files that must be found for the installation 
-	 * to be considered a valid Repentogon installation.
-	 */
-	static const char* mandatoryFileNames[] = {
-		"libzhl.dll",
-		"zhlRepentogon.dll",
-		"freetype.dll",
-		NULL
-	};
-
-	Version const knownVersions[] = {
-		{ "04469d0c3d3581936fcf85bea5f9f4f3a65b2ccf96b36310456c9626bac36dc6", "v1.7.9b.J835 (Steam)", true },
-		{ NULL, NULL, false }
-	};
-
+namespace Launcher {
 	/* GitHub URLs of the latest releases of Repentogon and the launcher. */
 	static const char* RepentogonURL = "https://api.github.com/repos/TeamREPENTOGON/REPENTOGON/releases/latest";
 	static const char* LauncherURL = "";
@@ -136,19 +122,6 @@ namespace IsaacLauncher {
 		FILE* _f = NULL;
 	};
 
-	Version const* Updater::GetIsaacVersionFromHash(const char* hash) {
-		Version const* version = knownVersions;
-		while (version->version) {
-			if (!strcmp(hash, version->hash)) {
-				return version;
-			}
-
-			++version;
-		}
-
-		return NULL;
-	}
-
 	/* RAII-style class to automatically clean the CURL session. */
 	class ScopedCURL {
 	public:
@@ -166,27 +139,6 @@ namespace IsaacLauncher {
 		CURL* _curl;
 	};
 
-	/* RAII-style class that automatically unloads a module upon destruction. */
-	class ScoppedModule {
-	public:
-		ScoppedModule(HMODULE mod) : _module(mod) {
-
-		}
-
-		~ScoppedModule() {
-			if (_module) {
-				FreeLibrary(_module);
-			}
-		}
-
-		HMODULE Get() const {
-			return _module;
-		}
-
-	private:
-		HMODULE _module = NULL;
-	};
-
 	RepentogonUpdateState::RepentogonUpdateState() {
 
 	}
@@ -195,297 +147,18 @@ namespace IsaacLauncher {
 
 	}
 
-	bool Updater::FileExists(const char* name) {
-		WIN32_FIND_DATAA data;
-		return FileExists(name, &data);
-	}
-
-	bool Updater::FileExists(const char* name, WIN32_FIND_DATAA* data) {
-		memset(data, 0, sizeof(*data));
-		HANDLE result = FindFirstFileA(name, data);
-		bool ret = result != INVALID_HANDLE_VALUE;
-		if (ret) {
-			FindClose(result);
-		}
-
-		return ret;
-	}
-
-	std::string Updater::Sha256F(const char* filename) {
-		WIN32_FIND_DATAA data;
-		if (!FileExists(filename, &data)) {
-			std::ostringstream s;
-			s << "Updater::Sha256F: Attempt to hash non existant file " << filename;
-			throw std::runtime_error(s.str());
-		}
-
-		std::unique_ptr<char[]> content(new char[data.nFileSizeLow]);
-		if (!content) {
-			std::ostringstream s;
-			s << "Updater::Sha256F: Cannot hash " << filename << ": file size (" << data.nFileSizeLow << " bytes) would exceed available memory";
-			throw std::runtime_error(s.str());
-		}
-
-		FILE* f = fopen(filename, "rb");
-		fread(content.get(), data.nFileSizeLow, 1, f);
-
-		return Sha256(content.get(), data.nFileSizeLow);
-	}
-
-	std::string Updater::Sha256(const char* str, size_t size) {
-		BCRYPT_ALG_HANDLE alg;
-		NTSTATUS err = BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s; 
-			s << "Updater::Sha256: Unable to open BCrypt SHA256 provider (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		DWORD buffSize;
-		DWORD dummy;
-		err = BCryptGetProperty(alg, BCRYPT_OBJECT_LENGTH, (unsigned char*)&buffSize, sizeof(buffSize), &dummy, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s; 
-			s << "Updater::Sha256: Unable to retrieve object length property of BCrypt SHA256 provider (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		BCRYPT_HASH_HANDLE hashHandle;
-		std::unique_ptr<unsigned char[]> hashBuffer(new unsigned char[buffSize]);
-		if (!hashBuffer) {
-			throw std::runtime_error("Updater::Sha256: Unable to allocate buffer for internal computation");
-		}
-
-		err = BCryptCreateHash(alg, &hashHandle, hashBuffer.get(), buffSize, NULL, 0, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to create BCrypt hash object (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		err = BCryptHashData(hashHandle, (unsigned char*)str, size, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to hash data (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		DWORD hashSize;
-		err = BCryptGetProperty(alg, BCRYPT_HASH_LENGTH, (unsigned char*)&hashSize, sizeof(hashSize), &dummy, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to retrieve hash length property of BCrypt SHA256 provider (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		std::unique_ptr<unsigned char[]> hash(new unsigned char[hashSize]);
-		if (!hash) {
-			throw std::runtime_error("Updater::Sha256: Unable to allocate buffer for final computation");
-		}
-
-		err = BCryptFinishHash(hashHandle, hash.get(), hashSize, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to finish hashing (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		hashBuffer.reset();
-		std::unique_ptr<char[]> hashHex(new char[hashSize * 2 + 1]);
-		if (!hashHex) {
-			throw std::runtime_error("Updater::Sha256: Unable to allocate buffer for hexdump of hash");
-		}
-
-		err = BCryptCloseAlgorithmProvider(alg, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Error while closing provider (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		for (int i = 0; i < hashSize; ++i) {
-			sprintf(hashHex.get() + 2 * i, "%02hhx", hash[i]);
-		}
-
-		hashHex[hashSize * 2] = '\0';
-		/* std::string will perform a copy of the content of the string, 
-		 * the unique_ptr can safely release it afterwards. 
-		 */
-		return std::string(hashHex.get());
-	}
-
-	bool Updater::CheckIsaacInstallation() {
-		if (!FileExists(isaacExecutable)) {
-			return false;
-		}
-
-		try {
-			std::string hash = Sha256F(isaacExecutable);
-			_isaacVersion = GetIsaacVersionFromHash(hash.c_str());
-		}
-		catch (std::runtime_error& e) {
-			Logger::Error("Updater::CheckIsaacInstallation: exception: %s\n", e.what());
-		}
-
-		return true;
-	}
-
-	bool Updater::CheckRepentogonInstallation() {
-		_repentogonFiles.clear();
-
-		const char** mandatoryFile = mandatoryFileNames;
-		bool ok = true;
-		while (*mandatoryFile) {
-			FoundFile& file = _repentogonFiles.emplace_back();
-			file.filename = *mandatoryFile;
-			file.found = FileExists(*mandatoryFile);
-
-			if (!file.found) {
-				Logger::Error("Updater::CheckRepentogonInstallation: %s not found\n", *mandatoryFile);
-			}
-
-			ok = ok && file.found;
-			++mandatoryFile;
-		}
-
-		if (!ok) {
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
-		}
-
-		ScoppedModule zhl(LoadLib("libzhl.dll", LOADABLE_DLL_ZHL));
-		if (!zhl.Get()) {
-			Logger::Error("Updater::CheckRepentogonInstallation: Failed to load libzhl.dll (%d)\n", GetLastError());
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
-		}
-
-		ScoppedModule repentogon(LoadLib("zhlRepentogon.dll", LOADABLE_DLL_REPENTOGON));
-		if (!repentogon.Get()) {
-			Logger::Error("Updater::CheckRepentogonInstallation: Failed to load zhlRepentogon.dll (%d)\n", GetLastError());
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
-		}
-
-		FARPROC zhlVersion = GetProcAddress(zhl.Get(), "__ZHL_VERSION");
-		if (!zhlVersion) {
-			Logger::Warn("Updater::CheckRepentogonInstallation: libzhl.dll does not export __ZHL_VERSION\n");
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
-		}
-
-		FARPROC repentogonVersion = GetProcAddress(repentogon.Get(), "__REPENTOGON_VERSION");
-		if (!repentogonVersion) {
-			Logger::Warn("Updater::CheckRepentogonInstallation: zhlRepentogon.dll does not export __REPENTOGON_VERSION\n");
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
-		}
-
-		const char** zhlVersionStr = (const char**)zhlVersion;
-		const char** repentogonVersionStr = (const char**)repentogonVersion;
-
-		if (!ValidateVersionString(zhl.Get(), zhlVersionStr, _zhlVersion)) {
-			Logger::Error("Updater::CheckRepentogonInstallation: malformed libzhl.dll, __ZHL_VERSION extends past the module's boundaries\n");
-			MessageBoxA(NULL, "Alert", 
-				"Your build of libzhl.dll is malformed\n"
-				"If you downloaded ZHL and/or Repentogon without using the launcher, the legacy updater or without going through GitHub, you may be exposing yourself to risks\n"
-				"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
-				"You may be prompted to download the latest release",
-				MB_ICONEXCLAMATION);
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
-		}
-
-		if (!ValidateVersionString(repentogon.Get(), repentogonVersionStr, _repentogonVersion)) {
-			Logger::Error("Updater::CheckRepentogonInstallation: malformed zhlRepentogon.dll, __ZHL_VERSION extends past the module's boundaries\n");
-			MessageBoxA(NULL, "Alert",
-				"Your build of zhlRepentogon.dll is malformed\n"
-				"If you downloaded ZHL and/or Repentogon without using the launcher, the legacy updater or without going through GitHub, you may be exposing yourself to risks\n"
-				"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
-				"You may be prompted to download the latest release",
-				MB_ICONEXCLAMATION);
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
-		}
-
-		_zhlVersion = *zhlVersionStr;
-		_repentogonVersion = *repentogonVersionStr;
-
-		if (_zhlVersion != _repentogonVersion) {
-			Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, Repentogon version %s)\n", 
-				_zhlVersion.c_str(), _repentogonVersion.c_str());
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			_repentogonZHLVersionMatch = false;
-			return false;
-		}
-
-		_repentogonZHLVersionMatch = true;
-
-		if (FileExists("dsound.dll")) {
-			_installationState = REPENTOGON_INSTALLATION_STATE_LEGACY;
-		}
-		else {
-			_installationState = REPENTOGON_INSTALLATION_STATE_MODERN;
-		}
-
-		return true;
-	}
-
-	HMODULE Updater::LoadLib(const char* name, LoadableDlls dll) {
-		/* Library must be loaded using IMAGE_RESOURCE in order to sanitize it 
-		 * using GetModuleInformation() later. 
-		 */
-		HMODULE lib = LoadLibraryExA(name, NULL, LOAD_LIBRARY_AS_IMAGE_RESOURCE);
-		if (!lib) {
-			return NULL;
-		}
-
-		_dllStates[dll] = true;
-		return lib;
-	}
-
-	bool Updater::ValidateVersionString(HMODULE module, const char** addr, std::string& version) {
-		MODULEINFO info;
-		DWORD result = GetModuleInformation(GetCurrentProcess(), module, &info, sizeof(info));
-		if (result == 0) {
-			Logger::Error("Updater::ValidateVersionString: "
-				"Unable to retrieve information about the module (%d)\n", GetLastError());
-			return false;
-		}
-
-		/* Start walking the DLL. The walk ends when we find a 0, or when we 
-		 * would exit the boundaries.
-		 */
-		const char* base = (const char*)addr;
-		const char* limit = (const char*)info.lpBaseOfDll + info.SizeOfImage;
-
-		while (base < limit && *base) {
-			++base;
-		}
-
-		/* base == limit. The PE format makes it virtually impossible for the 
-		 * string to end on the very last byte. 
-		 */
-		if (*base) {
-			Logger::Error("Updater::ValidateVersionString: string extends past the boundaries of the module\n");
-			return false;
-		}
-
-		version = *addr;
-		return true;
-	}
-
-	VersionCheckResult Updater::CheckRepentogonUpdates(rapidjson::Document& doc) {
+	VersionCheckResult Updater::CheckRepentogonUpdates(rapidjson::Document& doc, 
+		fs::Installation const& installation) {
 		FetchUpdatesResult fetchResult = FetchRepentogonUpdates(doc);
 		if (fetchResult != FETCH_UPDATE_OK) {
 			return VERSION_CHECK_ERROR;
 		}
 
-		if (_installationState == REPENTOGON_INSTALLATION_STATE_NONE) {
+		if (installation.GetRepentogonInstallationState() == fs::REPENTOGON_INSTALLATION_STATE_NONE) {
 			return VERSION_CHECK_NEW;
 		}
 
-		return CheckUpdates(_zhlVersion.c_str(), "Repentogon", doc);
+		return CheckUpdates(installation.GetZHLVersion().c_str(), "Repentogon", doc);
 	}
 
 	FetchUpdatesResult Updater::FetchRepentogonUpdates(rapidjson::Document& response) {
@@ -721,7 +394,7 @@ namespace IsaacLauncher {
 
 		std::string zipHash;
 		try {
-			zipHash = Sha256F(RepentogonZipName);
+			zipHash = fs::Sha256F(RepentogonZipName);
 		}
 		catch (std::exception& e) {
 			Logger::Fatal("Updater::CHeckRepentogonIntegrity: exception while hashing %s: %s\n", RepentogonZipName, e.what());
@@ -842,34 +515,6 @@ namespace IsaacLauncher {
 
 	VersionCheckResult Updater::CheckLauncherUpdates(rapidjson::Document&) {
 		return VERSION_CHECK_UTD;
-	}
-
-	RepentogonInstallationState Updater::GetRepentogonInstallationState() const {
-		return _installationState;
-	}
-
-	Version const* Updater::GetIsaacVersion() const {
-		return _isaacVersion;
-	}
-
-	bool Updater::WasLibraryLoaded(LoadableDlls dll) const {
-		return _dllStates[dll];
-	}
-
-	std::vector<FoundFile> const& Updater::GetRepentogonInstallationFilesState() const {
-		return _repentogonFiles;
-	}
-
-	std::string const& Updater::GetRepentogonVersion() const {
-		return _repentogonVersion;
-	}
-
-	std::string const& Updater::GetZHLVersion() const {
-		return _zhlVersion;
-	}
-
-	bool Updater::RepentogonZHLVersionMatch() const {
-		return _repentogonZHLVersionMatch;
 	}
 
 	RepentogonUpdateState const& Updater::GetRepentogonUpdateState() const {

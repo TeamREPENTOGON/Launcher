@@ -13,8 +13,14 @@ struct IsaacOptions {
 	bool update;
 
 	// Game options
-	bool lua_debug;
-	int level_stage;
-	int stage_type;
-	int lua_heap_size;
+	bool luaDebug;
+	int levelStage;
+	int stageType;
+	int luaHeapSize;
 };
+
+namespace Launcher {
+	static constexpr const char* version = "alpha";
+}
+
+void Launch(IsaacOptions const& options);

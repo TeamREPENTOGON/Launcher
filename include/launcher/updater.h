@@ -11,32 +11,8 @@
 
 #include "launcher/scoped_file.h"
 
-namespace IsaacLauncher {
+namespace Launcher {
 	class MainFrame;
-
-	static constexpr const char* version = "alpha";
-	static constexpr const char* isaacExecutable = "isaac-ng.exe";
-
-	struct Version {
-		/* Hash of a given version. */
-		const char* hash;
-		/* User-friendly string associated with this version. */
-		const char* version;
-		/* Whether the version is compatible with Repentogon or not. */
-		bool valid;
-	};
-
-	enum LoadableDlls {
-		LOADABLE_DLL_ZHL,
-		LOADABLE_DLL_REPENTOGON,
-		LOADABLE_DLL_MAX
-	};
-
-	/* Pair <string, bool> indicating whether a file was found on the fileystem. */
-	struct FoundFile {
-		std::string filename;
-		bool found;
-	};
 
 	/* Phases in the update of Repentogon. */
 	enum RepentogonUpdatePhase {
@@ -71,18 +47,6 @@ namespace IsaacLauncher {
 		std::vector<std::tuple<std::string, bool>> unzipedFiles;
 
 		void Clear();
-	};
-
-	/* State of the installation of Repentogon, if any. */
-	enum RepentogonInstallationState {
-		/* No installation found, or installation in an invalid state. */
-		REPENTOGON_INSTALLATION_STATE_NONE, 
-		/* Installation with a legacy dsound.dll. This value can only be used
-		 * if ZHL and Repentogon have the same version AND there is a dsound.dll 
-		 * found. */
-		REPENTOGON_INSTALLATION_STATE_LEGACY,
-		/* Installation without a legacy dsound.dll. */
-		REPENTOGON_INSTALLATION_STATE_MODERN
 	};
 
 	enum RepentogonUpdateResult {
@@ -122,9 +86,6 @@ namespace IsaacLauncher {
 		VERSION_CHECK_ERROR
 	};
 
-	/* Global array of all known versions of the game. */
-	extern Version const knownVersions[];
-
 	/* Helper class used to perform all the tasks related to updating.
 	 *
 	 * This class exposes methods to check the sanity of the filesystem, i.e. check
@@ -138,59 +99,6 @@ namespace IsaacLauncher {
 	public:
 		Updater();
 
-		/* Check that a file with the given name exists. Return true on success,
-		 * false on failure.
-		 */
-		static bool FileExists(const char* filename);
-
-		/* Check that a file with the given name exists. Fill the search
-		 * structure with the result of the search. 
-		 * 
-		 * Return true on success, false on failure.
-		 */
-		static bool FileExists(const char* filename, WIN32_FIND_DATAA* search);
-
-		/* Return a pointer to the Version object associated with a version's hash.
-		 * If no such hash exists, return NULL.
-		 */
-		static Version const* GetIsaacVersionFromHash(const char* hash);
-
-		/* Return the SHA-256 hash of the content of filename. 
-		 * 
-		 * If the function cannot load the content of the file in memory, or if
-		 * the file does not exist, the function throws.
-		 */
-		static std::string Sha256F(const char* filename) noexcept(false);
-
-		/* Return the SHA-256 hash of the string. NULL strings have an empty 
-		 * hash. */
-		static std::string Sha256(const char* string, size_t size);
-
-		/* Check that the installation of Isaac is valid. 
-		 * 
-		 * An installation of Isaac is valid if the following conditions are 
-		 * met:
-		 *	- The current folder contains a file called isaac-ng.exe.
-		 * 
-		 * After a call to this function, GetIsaacVersion() can be used to 
-		 * query information about the currently installed version.
-		 */
-		bool CheckIsaacInstallation();
-
-		/* Check for an installation of Repentogon.
-		 * 
-		 * The function determines what kind of installation we are dealing 
-		 * with. After a call to this function, calls to GetRepentogonInstallationState()
-		 * and GetRepentogonVersion() will return an accurate value.
-		 * 
-		 * The function returns true if all DLLs required are present and the
-		 * versions of ZHL and Repentogon match. Otherwise it returns false.
-		 * The presence of dsound.dll does not change the return value and 
-		 * merely changes the value returned by GetRepentogonInstallationState()
-		 * and GetRepentogonVersion().
-		 */
-		bool CheckRepentogonInstallation();
-
 		/* Check if a Repentogon update is available. 
 		 * 
 		 * An update is available if the hash of any of the DLLs is different
@@ -199,7 +107,8 @@ namespace IsaacLauncher {
 		 * The response parameter is updated to store the possible answer to
 		 * the request.
 		 */
-		VersionCheckResult CheckRepentogonUpdates(rapidjson::Document& response);
+		VersionCheckResult CheckRepentogonUpdates(rapidjson::Document& response, 
+			fs::Installation const& installation);
 
 		/* Same as CheckRepentogonUpdates(), except for the launcher. */
 		VersionCheckResult CheckLauncherUpdates(rapidjson::Document& response);
@@ -220,63 +129,11 @@ namespace IsaacLauncher {
 		 */
 		RepentogonUpdateResult UpdateRepentogon(rapidjson::Document& base);
 
-		RepentogonInstallationState GetRepentogonInstallationState() const;
-		Version const* GetIsaacVersion() const;
-		bool WasLibraryLoaded(LoadableDlls dll) const;
-		std::vector<FoundFile> const& GetRepentogonInstallationFilesState() const;
-		std::string const& GetRepentogonVersion() const;
-		std::string const& GetZHLVersion() const;
-		bool RepentogonZHLVersionMatch() const;
 		RepentogonUpdateState const& GetRepentogonUpdateState() const;
 
 	private:
-		/* State of the Repentogon installation. */
-		RepentogonInstallationState _installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-		/* Version of Repentogon that is installed. Empty if the info cannot
-		 * be found. 
-		 */
-		std::string _repentogonVersion;
-		/* Version of ZHL that is installed. Empty if the info cannot be found. */
-		std::string _zhlVersion;
-		/* Whether the versions of ZHL and Repentogon match. False by default. */
-		bool _repentogonZHLVersionMatch = false;
-		/* SHA-256 hash of the zhlRepentogon.dll found on the disk. NULL if the 
-		 * info cannot be found. 
-		 */
-		std::unique_ptr<char[]> _dllHash;
-		/* Version of the current installation of Isaac. NULL if no installation 
-		 * found, or version unknown. 
-		 */
-		Version const* _isaacVersion = NULL;
-		/* List of the mandatory files of a Repentogon installation, and whether 
-		 * they were found or not. 
-		 */
-		std::vector<FoundFile> _repentogonFiles;
-		/* For all DLLs that need to be loaded to retrieve data, indicate whether
-		 * the load was successful or not.
-		 */
-		bool _dllStates[LOADABLE_DLL_MAX] = { false };
 		/* State of the current Repentogon update. */
 		RepentogonUpdateState _repentogonUpdateState;
-
-		/* Load a library that has an entry in the _dllStates array.
-		 * 
-		 * Returns the result of loading the library. If the load is successful,
-		 * the entry in _dllStates is updated to true.
-		 */
-		HMODULE LoadLib(const char* name, LoadableDlls dll);
-
-		/* Validate a string in an unsafe module. 
-		 * 
-		 * The string starting at address addr in the module module is valid if 
-		 * and only if it does not extend past the boundaries of the module.
-		 * The function searches for a terminating zero in order to end the 
-		 * string.
-		 * 
-		 * Return true if the string is valid, false otherwise. If the string
-		 * is valid, it is copied inside result.
-		 */
-		bool ValidateVersionString(HMODULE module, const char** addr, std::string& result);
 
 		/* Check that the latest release of Repentogon contains a hash and 
 		 * the archive itself.

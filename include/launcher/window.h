@@ -10,11 +10,12 @@
 #endif
 
 #include "curl/curl.h"
+#include "launcher/filesystem.h"
 #include "launcher/launcher.h"
 #include "launcher/updater.h"
 #include "rapidjson/document.h"
 
-namespace IsaacLauncher {
+namespace Launcher {
 	class MainFrame;
 
 	enum Windows {
@@ -43,10 +44,11 @@ namespace IsaacLauncher {
 		void LogError(const char* fmt, ...);
 		void PostInit();
 
-		static Version const* GetVersion(const char* hash);
+		static fs::Version const* GetVersion(const char* hash);
 		static bool FileExists(const char* name);
 
 	private:
+		fs::Installation _installation;
 		Updater _updater;
 
 		/* Window building. */
@@ -111,8 +113,15 @@ namespace IsaacLauncher {
 		void Inject();
 
 		/* Post init stuff. */
+		bool CheckIsaacInstallation();
 		bool CheckIsaacVersion();
 		bool CheckRepentogonInstallation();
+
+		/* Prompt the user for a place to store the configuration file.	*/
+		Launcher::fs::ConfigurationFileLocation PromptConfigurationFileLocation();
+
+		/* Prompt the user for the folder containing an Isaac installation. */
+		std::string PromptIsaacInstallation(bool repeat);
 
 		/* Prompt the user for a Repentogon installation. This is useful if we 
 		 * don't detect a valid Repentogon installation. 
