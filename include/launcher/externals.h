@@ -12,6 +12,6 @@ namespace Launcher {
 	namespace Externals {
 		void Init();
 
-		extern BOOL(*pGetUserProfileDirectoryA)(HANDLE, LPSTR, LPDWORD);
+		extern BOOL(WINAPI *pGetUserProfileDirectoryA)(HANDLE, LPSTR, LPDWORD);
 	}
 }

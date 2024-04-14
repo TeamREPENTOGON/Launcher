@@ -226,7 +226,7 @@ namespace Launcher::fs {
 			return false;
 		}
 
-		std::string fullPath = _isaacFolder + isaacExecutable;
+		std::string fullPath = (_isaacFolder + "\\") + isaacExecutable;
 		if (!FileExists(fullPath.c_str())) {
 			return false;
 		}
@@ -511,7 +511,7 @@ namespace Launcher::fs {
 		else {
 			BOOL result = Externals::pGetUserProfileDirectoryA(token, homeDirectory, &homeLen);
 
-			if (result) {
+			if (!result) {
 				Logger::Error("Unable to find user profile directory: %d\n", GetLastError());
 				return INSTALLATION_PATH_INIT_ERR_PROFILE_DIR;
 			}
