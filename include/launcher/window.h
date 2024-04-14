@@ -121,7 +121,7 @@ namespace Launcher {
 		Launcher::fs::ConfigurationFileLocation PromptConfigurationFileLocation();
 
 		/* Prompt the user for the folder containing an Isaac installation. */
-		std::string PromptIsaacInstallation(bool repeat);
+		std::string PromptIsaacInstallation();
 
 		/* Prompt the user for a Repentogon installation. This is useful if we 
 		 * don't detect a valid Repentogon installation. 

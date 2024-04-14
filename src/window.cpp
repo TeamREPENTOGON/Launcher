@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <future>
+#include <filesystem>
 #include <mutex>
 #include <regex>
 #include <set>
@@ -342,17 +343,13 @@ namespace Launcher {
 
 		_hasIsaac = CheckIsaacInstallation();
 		if (!_hasIsaac) {
-			std::string path;
-			bool repeat = false;
-			do {
-				path = PromptIsaacInstallation(repeat);
-				if (path.empty()) {
-					Log("Abandonning attempts at finding the Isaac installation folder\n");
-					return;
-				}
-				repeat = true;
-
-			} while (!_installation.SetIsaacInstallationFolder(path));
+			std::string path = PromptIsaacInstallation();
+			std::filesystem::path p(path);
+			p.remove_filename();
+			if (!_installation.SetIsaacInstallationFolder(p.string())) {
+				LogError("Unable to configure the Isaac installation folder");
+				return;
+			}
 		}
 
 		if (!CheckIsaacVersion()) {
@@ -875,13 +872,11 @@ namespace Launcher {
 		return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
 	}
 
-	std::string MainFrame::PromptIsaacInstallation(bool repeat) {
-		wxString message("No Isaac installation found ");
-		if (repeat) {
-			message += "and previously selected folder does not contain isaac-ng.exe";
-		}
-		message += ", please select the folder containing isaac-ng.exe";
-		wxDirDialog dialog(this, message, wxEmptyString, wxDD_DIR_MUST_EXIST, wxDefaultPosition, wxDefaultSize, "Select Isaac folder");
+	std::string MainFrame::PromptIsaacInstallation() {
+		wxString message("No Isaac installation found, please select isaac-ng.exe in the Isaac installation folder");
+		// wxDirDialog dialog(this, message, wxEmptyString, wxDD_DIR_MUST_EXIST, wxDefaultPosition, wxDefaultSize, "Select Isaac folder");
+		wxFileDialog dialog(this, message, wxEmptyString, wxEmptyString, "isaac-ng.exe", wxFD_FILE_MUST_EXIST, wxDefaultPosition,
+			wxDefaultSize, "Select isaac-ng.exe executable");
 		dialog.ShowModal();
 		return dialog.GetPath().ToStdString();
 	}
