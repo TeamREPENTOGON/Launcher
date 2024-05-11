@@ -1,0 +1,63 @@
+name: Build Project and Upload Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    if: "${{ github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, 'ci: release') }}"
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: 'true'
+        fetch-depth: 0
+
+    - name: Configure CMake
+      run: cmake -G "Visual Studio 17 2022" -A "Win32" -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+      
+    - name: Setup Version
+      id: version
+      shell: powershell
+      run: |
+        $version = Get-Content ${{github.workspace}}/version.txt -Raw
+
+    - name: Create Artifact Folder
+      shell: powershell
+      run: |
+        cd ${{github.workspace}}/build/Release
+        mkdir artifact
+        mv REPENTOGONLauncher.exe artifact
+        mv wxbase330u_vc.dll artifact
+        mv wxmsw330u_core_vc.dll artifact
+        mv zlibd.dll artifact
+        mv inih.dll artifact
+        Install-Module Microsoft.PowerShell.Archive -MinimumVersion 1.2.3.0 -Repository PSGallery -Force
+        Import-Module Microsoft.PowerShell.Archive
+        Compress-Archive -Path artifact/* -Destination REPENTOGONLauncher.zip
+        mkdir ${{github.workspace}}/workshop/REPENTOGONLauncher
+        Copy-Item artifact/* ${{github.workspace}}/workshop/REPENTOGONLauncher
+        $PSDefaultParameterValues['*:Encoding'] = 'Default'
+        $OutputEncoding = [System.Text.Utf8Encoding]::new($false)
+        Get-FileHash .\REPENTOGONLauncher.zip | Select-Object -ExpandProperty Hash > hash.txt
+
+    - name: Upload release
+      uses: ncipollo/release-action@v1
+      with:
+        artifacts: "${{github.workspace}}/build/Release/REPENTOGONLauncher.zip,${{github.workspace}}/build/Release/hash.txt"
+        tag: ${{steps.version.outputs.version}}
+        token: ${{ secrets.GITHUB_TOKEN }}
