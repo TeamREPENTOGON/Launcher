@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <optional>
 
 #include <wx/wxprec.h>

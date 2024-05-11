@@ -21,20 +21,23 @@ jobs:
     steps:
     - uses: actions/checkout@v3
       with:
-        submodules: 'true'
+        submodules: 'recursive'
         fetch-depth: 0
+
+    - name: Setup Version
+      id: version
+      shell: powershell
+      run: |
+        $version = Get-Content ${{github.workspace}}/version.txt -Raw
+        echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        echo "#include `"shared/shared.h`"`n`nconst char* Shared::version = `"$version`";" > ${{github.workspace}}/shared/version.cpp
+        type ${{github.workspace}}/shared/version.cpp
 
     - name: Configure CMake
       run: cmake -G "Visual Studio 17 2022" -A "Win32" -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
-      
-    - name: Setup Version
-      id: version
-      shell: powershell
-      run: |
-        $version = Get-Content ${{github.workspace}}/version.txt -Raw
 
     - name: Create Artifact Folder
       shell: powershell
@@ -44,7 +47,7 @@ jobs:
         mv REPENTOGONLauncher.exe artifact
         mv wxbase330u_vc.dll artifact
         mv wxmsw330u_core_vc.dll artifact
-        mv zlibd.dll artifact
+        mv zlib.dll artifact
         mv inih.dll artifact
         Install-Module Microsoft.PowerShell.Archive -MinimumVersion 1.2.3.0 -Repository PSGallery -Force
         Import-Module Microsoft.PowerShell.Archive

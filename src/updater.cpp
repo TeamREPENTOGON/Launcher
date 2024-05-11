@@ -2,6 +2,7 @@
 #include <bcrypt.h>
 #include <Psapi.h>
 
+#include <algorithm>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
