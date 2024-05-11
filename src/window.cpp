@@ -12,9 +12,14 @@
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/document.h"
 
+#include "wx/filectrl.h"
+#include "wx/statline.h"
+
 #include "curl/curl.h"
 #include "launcher/filesystem.h"
 #include "launcher/window.h"
+#include "self_updater/updater_resources.h"
+#include "self_updater/updater.h"
 
 #include "zip.h"
 #include "zipint.h"
@@ -24,19 +29,21 @@
 #endif
 
 wxBEGIN_EVENT_TABLE(Launcher::MainFrame, wxFrame)
-	EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::MainFrame::OnLevelSelect)
-	EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLauchModeSelect)
-	EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::MainFrame::OnOptionSelected)
-	EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::MainFrame::OnOptionSelected)
-	EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::MainFrame::OnOptionSelected)
-	EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnCharacterWritten)
-	EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::MainFrame::Launch)
-	EVT_BUTTON(Launcher::WINDOW_BUTTON_FORCE_UPDATE, Launcher::MainFrame::ForceUpdate)
+EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::MainFrame::OnLevelSelect)
+EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLauchModeSelect)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::MainFrame::OnOptionSelected)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::MainFrame::OnOptionSelected)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::MainFrame::OnOptionSelected)
+EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnCharacterWritten)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::MainFrame::Launch)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_FORCE_UPDATE, Launcher::MainFrame::ForceUpdate)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::MainFrame::OnIsaacSelectClick)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_SELF_UPDATE, Launcher::MainFrame::OnSelfUpdateClick)
 wxEND_EVENT_TABLE()
 
 namespace Launcher {
-	static std::tuple<wxFont, wxFont> MakeBoldFont(wxFrame* frame);
-	static wxComboBox* CreateLevelsComboBox(wxFrame* frame);
+	static std::tuple<wxFont, wxFont> MakeBoldFont(wxWindow* window);
+	static wxComboBox* CreateLevelsComboBox(wxWindow* window);
 
 	// Read chunks of 1MB in the zip stream of REPENTOGON.zip
 	static constexpr size_t StreamChunkSize = 1 << 20; 
@@ -117,7 +124,7 @@ namespace Launcher {
 
 	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher") {
 		memset(&_options, 0, sizeof(_options));
-		_grid = new wxGridBagSizer(0, 20);
+		// _optionsGrid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
 		_luaHeapSize = nullptr;
 		_hasRepentogon = false;
@@ -126,97 +133,162 @@ namespace Launcher {
 
 		SetSize(1024, 650);
 
-		AddLaunchOptions();
-		AddRepentogonOptions();
-		AddVanillaOptions();
-
-		wxSizer* horizontalSizer = new wxBoxSizer(wxHORIZONTAL);
-		horizontalSizer->Add(_grid, 0, wxLEFT, 20);
+		wxBoxSizer* optionsSizer = new wxBoxSizer(wxHORIZONTAL);
+		wxStaticBox* optionsBox = new wxStaticBox(this, -1, "Game configuration");
+		optionsBox->SetSizer(optionsSizer);
 
 		wxSizer* verticalSizer = new wxBoxSizer(wxVERTICAL);
 		wxTextCtrl* logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, 400), wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH);
 		logWindow->SetBackgroundColour(*wxWHITE);
-		_logWindow = logWindow;
+
+		wxStaticBox* configurationBox = new wxStaticBox(this, -1, "Launcher configuration");
+		wxBoxSizer* configurationSizer = new wxBoxSizer(wxVERTICAL);
+		configurationBox->SetSizer(configurationSizer);
+
+		wxStaticBox* advanced = new wxStaticBox(this, -1, "Advanced options");
+		wxBoxSizer* advancedSizer = new wxBoxSizer(wxVERTICAL);
+		advanced->SetSizer(advancedSizer);
+
 		verticalSizer->Add(logWindow, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 20);
-		verticalSizer->Add(horizontalSizer);
+		verticalSizer->Add(configurationBox, 0, wxLEFT | wxEXPAND | wxRIGHT, 20);
+		verticalSizer->Add(optionsBox, 0, wxLEFT | wxEXPAND | wxRIGHT | wxTOP, 20);
+		verticalSizer->Add(advanced, 0, wxLEFT | wxEXPAND | wxRIGHT | wxTOP, 20);
+
+		_logWindow = logWindow;
+		_configurationBox = configurationBox;
+		_configurationSizer = configurationSizer;
+		_optionsSizer = optionsSizer;
+		_optionsBox = optionsBox;
+		_advancedOptions = advanced;
+		_advancedSizer = advancedSizer;
+
+		AddLauncherConfigurationOptions();
+		AddRepentogonOptions();
+		AddVanillaOptions();
+		AddLaunchOptions();
+		AddAdvancedOptions();
+
 		SetSizer(verticalSizer);
 
 		SetBackgroundColour(wxColour(237, 237, 237));
 	}
 
+	void MainFrame::AddAdvancedOptions() {
+		wxButton* button = new wxButton(_advancedOptions, Launcher::WINDOW_BUTTON_SELF_UPDATE, "Self-update");
+		_advancedSizer->Add(button, 0, wxTOP | wxLEFT | wxBOTTOM, 20);
+	}
+
+	void MainFrame::AddLauncherConfigurationOptions() {
+		wxBoxSizer* isaacSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
+		AddLauncherConfigurationTextField("Indicate the path of the isaac-ng.exe file",
+			"Select file", "No file specified, won't be able to launch anything", 
+			*wxRED, isaacSelectionSizer, &_isaacFileText);
+
+		wxBoxSizer* repentogonSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
+		AddLauncherConfigurationTextField("Indicate folder in which to download and install REPENTOGON",
+			"Select folder", 
+			"No folder specified, will download in current folder", wxColor(255, 128, 64),
+			repentogonSelectionSizer, &_repentogonInstallFolderText);
+
+		// isaacSelectionSizer->Add(new wxStaticLine(), 0, wxBOTTOM | wxTOP, 20);
+
+		_configurationSizer->Add(isaacSelectionSizer, 0, wxTOP | wxLEFT | wxRIGHT, 20);
+		_configurationSizer->Add(new wxStaticLine(), 0, wxTOP | wxBOTTOM, 5);
+		_configurationSizer->Add(repentogonSelectionSizer, 0, wxLEFT | wxRIGHT, 20);
+		_configurationSizer->Add(new wxStaticLine(), 0, wxBOTTOM, 20);
+	}
+
 	void MainFrame::AddLaunchOptions() {
-		auto [sourceFont, boldFont] = MakeBoldFont(this);
-		boldFont.SetPointSize(14);
-		SetFont(boldFont);
-		wxStaticText* text = new wxStaticText(this, -1, "Launch mode");
-		SetFont(sourceFont);
+		wxStaticBox* launchModeBox = new wxStaticBox(_optionsBox, -1, "Launch Options");
+		wxBoxSizer* launchModeBoxSizer = new wxBoxSizer(wxVERTICAL);
+		launchModeBox->SetSizer(launchModeBoxSizer);
 
 		wxSizer* box = new wxBoxSizer(wxHORIZONTAL);
-		box->Add(new wxStaticText(this, -1, "Launch mode: "));
+		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "));
 
-		_launchMode = new wxComboBox(this, WINDOW_COMBOBOX_LAUNCH_MODE);
+		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE);
 		_launchMode->Insert("Repentogon", 0, (void*)nullptr);
 		_launchMode->Insert("Vanilla", 0, (void*)nullptr);
 		_launchMode->SetValue("Repentogon");
 
 		box->Add(_launchMode);
 
-		_grid->Add(text, wxGBPosition(0, 2), wxDefaultSpan, wxALIGN_CENTER);
-		_grid->Add(box, wxGBPosition(1, 2));
+		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 20);
 
-		wxButton* launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game");
-		_grid->Add(launchButton, wxGBPosition(2, 2), wxDefaultSpan, wxEXPAND);
+		wxButton* launchButton = new wxButton(launchModeBox, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game");
+		launchModeBoxSizer->Add(launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 20);
 
-		wxButton* updateButton = new wxButton(this, WINDOW_BUTTON_FORCE_UPDATE, "Update (force)");
-		_grid->Add(updateButton, wxGBPosition(3, 2), wxDefaultSpan, wxEXPAND);
+		wxButton* updateButton = new wxButton(launchModeBox, WINDOW_BUTTON_FORCE_UPDATE, "Update Repentogon (force)");
+		launchModeBoxSizer->Add(updateButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 20);
+		launchModeBoxSizer->Add(new wxStaticLine(), 0, wxBOTTOM, 5);
+
+		_optionsSizer->Add(launchModeBox, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 20);
 	}
 
 	void MainFrame::AddRepentogonOptions() {
-		auto [sourceFont, boldFont] = MakeBoldFont(this);
-		boldFont.SetPointSize(14);
-		SetFont(boldFont);
-		wxStaticText* text = new wxStaticText(this, -1, "REPENTOGON Options");
-		SetFont(sourceFont);
+		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "REPENTOGON Options");
+		wxBoxSizer* repentogonBoxSizer = new wxBoxSizer(wxVERTICAL);
+		repentogonBox->SetSizer(repentogonBoxSizer);
 
 		// wxCheckBox* updates = new wxCheckBox(this, WINDOW_CHECKBOX_REPENTOGON_UPDATES, "Check for updates");
 		// updates->SetValue(true);
-		wxCheckBox* console = new wxCheckBox(this, WINDOW_CHECKBOX_REPENTOGON_CONSOLE, "Enable console window");
+		wxCheckBox* console = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_CONSOLE, "Enable console window");
 		console->SetValue(false);
 
 		// _updates = updates;
 		_console = console;
 
-		_grid->Add(text, wxGBPosition(0, 0), wxDefaultSpan, wxALIGN_CENTER);
-		// _grid->Add(updates, wxGBPosition(1, 0));
-		_grid->Add(console, wxGBPosition(1, 0));
+		// _optionsGrid->Add(updates, wxGBPosition(1, 0));
+		repentogonBoxSizer->Add(console, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 20);
+
+		_repentogonOptions = repentogonBox;
+		_optionsSizer->Add(repentogonBox, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 20);
 	}
 
 	void MainFrame::AddVanillaOptions() {
-		auto [sourceFont, boldFont] = MakeBoldFont(this);
-		boldFont.SetPointSize(14);
-		SetFont(boldFont);
-		wxStaticText* text = new wxStaticText(this, -1, "Universal Options");
-		SetFont(sourceFont);
+		wxStaticBox* vanillaBox = new wxStaticBox(_optionsBox, -1, "Vanilla Options");
+		wxBoxSizer* vanillaBoxSizer = new wxBoxSizer(wxVERTICAL);
+		vanillaBox->SetSizer(vanillaBoxSizer);
 
 		wxSizer* levelSelectSizer = new wxBoxSizer(wxHORIZONTAL);
-		levelSelectSizer->Add(new wxStaticText(this, -1, "Starting stage: "));
-		_levelSelect = CreateLevelsComboBox(this);
+		levelSelectSizer->Add(new wxStaticText(vanillaBox, -1, "Starting stage: "));
+		_levelSelect = CreateLevelsComboBox(vanillaBox);
 		levelSelectSizer->Add(_levelSelect);
 
-		_grid->Add(text, wxGBPosition(0, 1), wxDefaultSpan, wxALIGN_CENTER);
-		_grid->Add(levelSelectSizer, wxGBPosition(1, 1));
-		_luaDebug = new wxCheckBox(this, WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe)");
-		_grid->Add(_luaDebug, wxGBPosition(2, 1));
+		vanillaBoxSizer->Add(levelSelectSizer, 0, wxTOP | wxLEFT | wxRIGHT, 20);
+		_luaDebug = new wxCheckBox(vanillaBox, WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe)");
+		vanillaBoxSizer->Add(_luaDebug, 0, wxLEFT | wxRIGHT, 20);
+		vanillaBoxSizer->Add(new wxStaticLine(), 0, wxTOP | wxBOTTOM, 5);
 
 		wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
 		wxTextValidator heapSizeValidator(wxFILTER_NUMERIC);
-		wxTextCtrl* heapSizeCtrl = new wxTextCtrl(this, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024");
+		wxTextCtrl* heapSizeCtrl = new wxTextCtrl(vanillaBox, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024");
 		heapSizeCtrl->SetValidator(heapSizeValidator);
 		_luaHeapSize = heapSizeCtrl;
-		wxStaticText* heapSizeText = new wxStaticText(this, -1, "Lua heap size (MB): ");
+		wxStaticText* heapSizeText = new wxStaticText(vanillaBox, -1, "Lua heap size (MB): ");
 		heapSizeBox->Add(heapSizeText);
 		heapSizeBox->Add(heapSizeCtrl);
-		_grid->Add(heapSizeBox, wxGBPosition(3, 1));
+		vanillaBoxSizer->Add(heapSizeBox, 0, wxLEFT | wxRIGHT, 20);
+		vanillaBoxSizer->Add(new wxStaticLine(), 0, wxBOTTOM, 5);
+
+		_optionsSizer->Add(vanillaBox, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 20);
+	}
+
+	void MainFrame::OnIsaacSelectClick(wxCommandEvent& event) {
+		wxFileDialog dialog(this, "Please select the isaac-ng.exe to launch", wxEmptyString, wxEmptyString, "isaac-ng.exe", wxFD_FILE_MUST_EXIST, wxDefaultPosition,
+			wxDefaultSize, "Select isaac-ng.exe executable");
+		dialog.ShowModal();
+		std::string path = dialog.GetPath().ToStdString();
+		if (!path.empty()) {
+			_isaacFileText->SetValue(path);
+		}
+		else {
+			wxTextAttr textAttr = _isaacFileText->GetDefaultStyle();
+			_isaacFileText->Clear();
+			_isaacFileText->SetDefaultStyle(wxTextAttr(*wxRED));
+			_isaacFileText->AppendText("No file specified, won't be able to launch anything");
+			_isaacFileText->SetDefaultStyle(textAttr);
+		}
 	}
 
 	void MainFrame::OnLevelSelect(wxCommandEvent& event) {
@@ -270,6 +342,85 @@ namespace Launcher {
 		default:
 			return;
 		}
+	}
+
+	void MainFrame::OnSelfUpdateClick(wxCommandEvent& event) {
+		HRSRC updater = FindResource(NULL, MAKEINTRESOURCE(IDB_EMBEDEXE1), RT_RCDATA);
+		if (!updater) {
+			LogError("Unable to self update: resource not found in executable !");
+			return;
+		}
+
+		HGLOBAL global = LoadResource(NULL, updater);
+		if (!global) {
+			LogError("Unable to load self updater: last error = %d !", GetLastError());
+			return;
+		}
+
+		DWORD size = SizeofResource(NULL, updater);
+		if (size == 0) {
+			LogError("Invalid size of self updater (0) !");
+			return;
+		}
+
+		void* data = LockResource(global);
+		if (!data) {
+			LogError("Unable to lock self updater !");
+			return;
+		}
+
+		const char* filename = "./repentogon_launcher_self_updater.exe";
+		FILE* output = fopen(filename, "wb");
+		if (!output) {
+			LogError("Unable to open temporary file %s to extract the self updater");
+			return;
+		}
+
+		size_t count = fwrite(data, size, 1, output);
+		if (count != size) {
+			LogWarn("Inconsistent amount of data written: expected %d, wrote %llu", size, count);
+		}
+
+		fclose(output);
+
+		std::string updateStatePath = _installation.GetSaveFolder() + "/repentogon_launcher_self_updater_state";
+		FILE* updateState = fopen(updateStatePath.c_str(), "wb");
+		if (!updateState) {
+			LogError("Unable to open lock file for self update process");
+			return;
+		}
+
+		fprintf(updateState, "%d", ::Updater::UpdateState::UPDATE_STATE_INIT);
+		fflush(updateState);
+		fclose(updateState);
+
+		char cli[4096] = { 0 };
+		int printfCount = snprintf(cli, 4096, "--lock-file=%s", updateStatePath.c_str());
+		if (printfCount < 0) {
+			LogError("Unable to generate command line for self updater");
+			return;
+		}
+
+		PROCESS_INFORMATION info;
+		memset(&info, 0, sizeof(info));
+
+		STARTUPINFOA startupInfo;
+		memset(&startupInfo, 0, sizeof(startupInfo));
+
+		BOOL ok = CreateProcessA(filename, cli, NULL, NULL, false, 0, NULL, NULL, &startupInfo, &info);
+		if (!ok) {
+			LogError("Unable to launch self updater");
+		}
+		else {
+			Log("Launched self updater");
+		}
+		HANDLE child = OpenProcess(SYNCHRONIZE, false, info.dwProcessId);
+
+		LogNoNL("Waiting until self updater is ready... ");
+		WaitForInputIdle(child, INFINITE);
+		Log("Done");
+
+		ExitProcess(0);
 	}
 
 	void MainFrame::Launch(wxCommandEvent& event) {
@@ -564,15 +715,15 @@ namespace Launcher {
 		_logWindow->SetDefaultStyle(attr);
 	}
 
-	std::tuple<wxFont, wxFont> MakeBoldFont(wxFrame* frame) {
-		wxFont source = frame->GetFont();
+	std::tuple<wxFont, wxFont> MakeBoldFont(wxWindow* window) {
+		wxFont source = window->GetFont();
 		wxFont bold = source;
 		bold.MakeBold();
 		return std::make_tuple(source, bold);
 	}
 
-	wxComboBox* CreateLevelsComboBox(wxFrame* frame) {
-		wxComboBox* box = new wxComboBox(frame, WINDOW_COMBOBOX_LEVEL, "Start level");
+	wxComboBox* CreateLevelsComboBox(wxWindow* window) {
+		wxComboBox* box = new wxComboBox(window, WINDOW_COMBOBOX_LEVEL, "Start level");
 
 		int pos = 0;
 		box->Insert(wxString("--"), pos++);
@@ -734,10 +885,12 @@ namespace Launcher {
 
 	void MainFrame::UpdateRepentogonOptionsFromLaunchMode() {
 		if (_launchMode->GetValue() == "Repentogon") {
-			_console->Enable(true);
+			_repentogonOptions->Enable(true);
+			// _console->Enable(true);
 		}
 		else {
-			_console->Enable(false);
+			_repentogonOptions->Enable(false);
+			// _console->Enable(false);
 		}
 	}
 
@@ -858,7 +1011,7 @@ namespace Launcher {
 				"Install next to launcher",
 				"Install in Repentance save folder"
 			};
-			wxSingleChoiceDialog dialog(this, message, "Create the configuration file", 2, options);
+			wxSingleChoiceDialog dialog(this, message, "Create the launcher's configuration file", 2, options);
 			dialog.ShowModal();
 
 			if (dialog.GetSelection() == 0) {
@@ -879,5 +1032,26 @@ namespace Launcher {
 			wxDefaultSize, "Select isaac-ng.exe executable");
 		dialog.ShowModal();
 		return dialog.GetPath().ToStdString();
+	}
+
+	void MainFrame::AddLauncherConfigurationTextField(const char* intro,
+		const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
+		wxBoxSizer* sizer, wxTextCtrl** result) {
+		sizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 20);
+		wxButton* isaacSelectionButton = new wxButton(_configurationBox, Launcher::WINDOW_BUTTON_SELECT_ISAAC, buttonText);
+		sizer->Add(isaacSelectionButton, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
+		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxSize(400, -1), wxTE_READONLY | wxTE_RICH);
+		textCtrl->SetBackgroundColour(*wxWHITE);
+
+		wxTextAttr textAttr = textCtrl->GetDefaultStyle();
+		textCtrl->SetDefaultStyle(wxTextAttr(emptyColor));
+		textCtrl->AppendText(emptyText);
+		textCtrl->SetDefaultStyle(textAttr);
+
+		sizer->Add(textCtrl, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
+
+		if (result) {
+			*result = textCtrl;
+		}
 	}
 }

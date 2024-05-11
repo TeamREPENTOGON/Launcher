@@ -14,8 +14,9 @@
 #include "launcher/externals.h"
 #include "launcher/launcher.h"
 #include "launcher/loader.h"
-#include "launcher/logger.h"
 #include "launcher/window.h"
+
+#include "shared/logger.h"
 
 /* Perform the early setup for the injection: create the Isaac process, 
  * allocate memory for the remote thread function etc. 

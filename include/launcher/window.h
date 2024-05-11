@@ -26,7 +26,9 @@ namespace Launcher {
 		WINDOW_CHECKBOX_VANILLA_LUADEBUG,
 		WINDOW_TEXT_VANILLA_LUAHEAPSIZE,
 		WINDOW_BUTTON_LAUNCH_BUTTON,
-		WINDOW_BUTTON_FORCE_UPDATE
+		WINDOW_BUTTON_FORCE_UPDATE,
+		WINDOW_BUTTON_SELECT_ISAAC,
+		WINDOW_BUTTON_SELF_UPDATE
 	};
 
 	class App : public wxApp {
@@ -52,9 +54,15 @@ namespace Launcher {
 		Updater _updater;
 
 		/* Window building. */
+		void AddLauncherConfigurationOptions();
 		void AddLaunchOptions();
 		void AddRepentogonOptions();
 		void AddVanillaOptions();
+		void AddAdvancedOptions();
+
+		void AddLauncherConfigurationTextField(const char* intro, 
+			const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
+			wxBoxSizer* sizer, wxTextCtrl** result);
 
 		/* Check Isaac version, Repentogon installation and Repentogon version. 
 		 * Disable Repentogon options if Repentogon is not installed correctly.
@@ -104,10 +112,12 @@ namespace Launcher {
 		void WriteLauncherConfiguration();
 
 		/* Event handlers. */
+		void OnIsaacSelectClick(wxCommandEvent& event);
 		void OnLevelSelect(wxCommandEvent& event);
 		void OnLauchModeSelect(wxCommandEvent& event);
 		void OnCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
+		void OnSelfUpdateClick(wxCommandEvent& event);
 		void ForceUpdate(wxCommandEvent& event);
 		void Launch(wxCommandEvent& event);
 		void Inject();
@@ -156,12 +166,21 @@ namespace Launcher {
 		bool DoCheckRepentogonUpdates(rapidjson::Document& document, bool force);
 
 		IsaacOptions _options;
-		wxGridBagSizer* _grid;
+		// wxGridBagSizer* _optionsGrid;
+		wxBoxSizer* _optionsSizer;
+		wxBoxSizer* _configurationSizer;
+		wxBoxSizer* _advancedSizer;
 		wxCheckBox* _console;
 		wxCheckBox* _luaDebug;
 		wxComboBox* _levelSelect;
 		wxComboBox* _launchMode;
 		wxTextCtrl* _luaHeapSize;
+		wxStaticBox* _optionsBox;
+		wxStaticBox* _configurationBox;
+		wxStaticBox* _repentogonOptions;
+		wxStaticBox* _advancedOptions;
+		wxTextCtrl* _isaacFileText;
+		wxTextCtrl* _repentogonInstallFolderText;
 
 		std::mutex _logMutex;
 		wxTextCtrl* _logWindow;

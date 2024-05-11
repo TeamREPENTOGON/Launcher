@@ -12,7 +12,7 @@
 #include "inih/cpp/INIReader.h"
 #include "launcher/externals.h"
 #include "launcher/filesystem.h"
-#include "launcher/logger.h"
+#include "shared/logger.h"
 
 namespace Launcher::fs {
 	/* Array of all the names of files that must be found for the installation

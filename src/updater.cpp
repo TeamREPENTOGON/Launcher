@@ -8,9 +8,11 @@
 
 #include <curl/curl.h>
 
-#include "launcher/curl_handler.h"
+#include "shared/curl/abstract_response_handler.h"
+#include "shared/curl/file_response_handler.h"
+#include "shared/curl/string_response_handler.h"
 #include "launcher/filesystem.h"
-#include "launcher/logger.h"
+#include "shared/logger.h"
 #include "launcher/updater.h"
 
 #include "zip.h"
@@ -67,60 +69,6 @@ namespace Launcher {
 	 * Return true if folders are created successfully, false otherwise.
 	 */
 	static bool CreateFileHierarchy(const char* name);
-
-	class CurlStringResponse : public AbstractCurlResponseHandler {
-	public:
-		size_t OnFirstData(void* data, size_t len, size_t n) {
-			return Append(data, len, n);
-		}
-
-		size_t OnNewData(void* data, size_t len, size_t n) {
-			return Append(data, len, n);
-		}
-
-		std::string const& GetData() const {
-			return _data;
-		}
-
-	private:
-		size_t Append(void* data, size_t len, size_t n) {
-			_data.append((char*)data, len * n);
-			return len * n;
-		}
-
-		std::string _data;
-	};
-
-	class CurlFileResponse : public AbstractCurlResponseHandler {
-	public:
-		CurlFileResponse(std::string const& name) {
-			_f = fopen(name.c_str(), "wb");
-		}
-
-		~CurlFileResponse() {
-			if (_f)
-				fclose(_f);
-		}
-
-		size_t OnFirstData(void* data, size_t len, size_t n) {
-			return Append(data, len, n);
-		}
-
-		size_t OnNewData(void* data, size_t len, size_t n) {
-			return Append(data, len, n);
-		}
-
-		FILE* GetFile() const {
-			return _f;
-		}
-
-	private:
-		size_t Append(void* data, size_t len, size_t n) {
-			return fwrite(data, len, n, _f);
-		}
-
-		FILE* _f = NULL;
-	};
 
 	/* RAII-style class to automatically clean the CURL session. */
 	class ScopedCURL {

@@ -2,7 +2,7 @@
 
 #include <ctime>
 
-#include "launcher/logger.h"
+#include "shared/logger.h"
 
 FILE* Logger::_file = NULL;
 

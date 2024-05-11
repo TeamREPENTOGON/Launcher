@@ -9,7 +9,7 @@
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/document.h"
 
-#include "launcher/scoped_file.h"
+#include "shared/scoped_file.h"
 
 namespace Launcher {
 	class MainFrame;

@@ -1,4 +1,4 @@
-#include "launcher/curl_handler.h"
+#include "shared/curl/abstract_response_handler.h"
 
 size_t AbstractCurlResponseHandler::OnData(void* data, size_t size, size_t n) {
 	if (!_firstReceived) {
