@@ -1,6 +1,6 @@
-#include "launcher/externals.h"
+#include "shared/externals.h"
 
-namespace Launcher::Externals {
+namespace Externals {
 	BOOL (WINAPI *pGetUserProfileDirectoryA)(HANDLE, LPSTR, LPDWORD) = NULL;
 
 	void Init() {

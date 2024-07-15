@@ -2,6 +2,8 @@
 
 #include <variant>
 
+#include "curl/curl.h"
+
 #include "rapidjson/document.h"
 
 #include "shared/monitor.h"

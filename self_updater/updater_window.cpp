@@ -1,6 +1,13 @@
+#include <WinSock2.h>
+
 #include "wx/cmdline.h"
 
+#include "shared/externals.h"
 #include "self_updater/updater_window.h"
+
+namespace Externals {
+	void Init();
+}
 
 namespace Updater {
 	struct CLIParams {
@@ -13,6 +20,8 @@ namespace Updater {
 	char Updater::_printBuffer[Updater::BUFF_SIZE] = { 0 };
 
 	bool App::OnInit() {
+		Externals::Init();
+
 		ParseArgs();
 
 		Updater* frame = new Updater();

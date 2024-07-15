@@ -1,0 +1,18 @@
+#pragma once
+
+namespace Launcher {
+	extern const char* SelfUpdaterExePath;
+
+	enum SelfUpdateResult {
+		SELF_UPDATE_RESOURCE_NOT_FOUND,
+		SELF_UPDATE_LOAD_FAILED,
+		SELF_UPDATE_INVALID_SIZE,
+		SELF_UPDATE_LOCK_FAILED,
+		SELF_UPDATE_CANNOT_OPEN_TEMPORARY_FILE,
+		SELF_UPDATE_CANNOT_OPEN_LOCK_FILE,
+		SELF_UPDATE_NO_CLI,
+		SELF_UPDATE_CREATE_PROCESS_FAILED
+	};
+
+	SelfUpdateResult DoSelfUpdate();
+}

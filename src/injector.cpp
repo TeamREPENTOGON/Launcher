@@ -11,11 +11,11 @@
 
 #include <wx/wx.h>
 
-#include "launcher/externals.h"
 #include "launcher/launcher.h"
 #include "launcher/loader.h"
 #include "launcher/window.h"
 
+#include "shared/externals.h"
 #include "shared/logger.h"
 
 /* Perform the early setup for the injection: create the Isaac process, 

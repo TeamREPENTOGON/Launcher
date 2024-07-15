@@ -10,8 +10,8 @@
 #include <cwchar>
 
 #include "inih/cpp/INIReader.h"
-#include "launcher/externals.h"
 #include "launcher/filesystem.h"
+#include "shared/externals.h"
 #include "shared/logger.h"
 #include "shared/filesystem.h"
 #include "shared/sha256.h"
@@ -369,31 +369,18 @@ namespace Launcher::fs {
 	}
 
 	IsaacInstallationPathInitResult Installation::SearchSaveFolder() {
-		char homeDirectory[4096];
-		DWORD homeLen = 4096;
-		HANDLE token = GetCurrentProcessToken();
+		std::string path;
+		Filesystem::SaveFolderResult result = Filesystem::GetIsaacSaveFolder(&path);
+		switch (result) {
+		case Filesystem::SAVE_FOLDER_ERR_USERPROFILE:
+		case Filesystem::SAVE_FOLDER_ERR_GET_USER_PROFILE_DIR:
+			return INSTALLATION_PATH_INIT_ERR_PROFILE_DIR;
 
-		if (!Externals::pGetUserProfileDirectoryA) {
-			DWORD result = GetEnvironmentVariableA("USERPROFILE", homeDirectory, 4096);
-			if (result < 0) {
-				return INSTALLATION_PATH_INIT_ERR_PROFILE_DIR;
-			}
-		}
-		else {
-			BOOL result = Externals::pGetUserProfileDirectoryA(token, homeDirectory, &homeLen);
-
-			if (!result) {
-				Logger::Error("Unable to find user profile directory: %d\n", GetLastError());
-				return INSTALLATION_PATH_INIT_ERR_PROFILE_DIR;
-			}
-		}
-
-		std::string path(homeDirectory);
-		path += "\\Documents\\My Games\\Binding of Isaac Repentance";
-
-		if (!Filesystem::FolderExists(path.c_str())) {
-			Logger::Error("Repentance save folder %s does not exist\n", path.c_str());
+		case Filesystem::SAVE_FOLDER_DOES_NOT_EXIST:
 			return INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR;
+
+		default:
+			break;
 		}
 
 		_saveFolder = std::move(path);

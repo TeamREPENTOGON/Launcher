@@ -17,6 +17,7 @@
 
 #include "curl/curl.h"
 #include "launcher/filesystem.h"
+#include "launcher/self_update.h"
 #include "launcher/window.h"
 #include "shared/github.h"
 #include "shared/monitor.h"
@@ -376,82 +377,45 @@ namespace Launcher {
 	}
 
 	void MainFrame::OnSelfUpdateClick(wxCommandEvent& event) {
-		HRSRC updater = FindResource(NULL, MAKEINTRESOURCE(IDB_EMBEDEXE1), RT_RCDATA);
-		if (!updater) {
+		switch (Launcher::SelfUpdateResult result = 
+			Launcher::DoSelfUpdate()) {
+		case SELF_UPDATE_RESOURCE_NOT_FOUND:
 			LogError("Unable to self update: resource not found in executable !");
-			return;
-		}
+			break;
 
-		HGLOBAL global = LoadResource(NULL, updater);
-		if (!global) {
+		case SELF_UPDATE_LOAD_FAILED:
 			LogError("Unable to load self updater: last error = %d !", GetLastError());
-			return;
-		}
+			break;
 
-		DWORD size = SizeofResource(NULL, updater);
-		if (size == 0) {
+		case SELF_UPDATE_INVALID_SIZE:
 			LogError("Invalid size of self updater (0) !");
-			return;
-		}
+			break;
 
-		void* data = LockResource(global);
-		if (!data) {
+		case SELF_UPDATE_LOCK_FAILED:
 			LogError("Unable to lock self updater !");
-			return;
-		}
+			break;
 
-		const char* filename = "./repentogon_launcher_self_updater.exe";
-		FILE* output = fopen(filename, "wb");
-		if (!output) {
-			LogError("Unable to open temporary file %s to extract the self updater", filename);
-			return;
-		}
+		case SELF_UPDATE_CANNOT_OPEN_TEMPORARY_FILE:
+			LogError("Unable to open temporary file %s to extract the self updater", Launcher::SelfUpdaterExePath);
+			break;
 
-		size_t count = fwrite(data, size, 1, output);
-		if (count != size) {
-			LogWarn("Inconsistent amount of data written: expected %d, wrote %lu", size, count);
-		}
-
-		fclose(output);
-
-		std::string updateStatePath = _installation.GetSaveFolder() + "/repentogon_launcher_self_updater_state";
-		FILE* updateState = fopen(updateStatePath.c_str(), "wb");
-		if (!updateState) {
+		case SELF_UPDATE_CANNOT_OPEN_LOCK_FILE:
 			LogError("Unable to open lock file for self update process");
-			return;
-		}
+			break;
 
-		fprintf(updateState, "%d", ::Updater::UpdateState::UPDATE_STATE_INIT);
-		fflush(updateState);
-		fclose(updateState);
-
-		char cli[4096] = { 0 };
-		int printfCount = snprintf(cli, 4096, "--lock-file=\"%s\"", updateStatePath.c_str());
-		if (printfCount < 0) {
+		case SELF_UPDATE_NO_CLI:
 			LogError("Unable to generate command line for self updater");
-			return;
-		}
+			break;
 
-		PROCESS_INFORMATION info;
-		memset(&info, 0, sizeof(info));
-
-		STARTUPINFOA startupInfo;
-		memset(&startupInfo, 0, sizeof(startupInfo));
-
-		BOOL ok = CreateProcessA(filename, cli, NULL, NULL, false, 0, NULL, NULL, &startupInfo, &info);
-		if (!ok) {
+		case SELF_UPDATE_CREATE_PROCESS_FAILED:
 			LogError("Unable to launch self updater");
-		}
-		else {
-			Log("Launched self updater");
-		}
-		HANDLE child = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION, false, info.dwProcessId);
+			break;
 
-		LogNoNL("Waiting until self updater is ready... ");
-		WaitForInputIdle(child, INFINITE);
-		Log("Done");
-
-		ExitProcess(0);
+		default:
+			LogError("Unknown error %d while attempting self update", (int)result);
+			break;
+		}
+		
 	}
 
 	void MainFrame::Launch(wxCommandEvent& event) {
