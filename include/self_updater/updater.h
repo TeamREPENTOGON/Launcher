@@ -1,6 +1,10 @@
 #pragma once
 
-#include "wx/wx.h"
+#include <cstdio>
+
+#include <string>
+
+#include "shared/monitor.h"
 
 namespace Updater {
 	enum UpdateState {
@@ -8,13 +12,27 @@ namespace Updater {
 		UPDATE_STATE_INIT,
 	};
 
-	class App : public wxApp {
-	public:
-		bool OnInit() override;
+	enum UpdateNotificationType {
+
 	};
 
-	class Updater : public wxFrame {
-	public:
-		Updater();
+	struct UpdateNotification {
+		UpdateNotificationType type;
+		void* data;
 	};
+
+	namespace Updater {
+		class UpdaterBackend {
+		public:
+			UpdaterBackend(const char* lockFile, const char* from, const char* to);
+
+		private:
+			FILE* _lockFile;
+			std::string _fromVersion;
+			std::string _toVersion;
+
+			UpdateState _state;
+			Threading::Monitor<UpdateNotification>* _monitor;
+		};
+	}
 }

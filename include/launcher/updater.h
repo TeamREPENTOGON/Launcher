@@ -6,9 +6,13 @@
 #include <string>
 #include <vector>
 
+#include "shared/github.h"
+#include "shared/monitor.h"
+
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/document.h"
 
+#include "shared/github.h"
 #include "shared/scoped_file.h"
 
 namespace Launcher {
@@ -62,30 +66,6 @@ namespace Launcher {
 		REPENTOGON_UPDATE_RESULT_EXTRACT_FAILED
 	};
 
-	/* Result of fetching updates. */
-	enum FetchUpdatesResult {
-		/* Fetched successfully. */
-		FETCH_UPDATE_OK,
-		/* cURL error. */
-		FETCH_UPDATE_BAD_CURL,
-		/* Invalid URL. */
-		FETCH_UPDATE_BAD_REQUEST,
-		/* Download error. */
-		FETCH_UPDATE_BAD_RESPONSE,
-		/* Response has no "name" field. */
-		FETCH_UPDATE_NO_NAME
-	};
-
-	/* Result of comparing installed version with latest release. */
-	enum VersionCheckResult {
-		/* New version available. */
-		VERSION_CHECK_NEW,
-		/* Up-to-date. */
-		VERSION_CHECK_UTD,
-		/* Error while checking version. */
-		VERSION_CHECK_ERROR
-	};
-
 	/* Helper class used to perform all the tasks related to updating.
 	 *
 	 * This class exposes methods to check the sanity of the filesystem, i.e. check
@@ -107,11 +87,12 @@ namespace Launcher {
 		 * The response parameter is updated to store the possible answer to
 		 * the request.
 		 */
-		VersionCheckResult CheckRepentogonUpdates(rapidjson::Document& response, 
-			fs::Installation const& installation);
+		Github::VersionCheckResult CheckRepentogonUpdates(rapidjson::Document& response, 
+			fs::Installation const& installation,
+			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 
 		/* Same as CheckRepentogonUpdates(), except for the launcher. */
-		VersionCheckResult CheckLauncherUpdates(rapidjson::Document& response);
+		Github::VersionCheckResult CheckLauncherUpdates(rapidjson::Document& response);
 
 		/* Update the installation of Repentogon. 
 		 * 
@@ -127,7 +108,8 @@ namespace Launcher {
 		 * process was successful, a REPENTOGON_UPDATE_RESULT_* constant 
 		 * otherwise.
 		 */
-		RepentogonUpdateResult UpdateRepentogon(rapidjson::Document& base);
+		RepentogonUpdateResult UpdateRepentogon(rapidjson::Document& base,
+			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 
 		RepentogonUpdateState const& GetRepentogonUpdateState() const;
 
@@ -146,7 +128,8 @@ namespace Launcher {
 		 * 
 		 * Return true if the download completes without issue, false otherwise.
 		 */
-		bool DownloadRepentogon();
+		bool DownloadRepentogon(
+			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 
 		/* Check that the hash of the downloaded archive matches the hash of
 		 * the release.
@@ -162,6 +145,7 @@ namespace Launcher {
 		bool ExtractRepentogon();
 
 		/* Fetch the JSON of the latest Repentogon release. */
-		FetchUpdatesResult FetchRepentogonUpdates(rapidjson::Document& result);
+		Github::FetchUpdatesResult FetchRepentogonUpdates(rapidjson::Document& result,
+			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 	};
 }

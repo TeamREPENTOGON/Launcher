@@ -29,6 +29,7 @@ namespace Launcher {
 		WINDOW_BUTTON_LAUNCH_BUTTON,
 		WINDOW_BUTTON_FORCE_UPDATE,
 		WINDOW_BUTTON_SELECT_ISAAC,
+		WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER,
 		WINDOW_BUTTON_SELF_UPDATE
 	};
 
@@ -63,7 +64,7 @@ namespace Launcher {
 
 		void AddLauncherConfigurationTextField(const char* intro, 
 			const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
-			wxBoxSizer* sizer, wxTextCtrl** result);
+			wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId);
 
 		/* Check Isaac version, Repentogon installation and Repentogon version. 
 		 * Disable Repentogon options if Repentogon is not installed correctly.
@@ -114,6 +115,9 @@ namespace Launcher {
 
 		/* Event handlers. */
 		void OnIsaacSelectClick(wxCommandEvent& event);
+		void OnSelectRepentogonFolderClick(wxCommandEvent& event);
+		void OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl, 
+			const char* emptyText);
 		void OnLevelSelect(wxCommandEvent& event);
 		void OnLauchModeSelect(wxCommandEvent& event);
 		void OnCharacterWritten(wxCommandEvent& event);

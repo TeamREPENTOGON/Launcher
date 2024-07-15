@@ -17,11 +17,11 @@ void LoaderData::InitializeStringTable() {
 #define STR(NAME) env->stringTable[NAME]
 
 #pragma code_seg(push, r1, ".trampo")
-/* Disable all checks that could lead to the functions containing information
+/* Disable all checks that could lead to the function containing information
  * it shouldn't: preservation of esp across function calls, balancing of the
  * stack etc.
  *
- * safebuffers disables the security which is address space dependant.
+ * safebuffers disables sanity checks which are address space dependant.
  *
  * Because the functions are injected into the game, their environement is limited
  * to their stack frame. In particular they cannot call any function that

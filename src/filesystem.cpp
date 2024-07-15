@@ -13,6 +13,8 @@
 #include "launcher/externals.h"
 #include "launcher/filesystem.h"
 #include "shared/logger.h"
+#include "shared/filesystem.h"
+#include "shared/sha256.h"
 
 namespace Launcher::fs {
 	/* Array of all the names of files that must be found for the installation
@@ -66,137 +68,6 @@ namespace Launcher::fs {
 		return NULL;
 	}
 
-	bool FolderExists(const char* name) {
-		return GetFileAttributesA(name) != INVALID_FILE_ATTRIBUTES;
-	}
-
-	bool FileExists(const char* name) {
-		WIN32_FIND_DATAA data;
-		return FileExists(name, &data);
-	}
-
-	bool FileExists(const char* name, WIN32_FIND_DATAA* data) {
-		memset(data, 0, sizeof(*data));
-		HANDLE result = FindFirstFileA(name, data);
-		bool ret = result != INVALID_HANDLE_VALUE;
-		if (ret) {
-			FindClose(result);
-		}
-
-		return ret;
-	}
-
-	std::string GetCurrentDirectory_() {
-		DWORD count = GetCurrentDirectoryA(0, NULL);
-		std::string result;
-		result.reserve(count + 1);
-		GetCurrentDirectoryA(result.capacity(), result.data());
-		return result;
-	}
-
-	std::string Sha256F(const char* filename) {
-		WIN32_FIND_DATAA data;
-		if (!FileExists(filename, &data)) {
-			std::ostringstream s;
-			s << "Updater::Sha256F: Attempt to hash non existant file " << filename;
-			throw std::runtime_error(s.str());
-		}
-
-		std::unique_ptr<char[]> content(new char[data.nFileSizeLow]);
-		if (!content) {
-			std::ostringstream s;
-			s << "Updater::Sha256F: Cannot hash " << filename << ": file size (" << data.nFileSizeLow << " bytes) would exceed available memory";
-			throw std::runtime_error(s.str());
-		}
-
-		FILE* f = fopen(filename, "rb");
-		fread(content.get(), data.nFileSizeLow, 1, f);
-
-		return Sha256(content.get(), data.nFileSizeLow);
-	}
-
-	std::string Sha256(const char* str, size_t size) {
-		BCRYPT_ALG_HANDLE alg;
-		NTSTATUS err = BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to open BCrypt SHA256 provider (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		DWORD buffSize;
-		DWORD dummy;
-		err = BCryptGetProperty(alg, BCRYPT_OBJECT_LENGTH, (unsigned char*)&buffSize, sizeof(buffSize), &dummy, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to retrieve object length property of BCrypt SHA256 provider (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		BCRYPT_HASH_HANDLE hashHandle;
-		std::unique_ptr<unsigned char[]> hashBuffer(new unsigned char[buffSize]);
-		if (!hashBuffer) {
-			throw std::runtime_error("Updater::Sha256: Unable to allocate buffer for internal computation");
-		}
-
-		err = BCryptCreateHash(alg, &hashHandle, hashBuffer.get(), buffSize, NULL, 0, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to create BCrypt hash object (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		err = BCryptHashData(hashHandle, (unsigned char*)str, size, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to hash data (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		DWORD hashSize;
-		err = BCryptGetProperty(alg, BCRYPT_HASH_LENGTH, (unsigned char*)&hashSize, sizeof(hashSize), &dummy, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to retrieve hash length property of BCrypt SHA256 provider (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		std::unique_ptr<unsigned char[]> hash(new unsigned char[hashSize]);
-		if (!hash) {
-			throw std::runtime_error("Updater::Sha256: Unable to allocate buffer for final computation");
-		}
-
-		err = BCryptFinishHash(hashHandle, hash.get(), hashSize, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Unable to finish hashing (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		hashBuffer.reset();
-		std::unique_ptr<char[]> hashHex(new char[hashSize * 2 + 1]);
-		if (!hashHex) {
-			throw std::runtime_error("Updater::Sha256: Unable to allocate buffer for hexdump of hash");
-		}
-
-		err = BCryptCloseAlgorithmProvider(alg, 0);
-		if (!BCRYPT_SUCCESS(err)) {
-			std::ostringstream s;
-			s << "Updater::Sha256: Error while closing provider (" << err << ")";
-			throw std::runtime_error(s.str());
-		}
-
-		for (int i = 0; i < hashSize; ++i) {
-			sprintf(hashHex.get() + 2 * i, "%02hhx", hash[i]);
-		}
-
-		hashHex[hashSize * 2] = '\0';
-		/* std::string will perform a copy of the content of the string,
-		 * the unique_ptr can safely release it afterwards.
-		 */
-		return std::string(hashHex.get());
-	}
-
 	IsaacInstallationPathInitResult Installation::InitFolders() {
 		IsaacInstallationPathInitResult result = SearchSaveFolder();
 		IsaacInstallationPathInitResult saveResult = result;
@@ -227,12 +98,12 @@ namespace Launcher::fs {
 		}
 
 		std::string fullPath = (_isaacFolder + "\\") + isaacExecutable;
-		if (!FileExists(fullPath.c_str())) {
+		if (!Filesystem::FileExists(fullPath.c_str())) {
 			return false;
 		}
 
 		try {
-			std::string hash = Sha256F(fullPath.c_str());
+			std::string hash = Sha256::Sha256F(fullPath.c_str());
 			_isaacVersion = GetIsaacVersionFromHash(hash.c_str());
 		}
 		catch (std::runtime_error& e) {
@@ -267,7 +138,7 @@ namespace Launcher::fs {
 			std::string fullName = _repentogonFolder + *mandatoryFile;
 			FoundFile& file = _repentogonFiles.emplace_back();
 			file.filename = *mandatoryFile;
-			file.found = FileExists(fullName.c_str());
+			file.found = Filesystem::FileExists(fullName.c_str());
 
 			if (!file.found) {
 				Logger::Error("Updater::CheckRepentogonInstallation: %s not found\n", *mandatoryFile);
@@ -362,7 +233,7 @@ namespace Launcher::fs {
 
 		_repentogonZHLVersionMatch = true;
 
-		if (FileExists((_repentogonFolder + "dsound.dll").c_str())) {
+		if (Filesystem::FileExists((_repentogonFolder + "dsound.dll").c_str())) {
 			_installationState = REPENTOGON_INSTALLATION_STATE_LEGACY;
 		}
 		else {
@@ -374,7 +245,7 @@ namespace Launcher::fs {
 
 	void Installation::SetLauncherConfigurationPath(ConfigurationFileLocation loc) {
 		if (loc == CONFIG_FILE_LOCATION_HERE) {
-			_configurationPath = GetCurrentDirectory_();
+			_configurationPath = Filesystem::GetCurrentDirectory_();
 		}
 		else {
 			if (_saveFolder.empty()) {
@@ -520,7 +391,7 @@ namespace Launcher::fs {
 		std::string path(homeDirectory);
 		path += "\\Documents\\My Games\\Binding of Isaac Repentance";
 
-		if (!FolderExists(path.c_str())) {
+		if (!Filesystem::FolderExists(path.c_str())) {
 			Logger::Error("Repentance save folder %s does not exist\n", path.c_str());
 			return INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR;
 		}
@@ -530,8 +401,8 @@ namespace Launcher::fs {
 	}
 
 	IsaacInstallationPathInitResult Installation::SearchConfigurationFile() {
-		if (FileExists(launcherConfigFile)) {
-			std::string path = (GetCurrentDirectory_() + "\\" + launcherConfigFile);
+		if (Filesystem::FileExists(launcherConfigFile)) {
+			std::string path = (Filesystem::GetCurrentDirectory_() + "\\" + launcherConfigFile);
 			IsaacInstallationPathInitResult parseRes = ProcessConfigurationFile(path.c_str());
 			if (parseRes != INSTALLATION_PATH_INIT_OK) {
 				Logger::Error("Error while opening/parsing the launcher configuration file\n");
@@ -551,7 +422,7 @@ namespace Launcher::fs {
 			path += "\\";
 			path += launcherConfigFile;
 
-			if (!FileExists(path.c_str())) {
+			if (!Filesystem::FileExists(path.c_str())) {
 				Logger::Error("No launcher configuration file found in Repentance save folder\n");
 				return INSTALLATION_PATH_INIT_ERR_NO_CONFIG;
 			}
@@ -571,8 +442,8 @@ namespace Launcher::fs {
 	IsaacInstallationPathInitResult Installation::SearchIsaacInstallationPath() {
 		std::string isaacFolder = _configurationFile->GetString("General", "IsaacFolder", "__empty__");
 		if (isaacFolder == "__empty__") {
-			if (FileExists(isaacExecutable)) {
-				_isaacFolder = GetCurrentDirectory_();
+			if (Filesystem::FileExists(isaacExecutable)) {
+				_isaacFolder = Filesystem::GetCurrentDirectory_();
 				Logger::Info("Found Isaac installation in %s\n", _isaacFolder.c_str());
 				return INSTALLATION_PATH_INIT_OK;
 			}
@@ -581,7 +452,7 @@ namespace Launcher::fs {
 			return INSTALLATION_PATH_INIT_ERR_NO_ISAAC;
 		}
 
-		if (!FolderExists(isaacFolder.c_str())) {
+		if (!Filesystem::FolderExists(isaacFolder.c_str())) {
 			Logger::Error("Isaac installation folder %s in launcher configuration file does not exist\n", isaacFolder.c_str());
 			return INSTALLATION_PATH_INIT_ERR_BAD_ISAAC_FOLDER;
 		}
@@ -594,8 +465,8 @@ namespace Launcher::fs {
 	IsaacInstallationPathInitResult Installation::SearchRepentogonInstallationPath() {
 		std::string repentogonFolder = _configurationFile->GetString("General", "RepentogonFolder", "__empty__");
 		if (repentogonFolder == "__empty__") {
-			if (FolderExists(defaultRepentogonFolder)) {
-				_repentogonFolder = (GetCurrentDirectory_() + "\\") + defaultRepentogonFolder;
+			if (Filesystem::FolderExists(defaultRepentogonFolder)) {
+				_repentogonFolder = (Filesystem::GetCurrentDirectory_() + "\\") + defaultRepentogonFolder;
 				Logger::Info("Found Repentogon installation folder in %s\n", _repentogonFolder.c_str());
 			}
 			else {
@@ -606,7 +477,7 @@ namespace Launcher::fs {
 			return INSTALLATION_PATH_INIT_OK;
 		}
 
-		if (!FolderExists(repentogonFolder.c_str())) {
+		if (!Filesystem::FolderExists(repentogonFolder.c_str())) {
 			Logger::Error("Repentogon installation folder %s in launcher configuration file does not exist\n", repentogonFolder.c_str());
 			return INSTALLATION_PATH_INIT_ERR_BAD_REPENTOGON_FOLDER;
 		}

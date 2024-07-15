@@ -12,81 +12,22 @@
 #include "shared/curl/abstract_response_handler.h"
 #include "shared/curl/file_response_handler.h"
 #include "shared/curl/string_response_handler.h"
-#include "launcher/filesystem.h"
+#include "shared/filesystem.h"
+#include "shared/github.h"
 #include "shared/logger.h"
+#include "shared/scoped_curl.h"
+#include "shared/sha256.h"
+
+#include "launcher/filesystem.h"
 #include "launcher/updater.h"
 
 #include "zip.h"
 
 namespace Launcher {
-	/* GitHub URLs of the latest releases of Repentogon and the launcher. */
+	/* GitHub URL of the latest releases of Repentogon. */
 	static const char* RepentogonURL = "https://api.github.com/repos/TeamREPENTOGON/REPENTOGON/releases/latest";
-	static const char* LauncherURL = "";
-
 	static const char* RepentogonZipName = "REPENTOGON.zip";
 	static const char* HashName = "hash.txt";
-
-	/* Check if the latest release data is newer than the installed version.
-	 * 
-	 * tool is the name of the tool whose version is checked, installedVersion
-	 * is the version of this tool, document is the JSON of the latest release
-	 * of said tool.
-	 */
-	static VersionCheckResult CheckUpdates(const char* installedVersion, 
-		const char* tool, rapidjson::Document& document);
-
-	/* Fetch the content at url and store it in response.
-	 * 
-	 * The content is assumed to be the JSON of a GitHub release and as such 
-	 * is expected to have a "name" field.
-	 */
-	static FetchUpdatesResult FetchUpdates(const char* url, 
-		rapidjson::Document& response);
-
-	/* Initialize a cURL session with sane parameters. 
-	 * 
-	 * url is the target address. handler is an instance of the generic class
-	 * used to process the data received.
-	 */
-	static void InitCurlSession(CURL* curl, const char* url, 
-		AbstractCurlResponseHandler* handler);
-
-	enum DownloadFileResult {
-		/* Download successful. */
-		DOWNLOAD_FILE_OK,
-		/* Error initializing curl. */
-		DOWNLOAD_FILE_BAD_CURL,
-		/* Error creating storage on filesystem. */
-		DOWNLOAD_FILE_BAD_FS,
-		/* Error while downloading. */
-		DOWNLOAD_FILE_DOWNLOAD_ERROR
-	};
-
-	/* Download file @file from the url @url. */
-	static DownloadFileResult DownloadFile(const char* file, const char* url);
-
-	/* Create the hierarchy of folders required in order to create the file @name. 
-	 * 
-	 * Return true if folders are created successfully, false otherwise.
-	 */
-	static bool CreateFileHierarchy(const char* name);
-
-	/* RAII-style class to automatically clean the CURL session. */
-	class ScopedCURL {
-	public:
-		ScopedCURL(CURL* curl) : _curl(curl) { 
-		
-		}
-
-		~ScopedCURL() {
-			if (_curl) {
-				curl_easy_cleanup(_curl);
-			}
-		}
-
-	private:
-		CURL* _curl;
-	};
 
 	RepentogonUpdateState::RepentogonUpdateState() {
 
@@ -96,97 +37,28 @@ namespace Launcher {
 
 	}
 
-	VersionCheckResult Updater::CheckRepentogonUpdates(rapidjson::Document& doc, 
-		fs::Installation const& installation) {
-		FetchUpdatesResult fetchResult = FetchRepentogonUpdates(doc);
-		if (fetchResult != FETCH_UPDATE_OK) {
-			return VERSION_CHECK_ERROR;
+	Github::VersionCheckResult Updater::CheckRepentogonUpdates(rapidjson::Document& doc,
+		fs::Installation const& installation,
+		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
+		Github::FetchUpdatesResult fetchResult = FetchRepentogonUpdates(doc, monitor);
+		if (fetchResult != Github::FETCH_UPDATE_OK) {
+			return Github::VERSION_CHECK_ERROR;
 		}
 
 		if (installation.GetRepentogonInstallationState() == fs::REPENTOGON_INSTALLATION_STATE_NONE) {
-			return VERSION_CHECK_NEW;
+			return Github::VERSION_CHECK_NEW;
 		}
 
-		return CheckUpdates(installation.GetZHLVersion().c_str(), "Repentogon", doc);
+		return Github::CheckUpdates(installation.GetZHLVersion().c_str(), "Repentogon", doc);
 	}
 
-	FetchUpdatesResult Updater::FetchRepentogonUpdates(rapidjson::Document& response) {
-		return FetchUpdates(RepentogonURL, response);
+	Github::FetchUpdatesResult Updater::FetchRepentogonUpdates(rapidjson::Document& response,
+		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
+		return Github::FetchUpdates(RepentogonURL, response, monitor);
 	}
 
-	FetchUpdatesResult FetchUpdates(const char* url, rapidjson::Document& response) {
-		CURL* curl;
-		CURLcode curlResult;
-
-		curl = curl_easy_init();
-		if (!curl) {
-			Logger::Error("CheckUpdates: error while initializing cURL session for %s\n", url);
-			return FETCH_UPDATE_BAD_CURL;
-		}
-
-		ScopedCURL session(curl);
-		CurlStringResponse data;
-		InitCurlSession(curl, url, &data);
-		curlResult = curl_easy_perform(curl);
-		if (curlResult != CURLE_OK) {
-			Logger::Error("CheckUpdates: %s: error while performing HTTP request to retrieve version information: "
-				"cURL error: %s", url, curl_easy_strerror(curlResult));
-			return FETCH_UPDATE_BAD_REQUEST;
-		}
-
-		response.Parse(data.GetData().c_str());
-
-		if (response.HasParseError()) {
-			Logger::Error("CheckUpdates: %s: error while parsing HTTP response. rapidjson error code %d", url,
-				response.GetParseError());
-			return FETCH_UPDATE_BAD_RESPONSE;
-		}
-
-		if (!response.HasMember("name")) {
-			Logger::Error("CheckUpdates: %s: malformed HTTP response: no field called \"name\"", url);
-			return FETCH_UPDATE_NO_NAME;
-		}
-
-		return FETCH_UPDATE_OK;
-	}
-
-	VersionCheckResult CheckUpdates(const char* installed, const char* tool, 
-		rapidjson::Document& response) {
-		if (!installed ||
-			!strcmp(installed, "nightly") || !strcmp(installed, "dev")) {
-			Logger::Info("CheckUpdates: not checking up-to-dateness of %s: dev build found\n", tool);
-			return VERSION_CHECK_UTD;
-		}
-
-		const char* remoteVersion = response["name"].GetString();
-		if (strcmp(remoteVersion, installed)) {
-			Logger::Info("CheckUpdates: %s: new version available: %s", tool, remoteVersion);
-			return VERSION_CHECK_NEW;
-		}
-		else {
-			Logger::Info("CheckUpdates: %s: up-to-date", tool);
-			return VERSION_CHECK_UTD;
-		}
-	}
-
-	void InitCurlSession(CURL* curl, const char* url, 
-		AbstractCurlResponseHandler* handler) {
-		struct curl_slist* headers = NULL;
-		headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
-		headers = curl_slist_append(headers, "X-GitHub-Api-Version: 2022-11-28");
-		headers = curl_slist_append(headers, "User-Agent: REPENTOGON");
-
-		curl_easy_setopt(curl, CURLOPT_URL, url);
-		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AbstractCurlResponseHandler::ResponseSkeleton);
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, handler);
-		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-		curl_easy_setopt(curl, CURLOPT_SERVER_RESPONSE_TIMEOUT, 5);
-		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30);
-	}
-
-	RepentogonUpdateResult Updater::UpdateRepentogon(rapidjson::Document& data) {
+	RepentogonUpdateResult Updater::UpdateRepentogon(rapidjson::Document& data,
+		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
 		_repentogonUpdateState.Clear();
 
 		_repentogonUpdateState.phase = REPENTOGON_UPDATE_PHASE_CHECK_ASSETS;
@@ -196,7 +68,7 @@ namespace Launcher {
 		}
 
 		_repentogonUpdateState.phase = REPENTOGON_UPDATE_PHASE_DOWNLOAD;
-		if (!DownloadRepentogon()) {
+		if (!DownloadRepentogon(monitor)) {
 			Logger::Error("Updater::UpdateRepentogon: download failed\n");
 			return REPENTOGON_UPDATE_RESULT_DOWNLOAD_ERROR;
 		}
@@ -282,8 +154,9 @@ namespace Launcher {
 		return hasHash && hasZip;
 	}
 
-	bool Updater::DownloadRepentogon() {
-		if (DownloadFile(HashName, _repentogonUpdateState.hashUrl.c_str()) != DOWNLOAD_FILE_OK) {
+	bool Updater::DownloadRepentogon(
+		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
+		if (Github::DownloadFile(HashName, _repentogonUpdateState.hashUrl.c_str(), monitor) != Github::DOWNLOAD_FILE_OK) {
 			Logger::Error("Updater::DownloadRepentogon: error while downloading hash\n");
 			return false;
 		}
@@ -294,7 +167,7 @@ namespace Launcher {
 			return false;
 		}
 
-		if (DownloadFile(RepentogonZipName, _repentogonUpdateState.zipUrl.c_str()) != DOWNLOAD_FILE_OK) {
+		if (Github::DownloadFile(RepentogonZipName, _repentogonUpdateState.zipUrl.c_str(), monitor) != Github::DOWNLOAD_FILE_OK) {
 			Logger::Error("Updater::DownloadRepentogon: error while downloading zip\n");
 			return false;
 		}
@@ -343,7 +216,7 @@ namespace Launcher {
 
 		std::string zipHash;
 		try {
-			zipHash = fs::Sha256F(RepentogonZipName);
+			zipHash = Sha256::Sha256F(RepentogonZipName);
 		}
 		catch (std::exception& e) {
 			Logger::Fatal("Updater::CHeckRepentogonIntegrity: exception while hashing %s: %s\n", RepentogonZipName, e.what());
@@ -395,7 +268,7 @@ namespace Launcher {
 				continue;
 			}
 
-			if (!CreateFileHierarchy(name)) {
+			if (!Filesystem::CreateFileHierarchy(name)) {
 				Logger::Error("Updater::ExtractRepentogon: cannot create intermediate folders for file %s\n", name);
 				ok = false;
 				zip_fclose(file);
@@ -436,34 +309,8 @@ namespace Launcher {
 		return ok;
 	}
 
-	DownloadFileResult DownloadFile(const char* file, const char* url) {
-		CurlFileResponse response(file);
-		if (!response.GetFile()) {
-			Logger::Error("DownloadFile: unable to open %s for writing\n", file);
-			return DOWNLOAD_FILE_BAD_FS;
-		}
-
-		CURL* curl = curl_easy_init();
-		CURLcode code;
-
-		if (!curl) {
-			Logger::Error("DownloadFile: error while initializing curl session to download hash\n");
-			return DOWNLOAD_FILE_BAD_CURL;
-		}
-
-		ScopedCURL scoppedCurl(curl);
-		InitCurlSession(curl, url, &response);
-		code = curl_easy_perform(curl);
-		if (code != CURLE_OK) {
-			Logger::Error("DownloadFile: error while downloading hash: %s\n", curl_easy_strerror(code));
-			return DOWNLOAD_FILE_DOWNLOAD_ERROR;
-		}
-
-		return DOWNLOAD_FILE_OK;
-	}
-
-	VersionCheckResult Updater::CheckLauncherUpdates(rapidjson::Document&) {
-		return VERSION_CHECK_UTD;
+	Github::VersionCheckResult Updater::CheckLauncherUpdates(rapidjson::Document&) {
+		return Github::VERSION_CHECK_UTD;
 	}
 
 	RepentogonUpdateState const& Updater::GetRepentogonUpdateState() const {
@@ -480,34 +327,5 @@ namespace Launcher {
 		hash.clear();
 		zipHash.clear();
 		unzipedFiles.clear();
-	}
-
-	bool CreateFileHierarchy(const char* name) {
-		char* copy = (char*)malloc(strlen(name) + 1);
-		if (!copy) {
-			Logger::Error("CreateFileHierarchy: unable to allocate memory to duplicate %s\n", name);
-			return false;
-		}
-
-		strcpy(copy, name);
-		char* next = strpbrk(copy, "/");
-		while (next) {
-			char save = *next;
-			*next = '\0';
-			BOOL created = CreateDirectoryA(copy, NULL);
-			if (!created) {
-				DWORD lastError = GetLastError();
-				if (lastError != ERROR_ALREADY_EXISTS) {
-					Logger::Error("CreateFileHierarchy: unable to create folder %s: %d\n", copy, lastError);
-					free(copy);
-					return false;
-				}
-			}
-			*next = save;
-			next = strpbrk(next + 1, "/");
-		}
-
-		free(copy);
-		return true;
 	}
 }

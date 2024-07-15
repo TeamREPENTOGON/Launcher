@@ -84,41 +84,6 @@ namespace Launcher {
 		/* Global array of all known versions of the game. */
 		extern Version const knownVersions[];
 
-		/* Check if a folder with the given name exists. Return true on success, 
-		 * false on failure. 
-		 */
-		bool FolderExists(const char* name);
-
-		/* Check that a file with the given name exists. Return true on success,
-		 * false on failure.
-		 */
-		bool FileExists(const char* filename);
-
-		/* Check that a file with the given name exists. Fill the search
-		 * structure with the result of the search.
-		 *
-		 * Return true on success, false on failure.
-		 */
-		bool FileExists(const char* filename, WIN32_FIND_DATAA* search);
-
-		std::string GetCurrentDirectory_();
-
-		/* Return a pointer to the Version object associated with a version's hash.
-		 * If no such hash exists, return NULL.
-		 */
-		Version const* GetIsaacVersionFromHash(const char* hash);
-
-		/* Return the SHA-256 hash of the content of filename.
-		 *
-		 * If the function cannot load the content of the file in memory, or if
-		 * the file does not exist, the function throws.
-		 */
-		std::string Sha256F(const char* filename) noexcept(false);
-
-		/* Return the SHA-256 hash of the string. NULL strings have an empty
-		 * hash. */
-		std::string Sha256(const char* string, size_t size);
-
 		class Installation {
 		public:
 			/* Initialize the save folder, Isaac installation, launcher 

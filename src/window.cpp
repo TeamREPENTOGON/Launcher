@@ -18,6 +18,8 @@
 #include "curl/curl.h"
 #include "launcher/filesystem.h"
 #include "launcher/window.h"
+#include "shared/github.h"
+#include "shared/monitor.h"
 #include "self_updater/updater_resources.h"
 #include "self_updater/updater.h"
 
@@ -38,6 +40,7 @@ EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnChara
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::MainFrame::Launch)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_FORCE_UPDATE, Launcher::MainFrame::ForceUpdate)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::MainFrame::OnIsaacSelectClick)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::MainFrame::OnSelectRepentogonFolderClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELF_UPDATE, Launcher::MainFrame::OnSelfUpdateClick)
 wxEND_EVENT_TABLE()
 
@@ -46,7 +49,19 @@ namespace Launcher {
 	static wxComboBox* CreateLevelsComboBox(wxWindow* window);
 
 	// Read chunks of 1MB in the zip stream of REPENTOGON.zip
-	static constexpr size_t StreamChunkSize = 1 << 20; 
+	static constexpr size_t StreamChunkSize = 1 << 20;
+
+	/* Color of the error text if no isaac-ng.exe is specified. */
+	static wxColor NoIsaacColor = *wxRED;
+	/* Color of the error if no installation folder for Repentogon is specified. */
+	static wxColor NoRepentogonInstallationFolderColor = wxColor(255, 128, 64);
+
+	/* Error text displayed if no isaac-ng.exe is specified. */
+	static const char* NoIsaacText = "No file specified, won't be able to launch anything";
+	/* Error text displayed if no installation folder for Repentogon is specified. */
+	static const char* NoRepentogonInstallationFolderText = "No folder specified, will download in current folder";
+
+	static const char* GetCurrentDirectoryError = "unable to get current directory";
 
 	namespace Defaults {
 		bool console = false;
@@ -138,7 +153,8 @@ namespace Launcher {
 		optionsBox->SetSizer(optionsSizer);
 
 		wxSizer* verticalSizer = new wxBoxSizer(wxVERTICAL);
-		wxTextCtrl* logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, 400), wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH);
+		wxTextCtrl* logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, 400), 
+			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH);
 		logWindow->SetBackgroundColour(*wxWHITE);
 
 		wxStaticBox* configurationBox = new wxStaticBox(this, -1, "Launcher configuration");
@@ -181,14 +197,14 @@ namespace Launcher {
 	void MainFrame::AddLauncherConfigurationOptions() {
 		wxBoxSizer* isaacSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
 		AddLauncherConfigurationTextField("Indicate the path of the isaac-ng.exe file",
-			"Select file", "No file specified, won't be able to launch anything", 
-			*wxRED, isaacSelectionSizer, &_isaacFileText);
+			"Select file", NoIsaacText, 
+			NoIsaacColor, isaacSelectionSizer, &_isaacFileText, WINDOW_BUTTON_SELECT_ISAAC);
 
 		wxBoxSizer* repentogonSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
 		AddLauncherConfigurationTextField("Indicate folder in which to download and install REPENTOGON",
 			"Select folder", 
-			"No folder specified, will download in current folder", wxColor(255, 128, 64),
-			repentogonSelectionSizer, &_repentogonInstallFolderText);
+			NoRepentogonInstallationFolderText, NoRepentogonInstallationFolderColor,
+			repentogonSelectionSizer, &_repentogonInstallFolderText, WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER);
 
 		// isaacSelectionSizer->Add(new wxStaticLine(), 0, wxBOTTOM | wxTOP, 20);
 
@@ -275,19 +291,34 @@ namespace Launcher {
 	}
 
 	void MainFrame::OnIsaacSelectClick(wxCommandEvent& event) {
-		wxFileDialog dialog(this, "Please select the isaac-ng.exe to launch", wxEmptyString, wxEmptyString, "isaac-ng.exe", wxFD_FILE_MUST_EXIST, wxDefaultPosition,
-			wxDefaultSize, "Select isaac-ng.exe executable");
+		wxFileDialog dialog(this, "Please select the isaac-ng.exe to launch", wxEmptyString, wxEmptyString, 
+			"isaac-ng.exe", wxFD_FILE_MUST_EXIST, wxDefaultPosition, wxDefaultSize, 
+			"Select isaac-ng.exe executable");
 		dialog.ShowModal();
 		std::string path = dialog.GetPath().ToStdString();
+		OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
+	}
+
+	void MainFrame::OnSelectRepentogonFolderClick(wxCommandEvent& event) {
+		wxDirDialog dialog(this, "Please select the folder in which to install Repentogon", wxEmptyString,
+			0, wxDefaultPosition, wxDefaultSize, "Select Repentogon installation folder");
+		dialog.ShowModal();
+
+		std::string path = dialog.GetPath().ToStdString();
+		OnFileSelected(path, NoRepentogonInstallationFolderColor, _repentogonInstallFolderText, NoRepentogonInstallationFolderText);
+	}
+
+	void MainFrame::OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl, 
+		const char* emptyText) {
 		if (!path.empty()) {
-			_isaacFileText->SetValue(path);
+			ctrl->SetValue(path);
 		}
 		else {
-			wxTextAttr textAttr = _isaacFileText->GetDefaultStyle();
-			_isaacFileText->Clear();
-			_isaacFileText->SetDefaultStyle(wxTextAttr(*wxRED));
-			_isaacFileText->AppendText("No file specified, won't be able to launch anything");
-			_isaacFileText->SetDefaultStyle(textAttr);
+			wxTextAttr textAttr = ctrl->GetDefaultStyle();
+			ctrl->Clear();
+			ctrl->SetDefaultStyle(wxTextAttr(emptyColor));
+			ctrl->AppendText(emptyText);
+			ctrl->SetDefaultStyle(textAttr);
 		}
 	}
 
@@ -372,13 +403,13 @@ namespace Launcher {
 		const char* filename = "./repentogon_launcher_self_updater.exe";
 		FILE* output = fopen(filename, "wb");
 		if (!output) {
-			LogError("Unable to open temporary file %s to extract the self updater");
+			LogError("Unable to open temporary file %s to extract the self updater", filename);
 			return;
 		}
 
 		size_t count = fwrite(data, size, 1, output);
 		if (count != size) {
-			LogWarn("Inconsistent amount of data written: expected %d, wrote %llu", size, count);
+			LogWarn("Inconsistent amount of data written: expected %d, wrote %lu", size, count);
 		}
 
 		fclose(output);
@@ -395,7 +426,7 @@ namespace Launcher {
 		fclose(updateState);
 
 		char cli[4096] = { 0 };
-		int printfCount = snprintf(cli, 4096, "--lock-file=%s", updateStatePath.c_str());
+		int printfCount = snprintf(cli, 4096, "--lock-file=\"%s\"", updateStatePath.c_str());
 		if (printfCount < 0) {
 			LogError("Unable to generate command line for self updater");
 			return;
@@ -414,7 +445,7 @@ namespace Launcher {
 		else {
 			Log("Launched self updater");
 		}
-		HANDLE child = OpenProcess(SYNCHRONIZE, false, info.dwProcessId);
+		HANDLE child = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_INFORMATION, false, info.dwProcessId);
 
 		LogNoNL("Waiting until self updater is ready... ");
 		WaitForInputIdle(child, INFINITE);
@@ -448,23 +479,51 @@ namespace Launcher {
 
 	void MainFrame::PostInit() {
 		Log("Welcome to the REPENTOGON Launcher version %s", Launcher::version);
+		char currentDir[4096];
+		char* buffer = currentDir;
+		bool needFree = false;
+		DWORD currentDirResult = GetCurrentDirectoryA(4096, currentDir);
+		if (currentDirResult) {
+			if (currentDirResult > 4096) {
+				buffer = (char*)malloc(currentDirResult);
+				if (!buffer) {
+					buffer = (char*)GetCurrentDirectoryError;
+				}
+				else {
+					needFree = true;
+					if (GetCurrentDirectoryA(currentDirResult, buffer) == 0) {
+						needFree = false;
+						buffer = (char*)GetCurrentDirectoryError;
+					}
+				}
+			}
+		}
+		else {
+			buffer = (char*)GetCurrentDirectoryError;
+		}
+		Log("Current directory is: %s", buffer);
+		if (needFree)
+			free(buffer);
+		LPSTR cli = GetCommandLineA();
+		// Log("Command line: %s", cli);
 		Log("Loading configuration...");
 
 		Launcher::fs::IsaacInstallationPathInitResult initState = _installation.InitFolders();
 		bool needConfigurationFileInput = false;
 		switch (initState) {
 		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_PROFILE_DIR:
-			LogError("No configuration file found in current dir and unable to access the Repentance save folder");
+			LogError("No configuration file found in current folder and unable to access the Repentance save folder");
 			needConfigurationFileInput = true;
 			break;
 
 		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR:
-			LogError("No configuration file found in current dir and no Repentance save folder found");
+			LogError("No configuration file found in current folder and no Repentance save folder found");
 			needConfigurationFileInput = true;
 			break;
 
 		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_NO_CONFIG:
-			LogError("No configuration file found in current dir and none found in the Repentance save folder");
+			Log("Found Isaac save folder %s", _installation.GetSaveFolder().c_str());
+			LogError("No configuration file found in current folder and none found in the Repentance save folder");
 			needConfigurationFileInput = true;
 			break;
 
@@ -501,6 +560,8 @@ namespace Launcher {
 				LogError("Unable to configure the Isaac installation folder");
 				return;
 			}
+
+			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
 		}
 
 		if (!CheckIsaacVersion()) {
@@ -918,9 +979,56 @@ namespace Launcher {
 	}
 
 	bool MainFrame::DoRepentogonUpdate(rapidjson::Document& response) {
-		RepentogonUpdateResult result = _updater.UpdateRepentogon(response);
+		Threading::Monitor<Github::GithubDownloadNotification> monitor;
+		std::future<RepentogonUpdateResult> result = std::async(std::launch::async, 
+			&Launcher::Updater::UpdateRepentogon, &_updater, std::ref(response), &monitor);
+		size_t totalDownloadSize = 0;
+		while (result.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
+			while (std::optional<Github::GithubDownloadNotification> message = monitor.Get()) {
+				switch (message->type) {
+				case Github::GH_NOTIFICATION_INIT_CURL:
+					Log("[Updater] Initializing cURL connection to %s", std::get<std::string>(message->data).c_str());
+					break;
+
+				case Github::GH_NOTIFICATION_INIT_CURL_DONE:
+					Log("[Updater] Initialized cURL connection to %s", std::get<std::string>(message->data).c_str());
+					break;
+
+				case Github::GH_NOTIFICATION_CURL_PERFORM:
+					Log("[Updater] Performing cURL request to %s", std::get<std::string>(message->data).c_str());
+					break;
+
+				case Github::GH_NOTIFICATION_CURL_PERFORM_DONE:
+					Log("[Updater] Performed cURL request to %s", std::get<std::string>(message->data).c_str());
+					break;
+
+				case Github::GH_NOTIFICATION_DATA_RECEIVED:
+					totalDownloadSize += std::get<size_t>(message->data);
+					Log("[Updater] Downloaded %lu bytes", totalDownloadSize);
+					break;
+
+				case Github::GH_NOTIFICATION_PARSE_RESPONSE:
+					Log("[Updater] Parsing result of cURL request from %s", std::get<std::string>(message->data).c_str());
+					break;
+
+				case Github::GH_NOTIFICATION_PARSE_RESPONSE_DONE:
+					Log("[Updater] Parsed result of cURL request from %s", std::get<std::string>(message->data).c_str());
+					break;
+
+				case Github::GH_NOTIFICATION_DONE:
+					Log("[Updater] Successfully downloaded content from %s", std::get<std::string>(message->data).c_str());
+					break;
+
+				default:
+					LogError("[Updater] Unexpected asynchronous notification (id = %d)", message->type);
+					break;
+				}
+			}
+		}
+
 		RepentogonUpdateState const& state = _updater.GetRepentogonUpdateState();
-		switch (result) {
+		Launcher::RepentogonUpdateResult updateResult = result.get();
+		switch (updateResult) {
 		case REPENTOGON_UPDATE_RESULT_MISSING_ASSET:
 			LogError("Could not install Repentogon: bad assets in release information\n");
 			LogError("Found hash.txt: %s\n", state.hashOk ? "yes" : "no");
@@ -958,10 +1066,10 @@ namespace Launcher {
 			break;
 
 		default:
-			LogError("Unknown error code from Updater::UpdateRepentogon: %d\n", result);
+			LogError("Unknown error code from Updater::UpdateRepentogon: %d\n", updateResult);
 		}
 
-		return result == REPENTOGON_UPDATE_RESULT_OK;
+		return updateResult == REPENTOGON_UPDATE_RESULT_OK;
 	}
 
 	bool MainFrame::DoSelfUpdate(rapidjson::Document& response) {
@@ -983,11 +1091,12 @@ namespace Launcher {
 
 	bool MainFrame::DoCheckRepentogonUpdates(rapidjson::Document& document, 
 		bool force) {
-		VersionCheckResult result = _updater.CheckRepentogonUpdates(document, _installation);
-		if (result == VERSION_CHECK_NEW)
+		Threading::Monitor<Github::GithubDownloadNotification> monitor;
+		Github::VersionCheckResult result = _updater.CheckRepentogonUpdates(document, _installation, &monitor);
+		if (result == Github::VERSION_CHECK_NEW)
 			return true;
 
-		if (result == VERSION_CHECK_UTD)
+		if (result == Github::VERSION_CHECK_UTD)
 			return force;
 
 		return false;
@@ -1036,9 +1145,9 @@ namespace Launcher {
 
 	void MainFrame::AddLauncherConfigurationTextField(const char* intro,
 		const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
-		wxBoxSizer* sizer, wxTextCtrl** result) {
+		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
 		sizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 20);
-		wxButton* isaacSelectionButton = new wxButton(_configurationBox, Launcher::WINDOW_BUTTON_SELECT_ISAAC, buttonText);
+		wxButton* isaacSelectionButton = new wxButton(_configurationBox, windowId, buttonText);
 		sizer->Add(isaacSelectionButton, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
 		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxSize(400, -1), wxTE_READONLY | wxTE_RICH);
 		textCtrl->SetBackgroundColour(*wxWHITE);
