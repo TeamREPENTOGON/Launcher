@@ -377,45 +377,133 @@ namespace Launcher {
 	}
 
 	void MainFrame::OnSelfUpdateClick(wxCommandEvent& event) {
-		switch (Launcher::SelfUpdateResult result = 
-			Launcher::DoSelfUpdate()) {
-		case SELF_UPDATE_RESOURCE_NOT_FOUND:
-			LogError("Unable to self update: resource not found in executable !");
+		Log("Performing self-update (forcibly triggered)");
+		Launcher::SelfUpdateErrorCode result = Launcher::DoSelfUpdate(false, false, true);
+		std::ostringstream err, info;
+		bool isError = result.base != SELF_UPDATE_UP_TO_DATE;
+		bool timedout = result.base == SELF_UPDATE_SELF_UPDATE_FAILED && 
+			result.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT;
+		switch (result.base) {
+		case SELF_UPDATE_UPDATE_CHECK_FAILED:
+			err << "Error while checking for available launcher updates: ";
+			switch (result.detail.fetchUpdatesResult) {
+			case Github::DOWNLOAD_AS_STRING_BAD_CURL:
+				err << "error while initializing cURL";
+				break;
+
+			case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
+				err << "error while performing cURL request";
+				break;
+
+			case Github::DOWNLOAD_AS_STRING_BAD_RESPONSE:
+				err << "malformed HTTP answer";
+				break;
+
+			case Github::DOWNLOAD_AS_STRING_NO_NAME:
+				err << "HTTP answer lacks a \"name\" field";
+				break;
+			}
 			break;
 
-		case SELF_UPDATE_LOAD_FAILED:
-			LogError("Unable to load self updater: last error = %d !", GetLastError());
+		case SELF_UPDATE_EXTRACTION_FAILED:
+			err << "Error while extracting the self-updater: ";
+			switch (result.detail.extractionResult) {
+			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_NOT_FOUND:
+				err << "unable to locate self-updater inside the launcher";
+				break;
+
+			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_LOAD_FAILED:
+				err << "unable to load self-updater from the launcher";
+				break;
+
+			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_LOCK_FAILED:
+				err << "unable to acquire resource lock on self-updater";
+				break;
+
+			case SELF_UPDATE_EXTRACTION_ERR_BAD_RESOURCE_SIZE:
+				err << "embedded self-updater has the wrong size";
+				break;
+
+			case SELF_UPDATE_EXTRACTION_ERR_OPEN_TEMPORARY_FILE:
+				err << "unable to open temporary file to extract self-updater";
+				break;
+
+			case SELF_UPDATE_EXTRACTION_ERR_WRITTEN_SIZE:
+				err << "unable to write self-updater on the disk";
+				break;
+			}
 			break;
 
-		case SELF_UPDATE_INVALID_SIZE:
-			LogError("Invalid size of self updater (0) !");
-			break;
+		case SELF_UPDATE_SELF_UPDATE_FAILED:
+			err << "Error while launching self-updater: ";
+			switch (result.detail.runUpdateResult) {
+			case SELF_UPDATE_RUN_UPDATER_ERR_OPEN_LOCK_FILE:
+				err << "error while opening internal lock file";
+				break;
 
-		case SELF_UPDATE_LOCK_FAILED:
-			LogError("Unable to lock self updater !");
-			break;
+			case SELF_UPDATE_RUN_UPDATER_ERR_GENERATE_CLI:
+				err << "error while generating self-updater command line";
+				break;
 
-		case SELF_UPDATE_CANNOT_OPEN_TEMPORARY_FILE:
-			LogError("Unable to open temporary file %s to extract the self updater", Launcher::SelfUpdaterExePath);
-			break;
+			case SELF_UPDATE_RUN_UPDATER_ERR_CREATE_PROCESS:
+				err << "error while creating self-updater process";
+				break;
 
-		case SELF_UPDATE_CANNOT_OPEN_LOCK_FILE:
-			LogError("Unable to open lock file for self update process");
-			break;
+			case SELF_UPDATE_RUN_UPDATER_ERR_OPEN_PROCESS:
+				err << "error while opening self-updater process handle";
+				break;
 
-		case SELF_UPDATE_NO_CLI:
-			LogError("Unable to generate command line for self updater");
-			break;
+			case SELF_UPDATE_RUN_UPDATER_ERR_WAIT:
+				err << "error while waiting for self-updater ready";
+				break;
 
-		case SELF_UPDATE_CREATE_PROCESS_FAILED:
-			LogError("Unable to launch self updater");
+			case SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT:
+				err << "timedout while waiting for self-updater ready";
+				break;
+			}
+
+		case SELF_UPDATE_UP_TO_DATE:
+			info << "Everything up-to-date (please report this as a bug: forced updates should never display this message)";
 			break;
 
 		default:
-			LogError("Unknown error %d while attempting self update", (int)result);
+			LogError("Unknown error %d while attempting self update", (int)result.base);
 			break;
 		}
 		
+		if (isError) {
+			LogError("%s", err.str().c_str());
+		}
+		else {
+			Log("%s", info.str().c_str());
+		}
+
+		const int maxRetries = 3;
+		int retries = 0;
+		while (timedout && retries < maxRetries) {
+			wxDialog promptRetry(this, -1, "Retry update", wxDefaultPosition, wxDefaultSize, wxYES_NO, "Retry update ?");
+			int modalResult = promptRetry.ShowModal();
+			if (modalResult == 0) {
+				break;
+			}
+			else {
+				result = Launcher::DoSelfUpdate(false, true, true);
+				if (result.base != SELF_UPDATE_SELF_UPDATE_FAILED) {
+					LogError("Unexpected error category %d when retrying self-update, aborting", result.base);
+					break;
+				}
+
+				if (result.detail.runUpdateResult != SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT) {
+					LogError("Unexpected self-update error %d when retrying self-update, aborting", result.detail.runUpdateResult);
+					break;
+				}
+
+				LogError("Timedout while waiting for self-updater ready (retry %d/%d)", retries + 1, maxRetries);
+				++retries;
+			}
+		}
+
+		LogError("Too many timeouts while waiting for self-updater ready. Aborting self-update, please kill the self-updater.");
 	}
 
 	void MainFrame::Launch(wxCommandEvent& event) {

@@ -16,7 +16,7 @@ namespace Github {
 	static GithubDownloadNotification CreateParseResponseNotification(const char* url, bool done);
 	static GithubDownloadNotification CreateDoneNotification(const char* url);
 
-	FetchUpdatesResult FetchUpdates(const char* url, rapidjson::Document& response,
+	DownloadAsStringResult DownloadAsString(const char* url, rapidjson::Document& response,
 		Threading::Monitor<GithubDownloadNotification>* monitor) {
 		CURL* curl;
 		CURLcode curlResult;
@@ -25,7 +25,7 @@ namespace Github {
 		curl = curl_easy_init();
 		if (!curl) {
 			Logger::Error("CheckUpdates: error while initializing cURL session for %s\n", url);
-			return FETCH_UPDATE_BAD_CURL;
+			return DOWNLOAD_AS_STRING_BAD_CURL;
 		}
 
 		ScopedCURL session(curl);
@@ -39,7 +39,7 @@ namespace Github {
 		if (curlResult != CURLE_OK) {
 			Logger::Error("CheckUpdates: %s: error while performing HTTP request to retrieve version information: "
 				"cURL error: %s", url, curl_easy_strerror(curlResult));
-			return FETCH_UPDATE_BAD_REQUEST;
+			return DOWNLOAD_AS_STRING_BAD_REQUEST;
 		}
 		monitor->Push(CreatePerformCurlNotification(url, true));
 
@@ -50,16 +50,16 @@ namespace Github {
 		if (response.HasParseError()) {
 			Logger::Error("CheckUpdates: %s: error while parsing HTTP response. rapidjson error code %d", url,
 				response.GetParseError());
-			return FETCH_UPDATE_BAD_RESPONSE;
+			return DOWNLOAD_AS_STRING_BAD_RESPONSE;
 		}
 
 		if (!response.HasMember("name")) {
 			Logger::Error("CheckUpdates: %s: malformed HTTP response: no field called \"name\"", url);
-			return FETCH_UPDATE_NO_NAME;
+			return DOWNLOAD_AS_STRING_NO_NAME;
 		}
 
 		monitor->Push(CreateDoneNotification(url));
-		return FETCH_UPDATE_OK;
+		return DOWNLOAD_AS_STRING_OK;
 	}
 
 	VersionCheckResult CheckUpdates(const char* installed, const char* tool,

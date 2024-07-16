@@ -11,17 +11,17 @@
 
 namespace Github {
 	/* Result of fetching updates. */
-	enum FetchUpdatesResult {
+	enum DownloadAsStringResult {
 		/* Fetched successfully. */
-		FETCH_UPDATE_OK,
+		DOWNLOAD_AS_STRING_OK,
 		/* cURL error. */
-		FETCH_UPDATE_BAD_CURL,
+		DOWNLOAD_AS_STRING_BAD_CURL,
 		/* Invalid URL. */
-		FETCH_UPDATE_BAD_REQUEST,
+		DOWNLOAD_AS_STRING_BAD_REQUEST,
 		/* Download error. */
-		FETCH_UPDATE_BAD_RESPONSE,
+		DOWNLOAD_AS_STRING_BAD_RESPONSE,
 		/* Response has no "name" field. */
-		FETCH_UPDATE_NO_NAME
+		DOWNLOAD_AS_STRING_NO_NAME
 	};
 
 	/* Result of comparing installed version with latest release. */
@@ -76,7 +76,7 @@ namespace Github {
 	 * The content is assumed to be the JSON of a GitHub release and as such
 	 * is expected to have a "name" field.
 	 */
-	FetchUpdatesResult FetchUpdates(const char* url,
+	DownloadAsStringResult DownloadAsString(const char* url,
 		rapidjson::Document& response,
 		Threading::Monitor<GithubDownloadNotification>* monitor);
 

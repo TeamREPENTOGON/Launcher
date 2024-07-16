@@ -30,7 +30,7 @@ include (cmake/deps/libzip.cmake)
 set (RESOURCE_PATH "${CMAKE_SOURCE_DIR}/updater_rsrc")
 configure_file (${CMAKE_SOURCE_DIR}/self_updater/updater.rc.in ${CMAKE_SOURCE_DIR}/self_updater/updater.rc)
 
-file (GLOB_RECURSE SHARED_FILES shared/*.cpp)
+file (GLOB_RECURSE SHARED_FILES shared/*.cpp "include/shared/*.h")
 add_library (shared STATIC ${SHARED_FILES})
 target_include_directories (shared PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
@@ -39,7 +39,7 @@ target_include_directories (shared PRIVATE
 target_compile_options (shared PUBLIC "/MD")
 target_link_libraries (shared libcurl)
 
-file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp src/*.h self_updater/updater.rc)
+file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h" self_updater/updater.rc)
 add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES})
 target_compile_options (REPENTOGONLauncher PUBLIC "/MD")
 target_include_directories (REPENTOGONLauncher PRIVATE 
@@ -54,7 +54,7 @@ target_compile_definitions (REPENTOGONLauncher PRIVATE UNICODE INI_SHARED_LIB)
 target_link_libraries (REPENTOGONLauncher shared wxbase wxcore bcrypt inih libcurl zip Imagehlp)
 add_custom_command (TARGET REPENTOGONLauncher POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS)
 
-file (GLOB_RECURSE UPDATER_FILES self_updater/*.cpp)
+file (GLOB_RECURSE UPDATER_FILES "include/self_updater/*.h" self_updater/*.cpp)
 add_executable (updater WIN32 ${UPDATER_FILES})
 target_include_directories (updater PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/curl/include" 

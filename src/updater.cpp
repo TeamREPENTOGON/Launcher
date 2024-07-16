@@ -40,8 +40,8 @@ namespace Launcher {
 	Github::VersionCheckResult Updater::CheckRepentogonUpdates(rapidjson::Document& doc,
 		fs::Installation const& installation,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
-		Github::FetchUpdatesResult fetchResult = FetchRepentogonUpdates(doc, monitor);
-		if (fetchResult != Github::FETCH_UPDATE_OK) {
+		Github::DownloadAsStringResult fetchResult = FetchRepentogonUpdates(doc, monitor);
+		if (fetchResult != Github::DOWNLOAD_AS_STRING_OK) {
 			return Github::VERSION_CHECK_ERROR;
 		}
 
@@ -52,9 +52,9 @@ namespace Launcher {
 		return Github::CheckUpdates(installation.GetZHLVersion().c_str(), "Repentogon", doc);
 	}
 
-	Github::FetchUpdatesResult Updater::FetchRepentogonUpdates(rapidjson::Document& response,
+	Github::DownloadAsStringResult Updater::FetchRepentogonUpdates(rapidjson::Document& response,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
-		return Github::FetchUpdates(RepentogonURL, response, monitor);
+		return Github::DownloadAsString(RepentogonURL, response, monitor);
 	}
 
 	RepentogonUpdateResult Updater::UpdateRepentogon(rapidjson::Document& data,

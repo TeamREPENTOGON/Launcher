@@ -145,7 +145,7 @@ namespace Launcher {
 		bool ExtractRepentogon();
 
 		/* Fetch the JSON of the latest Repentogon release. */
-		Github::FetchUpdatesResult FetchRepentogonUpdates(rapidjson::Document& result,
+		Github::DownloadAsStringResult FetchRepentogonUpdates(rapidjson::Document& result,
 			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 	};
 }

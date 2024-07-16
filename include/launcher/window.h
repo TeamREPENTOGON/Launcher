@@ -49,7 +49,6 @@ namespace Launcher {
 		void PostInit();
 
 		static fs::Version const* GetVersion(const char* hash);
-		static bool FileExists(const char* name);
 
 	private:
 		fs::Installation _installation;
