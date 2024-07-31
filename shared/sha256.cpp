@@ -1,5 +1,6 @@
 #include <Windows.h>
 
+#include <algorithm>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
@@ -9,7 +10,7 @@
 #include "shared/sha256.h"
 
 namespace Sha256 {
-	std::string Sha256F(const char* filename) {
+	std::string Sha256F(const char* filename, bool toUpper) {
 		WIN32_FIND_DATAA data;
 		if (!Filesystem::FileExists(filename, &data)) {
 			std::ostringstream s;
@@ -27,10 +28,10 @@ namespace Sha256 {
 		FILE* f = fopen(filename, "rb");
 		fread(content.get(), data.nFileSizeLow, 1, f);
 
-		return Sha256(content.get(), data.nFileSizeLow);
+		return Sha256(content.get(), data.nFileSizeLow, toUpper);
 	}
 
-	std::string Sha256(const char* str, size_t size) {
+	std::string Sha256(const char* str, size_t size, bool toUpper) {
 		BCRYPT_ALG_HANDLE alg;
 		NTSTATUS err = BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
 		if (!BCRYPT_SUCCESS(err)) {
@@ -109,6 +110,11 @@ namespace Sha256 {
 		/* std::string will perform a copy of the content of the string,
 		 * the unique_ptr can safely release it afterwards.
 		 */
-		return std::string(hashHex.get());
+
+		std::string result(hashHex.get());
+		if (toUpper) {
+			std::transform(result.begin(), result.end(), result.begin(), std::toupper);
+		}
+		return result;
 	}
 }

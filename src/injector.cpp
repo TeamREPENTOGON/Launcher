@@ -254,11 +254,13 @@ int InjectIsaac(int updates, int console, int lua_debug, int level_stage, int st
 }
 
 bool Launcher::App::OnInit() {
-	Logger::Init();
+	Logger::Init("launcher.log", "w");
 	Externals::Init();
+
 	MainFrame* frame = new MainFrame();
 	frame->Show();
 	frame->PostInit();
+
 	return true;
 }
 

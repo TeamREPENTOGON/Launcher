@@ -18,8 +18,8 @@ namespace Github {
 		DOWNLOAD_AS_STRING_BAD_CURL,
 		/* Invalid URL. */
 		DOWNLOAD_AS_STRING_BAD_REQUEST,
-		/* Download error. */
-		DOWNLOAD_AS_STRING_BAD_RESPONSE,
+		/* Download error: invalid JSON. */
+		DOWNLOAD_AS_STRING_INVALID_JSON,
 		/* Response has no "name" field. */
 		DOWNLOAD_AS_STRING_NO_NAME
 	};
@@ -71,12 +71,22 @@ namespace Github {
 	VersionCheckResult CheckUpdates(const char* installedVersion,
 		const char* tool, rapidjson::Document& document);
 
-	/* Fetch the content at url and store it in response.
-	 *
-	 * The content is assumed to be the JSON of a GitHub release and as such
-	 * is expected to have a "name" field.
+	/* Fetch the content at url and store it in response. 
+	 * 
+	 * This function cannot return the DOWNLOAD_AS_STRING_NO_NAME or 
+	 * DOWNLOAD_AS_STRING_INVALID_JSON error codes.
 	 */
 	DownloadAsStringResult DownloadAsString(const char* url,
+		std::string& response,
+		Threading::Monitor<GithubDownloadNotification>* monitor);
+
+	/* Fetch the content at url, assuming it to describe a release, and store it
+	 * in response. 
+	 * 
+	 * The release is well formed if it is JSON formatted and contains a "name" 
+	 * field.
+	 */
+	DownloadAsStringResult FetchReleaseInfo(const char* url,
 		rapidjson::Document& response,
 		Threading::Monitor<GithubDownloadNotification>* monitor);
 

@@ -6,9 +6,9 @@ namespace Sha256 {
 	 * If the function cannot load the content of the file in memory, or if
 	 * the file does not exist, the function throws.
 	 */
-	std::string Sha256F(const char* filename) noexcept(false);
+	std::string Sha256F(const char* filename, bool toUpper) noexcept(false);
 
 	/* Return the SHA-256 hash of the string. NULL strings have an empty
 	 * hash. */
-	std::string Sha256(const char* string, size_t size);
+	std::string Sha256(const char* string, size_t size, bool toUpper);
 }

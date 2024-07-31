@@ -65,43 +65,45 @@ namespace Launcher {
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 
 	namespace Defaults {
-		bool console = false;
-		int levelStage = 0;
-		int stageType = 0;
-		bool luaDebug = false;
-		int luaHeapSize = 1024;
-		bool update = true;
+		constexpr const bool console = false;
+		constexpr const int levelStage = 0;
+		constexpr const int stageType = 0;
+		constexpr const bool luaDebug = false;
+		constexpr const int luaHeapSize = 1024;
+		constexpr const bool update = true;
+		constexpr const bool unstableUpdates = false;
 	}
 
 	namespace Sections {
-		std::string repentogon("Repentogon");
-		std::string vanilla("Vanilla");
-		std::string shared("Shared");
+		const std::string repentogon("Repentogon");
+		const std::string vanilla("Vanilla");
+		const std::string shared("Shared");
 	}
 
 	namespace Keys {
-		std::string console("Console");
-		std::string levelStage("LevelStage");
-		std::string luaDebug("LuaDebug");
-		std::string luaHeapSize("LuaHeapSize");
-		std::string stageType("StageType");
-		std::string launchMode("LaunchMode");
-		std::string update("Update");
+		const std::string console("Console");
+		const std::string levelStage("LevelStage");
+		const std::string luaDebug("LuaDebug");
+		const std::string luaHeapSize("LuaHeapSize");
+		const std::string stageType("StageType");
+		const std::string launchMode("LaunchMode");
+		const std::string update("Update");
+		const std::string unstableUpdates("unstableUpdates");
 	}
 
 	namespace IsaacInterface {
 		// LevelStage
-		static constexpr unsigned int STAGE_NULL = 0;
-		static constexpr unsigned int STAGE4_1 = 7;
-		static constexpr unsigned int STAGE4_2 = 8;
-		static constexpr unsigned int STAGE4_3 = 9;
-		static constexpr unsigned int STAGE8 = 13;
-		static constexpr unsigned int NUM_STAGES = 14;
+		static constexpr const unsigned int STAGE_NULL = 0;
+		static constexpr const unsigned int STAGE4_1 = 7;
+		static constexpr const unsigned int STAGE4_2 = 8;
+		static constexpr const unsigned int STAGE4_3 = 9;
+		static constexpr const unsigned int STAGE8 = 13;
+		static constexpr const unsigned int NUM_STAGES = 14;
 
 		// StageType
-		static constexpr unsigned int STAGETYPE_ORIGINAL = 0;
-		static constexpr unsigned int STAGETYPE_GREEDMODE = 3;
-		static constexpr unsigned int STAGETYPE_REPENTANCE_B = 5;
+		static constexpr const unsigned int STAGETYPE_ORIGINAL = 0;
+		static constexpr const unsigned int STAGETYPE_GREEDMODE = 3;
+		static constexpr const unsigned int STAGETYPE_REPENTANCE_B = 5;
 	}
 
 	const char* levelNames[] = {
@@ -378,15 +380,19 @@ namespace Launcher {
 
 	void MainFrame::OnSelfUpdateClick(wxCommandEvent& event) {
 		Log("Performing self-update (forcibly triggered)");
-		Launcher::SelfUpdateErrorCode result = Launcher::DoSelfUpdate(false, false, true);
+		Launcher::SelfUpdateErrorCode result = _selfUpdater.DoSelfUpdate(_options.unstableUpdates, true);
+		HandleSelfUpdateResult(result);
+	}
+
+	void MainFrame::HandleSelfUpdateResult(SelfUpdateErrorCode const& updateResult) {
 		std::ostringstream err, info;
-		bool isError = result.base != SELF_UPDATE_UP_TO_DATE;
-		bool timedout = result.base == SELF_UPDATE_SELF_UPDATE_FAILED && 
-			result.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT;
-		switch (result.base) {
+		bool isError = updateResult.base != SELF_UPDATE_UP_TO_DATE;
+		bool timedout = updateResult.base == SELF_UPDATE_SELF_UPDATE_FAILED &&
+			updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT;
+		switch (updateResult.base) {
 		case SELF_UPDATE_UPDATE_CHECK_FAILED:
 			err << "Error while checking for available launcher updates: ";
-			switch (result.detail.fetchUpdatesResult) {
+			switch (updateResult.detail.fetchUpdatesResult) {
 			case Github::DOWNLOAD_AS_STRING_BAD_CURL:
 				err << "error while initializing cURL";
 				break;
@@ -395,7 +401,7 @@ namespace Launcher {
 				err << "error while performing cURL request";
 				break;
 
-			case Github::DOWNLOAD_AS_STRING_BAD_RESPONSE:
+			case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
 				err << "malformed HTTP answer";
 				break;
 
@@ -407,7 +413,7 @@ namespace Launcher {
 
 		case SELF_UPDATE_EXTRACTION_FAILED:
 			err << "Error while extracting the self-updater: ";
-			switch (result.detail.extractionResult) {
+			switch (updateResult.detail.extractionResult) {
 			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_NOT_FOUND:
 				err << "unable to locate self-updater inside the launcher";
 				break;
@@ -436,7 +442,7 @@ namespace Launcher {
 
 		case SELF_UPDATE_SELF_UPDATE_FAILED:
 			err << "Error while launching self-updater: ";
-			switch (result.detail.runUpdateResult) {
+			switch (updateResult.detail.runUpdateResult) {
 			case SELF_UPDATE_RUN_UPDATER_ERR_OPEN_LOCK_FILE:
 				err << "error while opening internal lock file";
 				break;
@@ -460,22 +466,31 @@ namespace Launcher {
 			case SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT:
 				err << "timedout while waiting for self-updater ready";
 				break;
+
+			case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT:
+				err << "attempted to resume an update that was not started";
+				break;
 			}
+			break;
 
 		case SELF_UPDATE_UP_TO_DATE:
 			info << "Everything up-to-date (please report this as a bug: forced updates should never display this message)";
 			break;
 
 		default:
-			LogError("Unknown error %d while attempting self update", (int)result.base);
+			LogError("Unknown error %d while attempting self update", (int)updateResult.base);
 			break;
 		}
-		
+
 		if (isError) {
 			LogError("%s", err.str().c_str());
 		}
 		else {
 			Log("%s", info.str().c_str());
+		}
+
+		if (!timedout) {
+			return;
 		}
 
 		const int maxRetries = 3;
@@ -487,19 +502,29 @@ namespace Launcher {
 				break;
 			}
 			else {
-				result = Launcher::DoSelfUpdate(false, true, true);
-				if (result.base != SELF_UPDATE_SELF_UPDATE_FAILED) {
-					LogError("Unexpected error category %d when retrying self-update, aborting", result.base);
+				SelfUpdateErrorCode resumeResult = _selfUpdater.ResumeSelfUpdate();
+				if (resumeResult.base != SELF_UPDATE_SELF_UPDATE_FAILED) {
+					LogError("Unexpected error category %d when retrying self-update, aborting", resumeResult.base);
 					break;
 				}
 
-				if (result.detail.runUpdateResult != SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT) {
-					LogError("Unexpected self-update error %d when retrying self-update, aborting", result.detail.runUpdateResult);
+				switch (resumeResult.detail.runUpdateResult) {
+				case SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT:
+					LogError("Timedout while waiting for self-updater ready (retry %d/%d)", retries + 1, maxRetries);
+					++retries;
+					break;
+
+				case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT:
+					LogError("Attempted to resume an update that was not started");
+					retries = maxRetries;
+					break;
+
+				default:
+					LogError("Unexpected self-update error %d when retrying self-update, aborting", resumeResult.detail.runUpdateResult);
 					break;
 				}
 
-				LogError("Timedout while waiting for self-updater ready (retry %d/%d)", retries + 1, maxRetries);
-				++retries;
+
 			}
 		}
 
@@ -635,14 +660,52 @@ namespace Launcher {
 
 		InitializeOptions();
 
+		LogNoNL("Checking for availability of launcher updates... ");
 		rapidjson::Document launcherResponse;
-		if (_updater.CheckLauncherUpdates(launcherResponse)) {
-			DoSelfUpdate(launcherResponse);
+		std::string updateVersion, updateUrl;
+		Github::DownloadAsStringResult downloadReleasesResult;
+		if (_selfUpdater.IsSelfUpdateAvailable(_options.unstableUpdates, false, updateVersion, updateUrl, &downloadReleasesResult)) {
+			Log("OK");
+			Log("New version of the launcher available: %s (downloaded from %s)\n", updateVersion.c_str(), updateUrl.c_str());
+			Log("Initiating update");
+			DoSelfUpdate(updateVersion, updateUrl);
+		}
+		else {
+			Log("KO");
+			if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
+				LogError("Error encountered while checking for availability of launcher update");
+				switch (downloadReleasesResult) {
+				case Github::DOWNLOAD_AS_STRING_BAD_CURL:
+					LogError("Unable to initialize cURL connection");
+					break;
+
+				case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
+					LogError("Unable to perform cURL request");
+					break;
+
+				case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
+					LogError("Invalid response");
+					break;
+
+				case Github::DOWNLOAD_AS_STRING_NO_NAME:
+					LogError("Release has no \"name\" field (although you should not be seeing this error, report it as a bug");
+					break;
+
+				default:
+					LogError("Unexpected error %d: report it as a bug", downloadReleasesResult);
+					break;
+				}
+			}
 		}
 
 		if (checkUpdates && _options.update) {
 			DownloadAndInstallRepentogon(false);
 		}
+	}
+
+	void MainFrame::DoSelfUpdate(std::string const& version, std::string const& url) {
+		SelfUpdateErrorCode result = _selfUpdater.DoSelfUpdate(version, url);
+		HandleSelfUpdateResult(result);
 	}
 
 	bool MainFrame::PromptRepentogonInstallation() {
@@ -873,6 +936,7 @@ namespace Launcher {
 			_options.luaHeapSize = Defaults::luaHeapSize;
 			_options.mode = _hasRepentogon ? LAUNCH_MODE_REPENTOGON : LAUNCH_MODE_VANILLA;
 			_options.stageType = Defaults::stageType;
+			_options.unstableUpdates = Defaults::unstableUpdates;
 			// _options.update = Defaults::update;
 
 			wxMessageDialog dialog(this, "Do you want to have the launcher automatically update Repentogon?\n(Warning: this will be applied **immediately**)", "Auto-updates", wxYES_NO | wxCANCEL);
@@ -888,6 +952,7 @@ namespace Launcher {
 			_options.stageType = reader.GetInteger(Sections::vanilla, Keys::stageType, Defaults::stageType);
 			_options.mode = (LaunchMode)reader.GetInteger(Sections::shared, Keys::launchMode, LAUNCH_MODE_REPENTOGON);
 			_options.update = reader.GetBoolean(Sections::repentogon, Keys::update, Defaults::update);
+			_options.unstableUpdates = reader.GetBoolean(Sections::shared, Keys::unstableUpdates, Defaults::unstableUpdates);
 
 			if (_options.mode != LAUNCH_MODE_REPENTOGON && _options.mode != LAUNCH_MODE_VANILLA) {
 				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.mode, Keys::launchMode);
@@ -1122,10 +1187,6 @@ namespace Launcher {
 		}
 
 		return updateResult == REPENTOGON_UPDATE_RESULT_OK;
-	}
-
-	bool MainFrame::DoSelfUpdate(rapidjson::Document& response) {
-		return false;
 	}
 
 	void MainFrame::ForceUpdate(wxCommandEvent& event) { 

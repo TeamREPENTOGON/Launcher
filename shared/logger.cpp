@@ -6,9 +6,9 @@
 
 FILE* Logger::_file = NULL;
 
-void Logger::Init() {
+void Logger::Init(const char* filename, bool append) {
 	if (!_file) {
-		_file = fopen("launcher.log", "w");
+		_file = fopen(filename, append ? "a" : "w");
 		if (!_file) {
 			MessageBoxA(NULL, "Error",
 				"Unable to create log file launcher.log\nExtra log information will not be available",

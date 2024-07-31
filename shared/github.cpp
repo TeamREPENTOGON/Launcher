@@ -13,15 +13,21 @@ namespace Github {
 	static GithubDownloadNotification CreateNotification(GithubDownloadNotificationType type);
 	static GithubDownloadNotification CreateInitCurlNotification(const char* url, bool done);
 	static GithubDownloadNotification CreatePerformCurlNotification(const char* url, bool done);
-	static GithubDownloadNotification CreateParseResponseNotification(const char* url, bool done);
 	static GithubDownloadNotification CreateDoneNotification(const char* url);
+	static GithubDownloadNotification CreateParseResponseNotification(const char* url, bool done);
 
-	DownloadAsStringResult DownloadAsString(const char* url, rapidjson::Document& response,
+	DownloadAsStringResult DownloadAsString(const char* url, std::string& response,
 		Threading::Monitor<GithubDownloadNotification>* monitor) {
 		CURL* curl;
 		CURLcode curlResult;
 
-		monitor->Push(CreateInitCurlNotification(url, false));
+		CurlStringResponse data;
+
+		if (monitor) {
+			data.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor));
+			monitor->Push(CreateInitCurlNotification(url, false));
+		}
+
 		curl = curl_easy_init();
 		if (!curl) {
 			Logger::Error("CheckUpdates: error while initializing cURL session for %s\n", url);
@@ -29,36 +35,57 @@ namespace Github {
 		}
 
 		ScopedCURL session(curl);
-		CurlStringResponse data;
-		data.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor));
 		InitCurlSession(curl, url, &data);
-		monitor->Push(CreateInitCurlNotification(url, true));
 
-		monitor->Push(CreatePerformCurlNotification(url, false));
+		if (monitor) {
+			monitor->Push(CreateInitCurlNotification(url, true));
+			monitor->Push(CreatePerformCurlNotification(url, false));
+		}
+
 		curlResult = curl_easy_perform(curl);
 		if (curlResult != CURLE_OK) {
 			Logger::Error("CheckUpdates: %s: error while performing HTTP request to retrieve version information: "
 				"cURL error: %s", url, curl_easy_strerror(curlResult));
 			return DOWNLOAD_AS_STRING_BAD_REQUEST;
 		}
-		monitor->Push(CreatePerformCurlNotification(url, true));
 
-		monitor->Push(CreateParseResponseNotification(url, false));
-		response.Parse(data.GetData().c_str());
-		monitor->Push(CreateParseResponseNotification(url, true));
+		if (monitor) {
+			monitor->Push(CreatePerformCurlNotification(url, true));
+			monitor->Push(CreateDoneNotification(url));
+		}
+
+		response = data.GetData();
+		return DOWNLOAD_AS_STRING_OK;
+	}
+
+	DownloadAsStringResult FetchReleaseInfo(const char* url,
+		rapidjson::Document& response,
+		Threading::Monitor<GithubDownloadNotification>* monitor) {
+		std::string stringResponse;
+		DownloadAsStringResult result = DownloadAsString(url, stringResponse, monitor);
+		if (result != DOWNLOAD_AS_STRING_OK) {
+			return result;
+		}
+
+		if (monitor)
+			monitor->Push(CreateParseResponseNotification(url, false));
+
+		response.Parse(stringResponse.c_str());
+
+		if (monitor)
+			monitor->Push(CreateParseResponseNotification(url, true));
 
 		if (response.HasParseError()) {
 			Logger::Error("CheckUpdates: %s: error while parsing HTTP response. rapidjson error code %d", url,
 				response.GetParseError());
-			return DOWNLOAD_AS_STRING_BAD_RESPONSE;
+			return Github::DOWNLOAD_AS_STRING_INVALID_JSON;
 		}
 
 		if (!response.HasMember("name")) {
 			Logger::Error("CheckUpdates: %s: malformed HTTP response: no field called \"name\"", url);
-			return DOWNLOAD_AS_STRING_NO_NAME;
+			return Github::DOWNLOAD_AS_STRING_NO_NAME;
 		}
 
-		monitor->Push(CreateDoneNotification(url));
 		return DOWNLOAD_AS_STRING_OK;
 	}
 
@@ -84,13 +111,17 @@ namespace Github {
 	DownloadFileResult DownloadFile(const char* file, const char* url,
 		Threading::Monitor<GithubDownloadNotification>* monitor) {
 		CurlFileResponse response(file);
-		response.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor));
+		
 		if (!response.GetFile()) {
 			Logger::Error("DownloadFile: unable to open %s for writing\n", file);
 			return DOWNLOAD_FILE_BAD_FS;
 		}
 
-		monitor->Push(CreateInitCurlNotification(url, false));
+		if (monitor) {
+			response.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor));
+			monitor->Push(CreateInitCurlNotification(url, false));
+		}
+
 		CURL* curl = curl_easy_init();
 		CURLcode code;
 
@@ -101,17 +132,23 @@ namespace Github {
 
 		ScopedCURL scoppedCurl(curl);
 		InitCurlSession(curl, url, &response);
-		monitor->Push(CreateInitCurlNotification(url, true));
 
-		monitor->Push(CreatePerformCurlNotification(url, false));
+		if (monitor) {
+			monitor->Push(CreateInitCurlNotification(url, true));
+			monitor->Push(CreatePerformCurlNotification(url, false));
+		}
+
 		code = curl_easy_perform(curl);
 		if (code != CURLE_OK) {
 			Logger::Error("DownloadFile: error while downloading hash: %s\n", curl_easy_strerror(code));
 			return DOWNLOAD_FILE_DOWNLOAD_ERROR;
 		}
-		monitor->Push(CreatePerformCurlNotification(url, true));
 
-		monitor->Push(CreateDoneNotification(url));
+		if (monitor) {
+			monitor->Push(CreatePerformCurlNotification(url, true));
+			monitor->Push(CreateDoneNotification(url));
+		}
+
 		return DOWNLOAD_FILE_OK;
 	}
 

@@ -2,6 +2,8 @@
 
 #include "wx/wx.h"
 
+#include "self_updater/updater.h"
+
 namespace Updater {
 	class App : public wxApp {
 	public:
@@ -17,17 +19,24 @@ namespace Updater {
 
 		Updater();
 
-		void DoUpdate();
+		bool DoUpdate();
 
 	private:
 		wxTextCtrl* _logWindow;
 		bool _logError = false;
 		static char _printBuffer[BUFF_SIZE];
+		UpdaterBackend _updater;
 
 		void Log(const char* fmt, ...);
 		void LogError(const char* fmt, ...);
 
 		void Log(const char* prefix, bool nl, wxTextAttr const& attr, const char* fmt, ...);
 		void Log(const char* prefix, bool nl, wxTextAttr const& attr, const char* fmt, va_list va);
+
+		void LogGithubDownloadAsString(const char* prefix, Github::DownloadAsStringResult code);
+
+		bool DoPreUpdateChecks();
+		bool DownloadUpdate(LauncherUpdateData* data);
+		bool PostDownloadChecks(bool downloadOk, LauncherUpdateData* data);
 	};
 }

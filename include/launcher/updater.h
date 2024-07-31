@@ -91,9 +91,6 @@ namespace Launcher {
 			fs::Installation const& installation,
 			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 
-		/* Same as CheckRepentogonUpdates(), except for the launcher. */
-		Github::VersionCheckResult CheckLauncherUpdates(rapidjson::Document& response);
-
 		/* Update the installation of Repentogon. 
 		 * 
 		 * The update is performed by downloading the latest release from 

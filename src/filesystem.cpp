@@ -103,7 +103,7 @@ namespace Launcher::fs {
 		}
 
 		try {
-			std::string hash = Sha256::Sha256F(fullPath.c_str());
+			std::string hash = Sha256::Sha256F(fullPath.c_str(), false);
 			_isaacVersion = GetIsaacVersionFromHash(hash.c_str());
 		}
 		catch (std::runtime_error& e) {

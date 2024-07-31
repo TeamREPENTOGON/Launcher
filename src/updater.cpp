@@ -54,7 +54,7 @@ namespace Launcher {
 
 	Github::DownloadAsStringResult Updater::FetchRepentogonUpdates(rapidjson::Document& response,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
-		return Github::DownloadAsString(RepentogonURL, response, monitor);
+		return Github::FetchReleaseInfo(RepentogonURL, response, monitor);
 	}
 
 	RepentogonUpdateResult Updater::UpdateRepentogon(rapidjson::Document& data,
@@ -216,10 +216,10 @@ namespace Launcher {
 
 		std::string zipHash;
 		try {
-			zipHash = Sha256::Sha256F(RepentogonZipName);
+			zipHash = Sha256::Sha256F(RepentogonZipName, true);
 		}
 		catch (std::exception& e) {
-			Logger::Fatal("Updater::CHeckRepentogonIntegrity: exception while hashing %s: %s\n", RepentogonZipName, e.what());
+			Logger::Fatal("Updater::CheckRepentogonIntegrity: exception while hashing %s: %s\n", RepentogonZipName, e.what());
 			throw;
 		}
 
@@ -307,10 +307,6 @@ namespace Launcher {
 
 		zip_close(zip);
 		return ok;
-	}
-
-	Github::VersionCheckResult Updater::CheckLauncherUpdates(rapidjson::Document&) {
-		return Github::VERSION_CHECK_UTD;
 	}
 
 	RepentogonUpdateState const& Updater::GetRepentogonUpdateState() const {

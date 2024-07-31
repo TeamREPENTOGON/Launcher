@@ -3,9 +3,11 @@
 #include "self_updater/updater.h"
 #include "self_updater/updater_resources.h"
 
+#include "launcher/launcher.h"
 #include "launcher/self_update.h"
 #include "rapidjson/document.h"
 #include "shared/github.h"
+#include "shared/logger.h"
 
 namespace Launcher {
 	/* Struct used to resume a self update that timed out while waiting for the
@@ -18,35 +20,29 @@ namespace Launcher {
 
 	static std::optional<PartialSelfUpdate> partialUpdate;
 
-	static SelfUpdateRunUpdaterResult RunUpdater(rapidjson::Document const& releases);
+	static SelfUpdateRunUpdaterResult RunUpdater(std::string const& url, std::string const& version);
 	static SelfUpdateRunUpdaterResult RunUpdaterFinalize(HANDLE child);
 	static SelfUpdateExtractionResult ExtractUpdater();
 	static Github::DownloadAsStringResult FetchReleases(rapidjson::Document& answer);
-	static bool CheckSelfUpdateAvailable(rapidjson::Document const& releases, bool allowPreRelease);
 
 	const char* ReleasesURL = "https://api.github.com/repos/TeamREPENTOGON/Launcher/releases";
 	const char* SelfUpdaterExePath = "./repentogon_launcher_self_updater.exe";
 
 	Github::DownloadAsStringResult FetchReleases(rapidjson::Document& answer) {
 		Threading::Monitor<Github::GithubDownloadNotification> monitor;
-		return Github::DownloadAsString(ReleasesURL, answer, &monitor);
-	}
-
-	bool CheckSelfUpdateAvailable(rapidjson::Document const& releases, bool allowPreRelease) {
-		auto releaseArray = releases.GetArray();
-		std::string version = "";
-		for (auto const& release : releaseArray) {
-			if (release["prerelease"].IsTrue() && allowPreRelease) {
-				version = release["name"].GetString();
-				break;
-			}
-			else if (!release["prerelease"].IsTrue()) {
-				version = release["name"].GetString();
-				break;
-			}
+		std::string releaseString;
+		// return Github::FetchReleaseInfo(ReleasesURL, answer, &monitor);
+		Github::DownloadAsStringResult result = Github::DownloadAsString(ReleasesURL, releaseString, nullptr);
+		if (result != Github::DOWNLOAD_AS_STRING_OK) {
+			return result;
 		}
 
-		return false;
+		answer.Parse(releaseString.c_str());
+		if (answer.HasParseError()) {
+			return Github::DOWNLOAD_AS_STRING_INVALID_JSON;
+		}
+
+		return Github::DOWNLOAD_AS_STRING_OK;
 	}
 
 	SelfUpdateExtractionResult ExtractUpdater() {
@@ -86,7 +82,7 @@ namespace Launcher {
 		return SELF_UPDATE_EXTRACTION_OK;
 	}
 
-	SelfUpdateRunUpdaterResult RunUpdater(rapidjson::Document const& releases) {
+	SelfUpdateRunUpdaterResult RunUpdater(std::string const& url, std::string const& version) {
 		std::string updateStatePath = "repentogon_launcher_self_updater_state";
 		FILE* updateState = fopen(updateStatePath.c_str(), "wb");
 		if (!updateState) {
@@ -98,7 +94,8 @@ namespace Launcher {
 		fclose(updateState);
 
 		char cli[4096] = { 0 };
-		int printfCount = snprintf(cli, 4096, "--lock-file=\"%s\"", updateStatePath.c_str());
+		int printfCount = snprintf(cli, 4096, "--debug --lock-file=\"%s\" --from=\"%s\" --to=\"%s\" --url=\"%s\"", 
+			updateStatePath.c_str(), Launcher::version, version.c_str(), url.c_str());
 		if (printfCount < 0) {
 			return SELF_UPDATE_RUN_UPDATER_ERR_GENERATE_CLI;
 		}
@@ -134,6 +131,7 @@ namespace Launcher {
 			return SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT;
 
 		case WAIT_FAILED:
+			Logger::Error("Launcher self-update: WaitForInputIdle returned WAIT_FAILED (GetLastError() = %d)\n", GetLastError());
 			return SELF_UPDATE_RUN_UPDATER_ERR_WAIT;
 
 		default:
@@ -141,45 +139,97 @@ namespace Launcher {
 		}
 	}
 
-	SelfUpdateErrorCode DoSelfUpdate(bool allowPreRelease, bool resume, bool force) {
-		if (!resume) {
-			partialUpdate.reset();
+	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
+		bool force, std::string& version, std::string& url);
+
+	bool SelfUpdater::IsSelfUpdateAvailable(bool allowDrafts, bool force, 
+		std::string& version, std::string& url, Github::DownloadAsStringResult* fetchReleasesResult) {
+		Github::DownloadAsStringResult downloadResult = FetchReleases(_releasesInfo);
+		if (fetchReleasesResult)
+			*fetchReleasesResult = downloadResult;
+
+		if (downloadResult != Github::DOWNLOAD_AS_STRING_OK) {
+			return false;
 		}
+
+		rapidjson::Document& releases = _releasesInfo;
+		_hasRelease = true;
+		
+		return SelectTargetRelease(releases, allowDrafts, force, version, url);
+	}
+
+	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
+		bool force, std::string& version, std::string& url) {
+		auto releaseArray = releases.GetArray();
+		for (auto const& release : releaseArray) {
+			if (!release["prerelease"].IsTrue() || allowPre) {
+				version = release["name"].GetString();
+				url = release["url"].GetString();
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	SelfUpdateErrorCode SelfUpdater::DoSelfUpdate(bool allowPreRelease, bool force) {
+		partialUpdate.reset();
 
 		SelfUpdateErrorCode result;
 		rapidjson::Document releases;
 
-		if (!resume) {
-			Github::DownloadAsStringResult releasesResult = FetchReleases(releases);
-			if (releasesResult != Github::DOWNLOAD_AS_STRING_OK) {
-				result.base = SELF_UPDATE_UPDATE_CHECK_FAILED;
-				result.detail.fetchUpdatesResult = releasesResult;
-				return result;
-			}
-
-			if (!force && !CheckSelfUpdateAvailable(releases, allowPreRelease)) {
-				result.base = SELF_UPDATE_UP_TO_DATE;
-				return result;
-			}
-
-			SelfUpdateExtractionResult extractResult = ExtractUpdater();
-			if (extractResult != SELF_UPDATE_EXTRACTION_OK) {
-				result.base = SELF_UPDATE_EXTRACTION_FAILED;
-				result.detail.extractionResult = extractResult;
-				return result;
-			}
-
-			SelfUpdateRunUpdaterResult runResult = RunUpdater(releases);
-			result.base = SELF_UPDATE_SELF_UPDATE_FAILED;
-			result.detail.runUpdateResult = runResult;
-		}
-		else {
-			SelfUpdateRunUpdaterResult runResult = RunUpdaterFinalize(partialUpdate->selfUpdaterHandle);
-			result.base = SELF_UPDATE_SELF_UPDATE_FAILED;
-			result.detail.runUpdateResult = runResult;
+		Github::DownloadAsStringResult releasesResult = FetchReleases(releases);
+		if (releasesResult != Github::DOWNLOAD_AS_STRING_OK) {
+			result.base = SELF_UPDATE_UPDATE_CHECK_FAILED;
+			result.detail.fetchUpdatesResult = releasesResult;
+			return result;
 		}
 
+		std::string version, url;
+		if (!SelectTargetRelease(releases, allowPreRelease, force, version, url)) {
+			result.base = SELF_UPDATE_UP_TO_DATE;
+			return result;
+		}
+
+		return DoSelfUpdate(version, url);
 		
+	}
+
+	SelfUpdateErrorCode SelfUpdater::DoSelfUpdate(std::string const& version, std::string const& url) {
+		partialUpdate.reset();
+
+		SelfUpdateErrorCode result;
+		SelfUpdateExtractionResult extractResult = ExtractUpdater();
+		if (extractResult != SELF_UPDATE_EXTRACTION_OK) {
+			result.base = SELF_UPDATE_EXTRACTION_FAILED;
+			result.detail.extractionResult = extractResult;
+			return result;
+		}
+
+		SelfUpdateRunUpdaterResult runResult = RunUpdater(url, version);
+		result.base = SELF_UPDATE_SELF_UPDATE_FAILED;
+		result.detail.runUpdateResult = runResult;
+
+		return result;
+	}
+
+	SelfUpdateErrorCode SelfUpdater::ResumeSelfUpdate() {
+		SelfUpdateErrorCode result;
+		if (!partialUpdate) {
+			result.base = SELF_UPDATE_SELF_UPDATE_FAILED;
+			result.detail.runUpdateResult = SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT;
+			return result;
+		}
+
+
+		SelfUpdateRunUpdaterResult runResult = RunUpdaterFinalize(partialUpdate->selfUpdaterHandle);
+		/* Remember: if the above function returns, then the updater is not launched.
+		 * If the updater is launched, the function never returns.
+		 */
+
+		result.base = SELF_UPDATE_SELF_UPDATE_FAILED;
+		result.detail.runUpdateResult = runResult;
+
 		return result;
 	}
 }

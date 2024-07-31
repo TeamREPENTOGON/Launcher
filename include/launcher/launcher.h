@@ -7,6 +7,7 @@ enum LaunchMode {
 
 struct IsaacOptions {
 	LaunchMode mode;
+	bool unstableUpdates;
 
 	// Repentogon options
 	bool console;

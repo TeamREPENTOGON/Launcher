@@ -11,7 +11,7 @@ public:
 	static void Fatal(const char* fmt, ...);
 	static void Memory(const char* ctx);
 
-	static void Init();
+	static void Init(const char* filename, bool append);
 
 private:
 	static void Log(const char* prefix, const char* fmt, va_list va);

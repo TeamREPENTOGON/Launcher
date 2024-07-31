@@ -13,6 +13,7 @@
 #include "curl/curl.h"
 #include "launcher/filesystem.h"
 #include "launcher/launcher.h"
+#include "launcher/self_update.h"
 #include "launcher/updater.h"
 #include "rapidjson/document.h"
 
@@ -36,6 +37,7 @@ namespace Launcher {
 	class App : public wxApp {
 	public:
 		bool OnInit() override;
+		void ParseCommandLine();
 	};
 
 	class MainFrame : public wxFrame {
@@ -53,6 +55,7 @@ namespace Launcher {
 	private:
 		fs::Installation _installation;
 		Updater _updater;
+		SelfUpdater _selfUpdater;
 
 		/* Window building. */
 		void AddLauncherConfigurationOptions();
@@ -74,32 +77,10 @@ namespace Launcher {
 		 */
 		void CheckVersionsAndInstallation();
 
-		/* Check if there is a Repentogon update available. This check is performed
-		 * by comparing the "name" field of the latest release on GitHub with the 
-		 * version global of ZHL / Repentogon.
-		 */
-		std::optional<rapidjson::Document> CheckRepentogonUpdates();
-
-		/* Check if there is a launcher update available. This check is performed 
-		 * by comparing the "name" field of the latest release on GitHub with the 
-		 * version global of the launcher.
-		 */
-		std::optional<rapidjson::Document> CheckSelfUpdates();
-
-		/* Check for the availability of updates. This check is performed by 
-		 * comparing the "name" field of the latest release at the given url with
-		 * the currentVersion.
-		 */
-		std::optional<rapidjson::Document> CheckUpdates(const char* url, const char* currentVersion);
-
 		bool DoRepentogonUpdate(rapidjson::Document& document);
-		bool DoSelfUpdate(rapidjson::Document& document);
+		void DoSelfUpdate(std::string const& version, std::string const& url);
 
-		/* Function to be run in a thread in order to download the latest Repentogon 
-		 * release when checking for updates. The main thread will block but the log
-		 * window will still update.
-		 */
-		void DownloadLatestRelease();
+		void HandleSelfUpdateResult(Launcher::SelfUpdateErrorCode const& errorCode);
 
 		/* Initialize the IsaacOptions structure. */
 		void InitializeOptions();

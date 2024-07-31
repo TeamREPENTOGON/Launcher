@@ -1,6 +1,9 @@
 #pragma once
 
 #include <cstdint>
+
+#include <optional>
+#include <string>
 #include <variant>
 
 #include "shared/github.h"
@@ -25,7 +28,8 @@ namespace Launcher {
 		SELF_UPDATE_RUN_UPDATER_ERR_CREATE_PROCESS,
 		SELF_UPDATE_RUN_UPDATER_ERR_OPEN_PROCESS,
 		SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT,
-		SELF_UPDATE_RUN_UPDATER_ERR_WAIT
+		SELF_UPDATE_RUN_UPDATER_ERR_WAIT,
+		SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT
 	};
 
 	/* No OK result as the process terminates if everything goes well. */
@@ -41,7 +45,7 @@ namespace Launcher {
 	};
 
 	struct SelfUpdateErrorCode {
-		SelfUpdateResult base : 1;
+		SelfUpdateResult base : 3;
 		union {
 			Github::DownloadAsStringResult fetchUpdatesResult : 8;
 			SelfUpdateExtractionResult extractionResult : 8;
@@ -49,5 +53,57 @@ namespace Launcher {
 		} detail;
 	};
 
-	SelfUpdateErrorCode DoSelfUpdate(bool allowDrafts, bool resume, bool force);
+	class SelfUpdater {
+	public:
+		/* Check if an update of the launcher is available.
+		 *
+		 *   allowDrafts indicates if a prerelease is considered a valid update.
+		 *   force causes the function to pick the first available release, 
+		 * regardless of allowDrafts and regardless of whether said release is
+		 * new than the current one.
+		 *   version receives the name of new available version, if any.
+		 *   url receives the url to download the newest available version, if any.
+		 *
+		 * Return true if an update is available, false otherwise. false is 
+		 * also returned on error.
+		 */
+		bool IsSelfUpdateAvailable(bool allowDrafts, bool force, 
+			std::string& version, std::string& url, Github::DownloadAsStringResult* fetchReleaseResult);
+
+		/* Perform a self-update.
+		 * 
+		 * The function will fetch the release data from GitHub, iterate through
+		 * the releases and pick the first valid one depending on whether it is
+		 * a prerelease or not, and whether it is newer than the currently 
+		 * installed release. This can be controlled through the two 
+		 * parameters allowDrafts and force.
+		 * 
+		 *   allowDrafts indicates if a prerelease is considered a valid update.
+		 *   force causes the function to pick the first available release, 
+		 * regardless of allowDrafts and regardless of wheter said release
+		 * if newer than the current one.
+		 * 
+		 * The function returns an extended error code that can designate 
+		 * multiple points of failure in the entire process, from fetching
+		 * the release data to starting the updater.
+		 */
+		SelfUpdateErrorCode DoSelfUpdate(bool allowDrafts, bool force);
+
+		/* Perform a self-update.
+		 * 
+		 * The function does not perform any checks: it extracts the updater and
+		 * launches it to update with the release available at the specified url.
+		 * 
+		 * The function returns an extended error code similar to the other 
+		 * version of DoSelfUpdate.
+		 */
+		SelfUpdateErrorCode DoSelfUpdate(std::string const& version, std::string const& url);
+
+		/* Resume a self update that timed out while waiting for the updater. */
+		SelfUpdateErrorCode ResumeSelfUpdate();
+
+	private:
+		rapidjson::Document _releasesInfo;
+		bool _hasRelease = false;
+	};
 }
