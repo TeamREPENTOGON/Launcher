@@ -10,7 +10,7 @@
 #include "shared/sha256.h"
 
 namespace Sha256 {
-	std::string Sha256F(const char* filename, bool toUpper) {
+	std::string Sha256F(const char* filename) {
 		WIN32_FIND_DATAA data;
 		if (!Filesystem::FileExists(filename, &data)) {
 			std::ostringstream s;
@@ -28,10 +28,10 @@ namespace Sha256 {
 		FILE* f = fopen(filename, "rb");
 		fread(content.get(), data.nFileSizeLow, 1, f);
 
-		return Sha256(content.get(), data.nFileSizeLow, toUpper);
+		return Sha256(content.get(), data.nFileSizeLow);
 	}
 
-	std::string Sha256(const char* str, size_t size, bool toUpper) {
+	std::string Sha256(const char* str, size_t size) {
 		BCRYPT_ALG_HANDLE alg;
 		NTSTATUS err = BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
 		if (!BCRYPT_SUCCESS(err)) {
@@ -112,9 +112,13 @@ namespace Sha256 {
 		 */
 
 		std::string result(hashHex.get());
-		if (toUpper) {
-			std::transform(result.begin(), result.end(), result.begin(), std::toupper);
-		}
 		return result;
+	}
+
+	bool Equals(const char* lhs, const char* rhs) {
+		std::string left(lhs), right(rhs);
+		std::transform(left.begin(), left.end(), left.begin(), std::toupper);
+		std::transform(right.begin(), right.end(), right.begin(), std::toupper);
+		return left == right;
 	}
 }

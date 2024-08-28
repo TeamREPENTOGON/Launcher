@@ -12,10 +12,12 @@
 
 #include "curl/curl.h"
 #include "launcher/filesystem.h"
+#include "launcher/installation_manager.h"
 #include "launcher/launcher.h"
 #include "launcher/self_update.h"
 #include "launcher/updater.h"
 #include "rapidjson/document.h"
+#include "shared/loggable_gui.h"
 
 namespace Launcher {
 	class MainFrame;
@@ -29,6 +31,7 @@ namespace Launcher {
 		WINDOW_TEXT_VANILLA_LUAHEAPSIZE,
 		WINDOW_BUTTON_LAUNCH_BUTTON,
 		WINDOW_BUTTON_FORCE_UPDATE,
+		WINDOW_BUTTON_FORCE_UNSTABLE_UPDATE,
 		WINDOW_BUTTON_SELECT_ISAAC,
 		WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER,
 		WINDOW_BUTTON_SELF_UPDATE
@@ -40,9 +43,10 @@ namespace Launcher {
 		void ParseCommandLine();
 	};
 
-	class MainFrame : public wxFrame {
+	class MainFrame : public wxFrame, public ILoggableGUI {
 	public:
 		MainFrame();
+		~MainFrame();
 
 		void LogNoNL(const char* fmt, ...);
 		void Log(const char* fmt, ...);
@@ -53,9 +57,7 @@ namespace Launcher {
 		static fs::Version const* GetVersion(const char* hash);
 
 	private:
-		fs::Installation _installation;
-		Updater _updater;
-		SelfUpdater _selfUpdater;
+		InstallationManager _installationManager;
 
 		/* Window building. */
 		void AddLauncherConfigurationOptions();
@@ -77,10 +79,11 @@ namespace Launcher {
 		 */
 		void CheckVersionsAndInstallation();
 
-		bool DoRepentogonUpdate(rapidjson::Document& document);
-		void DoSelfUpdate(std::string const& version, std::string const& url);
+		bool PromptLauncherUpdate(std::string const& version, std::string const& url);
 
-		void HandleSelfUpdateResult(Launcher::SelfUpdateErrorCode const& errorCode);
+		
+		void DoSelfUpdate(std::string const& version, std::string const& url);
+		void HandleSelfUpdateResult(SelfUpdateErrorCode const& code);
 
 		/* Initialize the IsaacOptions structure. */
 		void InitializeOptions();
@@ -90,8 +93,6 @@ namespace Launcher {
 		void InitializeLevelSelectFromOptions();
 		/* Enable/disable Repentogon options depending on the selected launch mode (in GUI). */
 		void UpdateRepentogonOptionsFromLaunchMode();
-
-		void WriteLauncherConfiguration();
 
 		/* Event handlers. */
 		void OnIsaacSelectClick(wxCommandEvent& event);
@@ -107,11 +108,6 @@ namespace Launcher {
 		void Launch(wxCommandEvent& event);
 		void Inject();
 
-		/* Post init stuff. */
-		bool CheckIsaacInstallation();
-		bool CheckIsaacVersion();
-		bool CheckRepentogonInstallation();
-
 		/* Prompt the user for a place to store the configuration file.	*/
 		Launcher::fs::ConfigurationFileLocation PromptConfigurationFileLocation();
 
@@ -125,30 +121,17 @@ namespace Launcher {
 		 */
 		bool PromptRepentogonInstallation();
 
-		/* Download and install the latest release of Repentogon.
+		/* Prompt the user for removal of a legacy installation.
 		 * 
-		 * Parameter force indicates whether the function will download and 
-		 * install the latest release even if the installation is up-to-date.
-		 * 
-		 * If a Repentogon installation has been detected, the function will 
-		 * check for the presence of dsound.dll, asking the user if they want 
-		 * that file deleted should it be found.
+		 * If the backend detects the presence of dsound.dll, this means we are
+		 * dealing with a legacy installation of Repentogon. Because the game
+		 * will load the DLL if it remains next to it, prompt the user on whether
+		 * they want to remove all Repentogon related DLLs in the Isaac folder.
 		 */
-		void DownloadAndInstallRepentogon(bool force);
+		bool PromptLegacyUninstall();
 
-		/* Check if an update is available. 
-		 * 
-		 * Parameter force will cause the function to consider that an update is
-		 * available even if the installation is up-to-date.
-		 * 
-		 * Return false if the request for up-to-dateness fails in any way.
-		 * Return true if there is an update available.
-		 * Return false if the request succeeds, and the installation is up-to-date
-		 * and force is false.
-		 * Return true if the request succeeds, and the installation is up-to-date
-		 * and force is true.
-		 */
-		bool DoCheckRepentogonUpdates(rapidjson::Document& document, bool force);
+		void InitializeIsaacFolderPath(bool needIsaacFolder, bool canWriteConfiguration);
+		void HandleLauncherUpdates(bool allowDrafts);
 
 		IsaacOptions _options;
 		// wxGridBagSizer* _optionsGrid;
@@ -166,15 +149,12 @@ namespace Launcher {
 		wxStaticBox* _advancedOptions;
 		wxTextCtrl* _isaacFileText;
 		wxTextCtrl* _repentogonInstallFolderText;
+		int _repentogonLaunchModeIdx = -1;
 
 		std::mutex _logMutex;
 		wxTextCtrl* _logWindow;
-		char* _repentogonVersion;
 		/* Log string used in CheckUpdates to indicate which tool is being checked. */
 		std::string _currentUpdate;
-
-		bool _hasIsaac = false;
-		bool _hasRepentogon = false;
 
 		wxDECLARE_EVENT_TABLE();
 	};

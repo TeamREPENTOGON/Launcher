@@ -17,9 +17,12 @@
 
 #include "curl/curl.h"
 #include "launcher/filesystem.h"
+#include "launcher/isaac.h"
 #include "launcher/self_update.h"
 #include "launcher/window.h"
 #include "shared/github.h"
+#include "shared/filesystem.h"
+#include "shared/logger.h"
 #include "shared/monitor.h"
 #include "self_updater/updater_resources.h"
 #include "self_updater/updater.h"
@@ -40,6 +43,7 @@ EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::MainFrame::On
 EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnCharacterWritten)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::MainFrame::Launch)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_FORCE_UPDATE, Launcher::MainFrame::ForceUpdate)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_FORCE_UNSTABLE_UPDATE, Launcher::MainFrame::ForceUpdate)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::MainFrame::OnIsaacSelectClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::MainFrame::OnSelectRepentogonFolderClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELF_UPDATE, Launcher::MainFrame::OnSelfUpdateClick)
@@ -64,90 +68,13 @@ namespace Launcher {
 
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 
-	namespace Defaults {
-		constexpr const bool console = false;
-		constexpr const int levelStage = 0;
-		constexpr const int stageType = 0;
-		constexpr const bool luaDebug = false;
-		constexpr const int luaHeapSize = 1024;
-		constexpr const bool update = true;
-		constexpr const bool unstableUpdates = false;
-	}
-
-	namespace Sections {
-		const std::string repentogon("Repentogon");
-		const std::string vanilla("Vanilla");
-		const std::string shared("Shared");
-	}
-
-	namespace Keys {
-		const std::string console("Console");
-		const std::string levelStage("LevelStage");
-		const std::string luaDebug("LuaDebug");
-		const std::string luaHeapSize("LuaHeapSize");
-		const std::string stageType("StageType");
-		const std::string launchMode("LaunchMode");
-		const std::string update("Update");
-		const std::string unstableUpdates("unstableUpdates");
-	}
-
-	namespace IsaacInterface {
-		// LevelStage
-		static constexpr const unsigned int STAGE_NULL = 0;
-		static constexpr const unsigned int STAGE4_1 = 7;
-		static constexpr const unsigned int STAGE4_2 = 8;
-		static constexpr const unsigned int STAGE4_3 = 9;
-		static constexpr const unsigned int STAGE8 = 13;
-		static constexpr const unsigned int NUM_STAGES = 14;
-
-		// StageType
-		static constexpr const unsigned int STAGETYPE_ORIGINAL = 0;
-		static constexpr const unsigned int STAGETYPE_GREEDMODE = 3;
-		static constexpr const unsigned int STAGETYPE_REPENTANCE_B = 5;
-	}
-
-	const char* levelNames[] = {
-			"Basement",
-			"Cellar",
-			"Burning Basement",
-			"Downpour",
-			"Dross",
-			"Caves",
-			"Catacombs",
-			"Flooded Caves",
-			"Mines",
-			"Ashpit",
-			"Depths",
-			"Necropolis",
-			"Dank Depths",
-			"Mausoleum",
-			"Gehenna",
-			"Womb",
-			"Utero",
-			"Scarred Womb",
-			"Corpse",
-			NULL
-	};
-
-	static const char* uniqueLevelNames[] = {
-		"??? (9.0)",
-		"Sheol (10.0)",
-		"Cathedral (10.1)",
-		"Dark Room (11.0)",
-		"Chest (11.1)",
-		"The Void (12.0)",
-		"Home (13.0)",
-		NULL
-	};
-
-	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher") {
+	
+	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"), 
+		_installationManager(this) {
 		memset(&_options, 0, sizeof(_options));
 		// _optionsGrid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
 		_luaHeapSize = nullptr;
-		_hasRepentogon = false;
-		_hasIsaac = false;
-		_repentogonVersion = nullptr;
 
 		SetSize(1024, 650);
 
@@ -192,6 +119,10 @@ namespace Launcher {
 		SetBackgroundColour(wxColour(237, 237, 237));
 	}
 
+	MainFrame::~MainFrame() {
+		_options.WriteConfiguration(this, _installationManager._installation);
+	}
+
 	void MainFrame::AddAdvancedOptions() {
 		wxButton* button = new wxButton(_advancedOptions, Launcher::WINDOW_BUTTON_SELF_UPDATE, "Self-update");
 		_advancedSizer->Add(button, 0, wxTOP | wxLEFT | wxBOTTOM, 20);
@@ -203,17 +134,17 @@ namespace Launcher {
 			"Select file", NoIsaacText, 
 			NoIsaacColor, isaacSelectionSizer, &_isaacFileText, WINDOW_BUTTON_SELECT_ISAAC);
 
-		wxBoxSizer* repentogonSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
+		/* wxBoxSizer* repentogonSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
 		AddLauncherConfigurationTextField("Indicate folder in which to download and install REPENTOGON",
 			"Select folder", 
 			NoRepentogonInstallationFolderText, NoRepentogonInstallationFolderColor,
-			repentogonSelectionSizer, &_repentogonInstallFolderText, WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER);
+			repentogonSelectionSizer, &_repentogonInstallFolderText, WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER); */
 
 		// isaacSelectionSizer->Add(new wxStaticLine(), 0, wxBOTTOM | wxTOP, 20);
 
 		_configurationSizer->Add(isaacSelectionSizer, 0, wxTOP | wxLEFT | wxRIGHT, 20);
 		_configurationSizer->Add(new wxStaticLine(), 0, wxTOP | wxBOTTOM, 5);
-		_configurationSizer->Add(repentogonSelectionSizer, 0, wxLEFT | wxRIGHT, 20);
+		// _configurationSizer->Add(repentogonSelectionSizer, 0, wxLEFT | wxRIGHT, 20);
 		_configurationSizer->Add(new wxStaticLine(), 0, wxBOTTOM, 20);
 	}
 
@@ -226,7 +157,7 @@ namespace Launcher {
 		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "));
 
 		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE);
-		_launchMode->Insert("Repentogon", 0, (void*)nullptr);
+		_repentogonLaunchModeIdx = _launchMode->Insert("Repentogon", 0, (void*)nullptr);
 		_launchMode->Insert("Vanilla", 0, (void*)nullptr);
 		_launchMode->SetValue("Repentogon");
 
@@ -237,8 +168,12 @@ namespace Launcher {
 		wxButton* launchButton = new wxButton(launchModeBox, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game");
 		launchModeBoxSizer->Add(launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 20);
 
-		wxButton* updateButton = new wxButton(launchModeBox, WINDOW_BUTTON_FORCE_UPDATE, "Update Repentogon (force)");
+		wxButton* updateButton = new wxButton(launchModeBox, WINDOW_BUTTON_FORCE_UPDATE, "Update Repentogon (force, stable version)");
 		launchModeBoxSizer->Add(updateButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 20);
+
+		wxButton* unstableUpdateButton = new wxButton(launchModeBox, WINDOW_BUTTON_FORCE_UNSTABLE_UPDATE, "Update Repentogon (force, unstable version)");
+		launchModeBoxSizer->Add(unstableUpdateButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 20);
+
 		launchModeBoxSizer->Add(new wxStaticLine(), 0, wxBOTTOM, 5);
 
 		_optionsSizer->Add(launchModeBox, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 20);
@@ -380,155 +315,26 @@ namespace Launcher {
 
 	void MainFrame::OnSelfUpdateClick(wxCommandEvent& event) {
 		Log("Performing self-update (forcibly triggered)");
-		Launcher::SelfUpdateErrorCode result = _selfUpdater.DoSelfUpdate(_options.unstableUpdates, true);
+		Launcher::SelfUpdateErrorCode result = _installationManager._selfUpdater.DoSelfUpdate(_options.unstableUpdates, true);
 		HandleSelfUpdateResult(result);
 	}
 
 	void MainFrame::HandleSelfUpdateResult(SelfUpdateErrorCode const& updateResult) {
-		std::ostringstream err, info;
-		bool isError = updateResult.base != SELF_UPDATE_UP_TO_DATE;
-		bool timedout = updateResult.base == SELF_UPDATE_SELF_UPDATE_FAILED &&
-			updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT;
-		switch (updateResult.base) {
-		case SELF_UPDATE_UPDATE_CHECK_FAILED:
-			err << "Error while checking for available launcher updates: ";
-			switch (updateResult.detail.fetchUpdatesResult) {
-			case Github::DOWNLOAD_AS_STRING_BAD_CURL:
-				err << "error while initializing cURL";
-				break;
-
-			case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
-				err << "error while performing cURL request";
-				break;
-
-			case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
-				err << "malformed HTTP answer";
-				break;
-
-			case Github::DOWNLOAD_AS_STRING_NO_NAME:
-				err << "HTTP answer lacks a \"name\" field";
-				break;
-			}
-			break;
-
-		case SELF_UPDATE_EXTRACTION_FAILED:
-			err << "Error while extracting the self-updater: ";
-			switch (updateResult.detail.extractionResult) {
-			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_NOT_FOUND:
-				err << "unable to locate self-updater inside the launcher";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_LOAD_FAILED:
-				err << "unable to load self-updater from the launcher";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_LOCK_FAILED:
-				err << "unable to acquire resource lock on self-updater";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_BAD_RESOURCE_SIZE:
-				err << "embedded self-updater has the wrong size";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_OPEN_TEMPORARY_FILE:
-				err << "unable to open temporary file to extract self-updater";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_WRITTEN_SIZE:
-				err << "unable to write self-updater on the disk";
-				break;
-			}
-			break;
-
-		case SELF_UPDATE_SELF_UPDATE_FAILED:
-			err << "Error while launching self-updater: ";
-			switch (updateResult.detail.runUpdateResult) {
-			case SELF_UPDATE_RUN_UPDATER_ERR_OPEN_LOCK_FILE:
-				err << "error while opening internal lock file";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_GENERATE_CLI:
-				err << "error while generating self-updater command line";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_CREATE_PROCESS:
-				err << "error while creating self-updater process";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_OPEN_PROCESS:
-				err << "error while opening self-updater process handle";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_WAIT:
-				err << "error while waiting for self-updater ready";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT:
-				err << "timedout while waiting for self-updater ready";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT:
-				err << "attempted to resume an update that was not started";
-				break;
-			}
-			break;
-
-		case SELF_UPDATE_UP_TO_DATE:
-			info << "Everything up-to-date (please report this as a bug: forced updates should never display this message)";
-			break;
-
-		default:
-			LogError("Unknown error %d while attempting self update", (int)updateResult.base);
-			break;
-		}
-
-		if (isError) {
-			LogError("%s", err.str().c_str());
-		}
-		else {
-			Log("%s", info.str().c_str());
-		}
-
-		if (!timedout) {
-			return;
-		}
-
-		const int maxRetries = 3;
-		int retries = 0;
-		while (timedout && retries < maxRetries) {
-			wxDialog promptRetry(this, -1, "Retry update", wxDefaultPosition, wxDefaultSize, wxYES_NO, "Retry update ?");
-			int modalResult = promptRetry.ShowModal();
-			if (modalResult == 0) {
-				break;
-			}
-			else {
-				SelfUpdateErrorCode resumeResult = _selfUpdater.ResumeSelfUpdate();
-				if (resumeResult.base != SELF_UPDATE_SELF_UPDATE_FAILED) {
-					LogError("Unexpected error category %d when retrying self-update, aborting", resumeResult.base);
+		InstallationManager::SelfUpdateResult result = _installationManager.HandleSelfUpdateResult(updateResult);
+		if (result == InstallationManager::SELF_UPDATE_PARTIAL) {
+			bool ok = true;
+			int currentRetry = 1;
+			int maxRetries = 3;
+			do {
+				wxDialog promptRetry(this, -1, "Retry update", wxDefaultPosition, wxDefaultSize, wxYES_NO, "Retry update ?");
+				int modalResult = promptRetry.ShowModal();
+				if (modalResult == 0) {
 					break;
 				}
-
-				switch (resumeResult.detail.runUpdateResult) {
-				case SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT:
-					LogError("Timedout while waiting for self-updater ready (retry %d/%d)", retries + 1, maxRetries);
-					++retries;
-					break;
-
-				case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT:
-					LogError("Attempted to resume an update that was not started");
-					retries = maxRetries;
-					break;
-
-				default:
-					LogError("Unexpected self-update error %d when retrying self-update, aborting", resumeResult.detail.runUpdateResult);
-					break;
-				}
-
-
-			}
+				ok = _installationManager.ResumeSelfUpdate(currentRetry, maxRetries);
+				++currentRetry;
+			} while (ok && currentRetry <= maxRetries);
 		}
-
-		LogError("Too many timeouts while waiting for self-updater ready. Aborting self-update, please kill the self-updater.");
 	}
 
 	void MainFrame::Launch(wxCommandEvent& event) {
@@ -538,6 +344,7 @@ namespace Launcher {
 			Log("\t\tRepentogon is disabled");
 		}
 		else {
+			Log("\t\tRepentogon is enabled");
 			Log("\t\tEnable Repentogon console window: %s", _options.console ? "yes" : "no");
 		}
 		Log("\tVanilla:");
@@ -550,161 +357,98 @@ namespace Launcher {
 		Log("\t\tLua debug: %s", _options.luaDebug ? "yes" : "no");
 		Log("\t\tLua heap size: %dM", _options.luaHeapSize);
 
-		WriteLauncherConfiguration();
+		_options.WriteConfiguration(this, _installationManager._installation);
 		::Launch(_options);
 	}
 
-	void MainFrame::PostInit() {
-		Log("Welcome to the REPENTOGON Launcher version %s", Launcher::version);
-		char currentDir[4096];
-		char* buffer = currentDir;
-		bool needFree = false;
-		DWORD currentDirResult = GetCurrentDirectoryA(4096, currentDir);
-		if (currentDirResult) {
-			if (currentDirResult > 4096) {
-				buffer = (char*)malloc(currentDirResult);
-				if (!buffer) {
-					buffer = (char*)GetCurrentDirectoryError;
-				}
-				else {
-					needFree = true;
-					if (GetCurrentDirectoryA(currentDirResult, buffer) == 0) {
-						needFree = false;
-						buffer = (char*)GetCurrentDirectoryError;
-					}
-				}
-			}
-		}
-		else {
-			buffer = (char*)GetCurrentDirectoryError;
-		}
-		Log("Current directory is: %s", buffer);
-		if (needFree)
-			free(buffer);
-		LPSTR cli = GetCommandLineA();
-		// Log("Command line: %s", cli);
-		Log("Loading configuration...");
-
-		Launcher::fs::IsaacInstallationPathInitResult initState = _installation.InitFolders();
-		bool needConfigurationFileInput = false;
-		switch (initState) {
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_PROFILE_DIR:
-			LogError("No configuration file found in current folder and unable to access the Repentance save folder");
-			needConfigurationFileInput = true;
-			break;
-
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR:
-			LogError("No configuration file found in current folder and no Repentance save folder found");
-			needConfigurationFileInput = true;
-			break;
-
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_NO_CONFIG:
-			Log("Found Isaac save folder %s", _installation.GetSaveFolder().c_str());
-			LogError("No configuration file found in current folder and none found in the Repentance save folder");
-			needConfigurationFileInput = true;
-			break;
-
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_OPEN_CONFIG:
-			LogError("Error while opening configuration file %s", _installation.GetLauncherConfigurationPath().c_str());
-			needConfigurationFileInput = true;
-			break;
-
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_PARSE_CONFIG:
-			LogError("Error while processing configuration file %s, syntax error on line %d\n",
-				_installation.GetLauncherConfigurationPath().c_str(),
-				_installation.GetConfigurationFileSyntaxErrorLine());
-			needConfigurationFileInput = true;
-			break;
-
-		default:
-			break;
-		}
-		
-		if (!needConfigurationFileInput) {
-			Log("Found configuration file %s", _installation.GetLauncherConfigurationPath().c_str());
-		}
-		else {
-			Launcher::fs::ConfigurationFileLocation location = PromptConfigurationFileLocation();
-			_installation.SetLauncherConfigurationPath(location);
-		}
-
-		_hasIsaac = CheckIsaacInstallation();
-		if (!_hasIsaac) {
+	void MainFrame::InitializeIsaacFolderPath(bool needIsaacFolder, bool canWriteConfiguration) {
+		if (needIsaacFolder || !_installationManager.CheckIsaacInstallation()) {
 			std::string path = PromptIsaacInstallation();
 			std::filesystem::path p(path);
 			p.remove_filename();
-			if (!_installation.SetIsaacInstallationFolder(p.string())) {
+			if (!_installationManager._installation.SetIsaacInstallationFolder(p.string())) {
 				LogError("Unable to configure the Isaac installation folder");
 				return;
+			}
+			else {
+				Log("Set Isaac installation folder to %s", p.string().c_str());
 			}
 
 			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
 		}
-
-		if (!CheckIsaacVersion()) {
-			return;
+		else {
+			OnFileSelected(_installationManager._installation.GetIsaacInstallationFolder() + "isaac.ng.exe", 
+				NoIsaacColor, _isaacFileText, NoIsaacText);
 		}
+	}
 
-		_hasRepentogon = CheckRepentogonInstallation();
-		bool checkUpdates = true;
-		if (!_hasRepentogon) {
-			if (PromptRepentogonInstallation()) {
-				DownloadAndInstallRepentogon(true);
-				checkUpdates = false;
-				_hasRepentogon = CheckRepentogonInstallation();
+	void MainFrame::HandleLauncherUpdates(bool allowDrafts) {
+		InstallationManager::CheckSelfUpdateResult result = _installationManager.CheckSelfUpdates(allowDrafts);
+		if (result.code == InstallationManager::SELF_UPDATE_CHECK_NEW) {
+			if (PromptLauncherUpdate(result.version, result.url)) {
+				Log("Initiating update");
+				DoSelfUpdate(result.version, result.url);
 			}
 			else {
-				checkUpdates = false;
+				Log("Skipping self-updater as per user choice");
 			}
 		}
+	}
+
+	void MainFrame::PostInit() {
+		Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::version);
+		std::string currentDir = Filesystem::GetCurrentDirectory_();
+		Log("Current directory is: %s", currentDir.c_str());
+		
+		HandleLauncherUpdates(true);
+
+		LPSTR cli = GetCommandLineA();
+		Log("Command line: %s", cli);
+		Log("Loading Repentogon configuration...");
+
+		
+		bool needIsaacFolder = true;
+		bool canWriteConfiguration = false;
+
+		_installationManager.InitFolders(&needIsaacFolder, &canWriteConfiguration);
+		InitializeIsaacFolderPath(needIsaacFolder, canWriteConfiguration);
 
 		InitializeOptions();
 
-		LogNoNL("Checking for availability of launcher updates... ");
-		rapidjson::Document launcherResponse;
-		std::string updateVersion, updateUrl;
-		Github::DownloadAsStringResult downloadReleasesResult;
-		if (_selfUpdater.IsSelfUpdateAvailable(_options.unstableUpdates, false, updateVersion, updateUrl, &downloadReleasesResult)) {
-			Log("OK");
-			Log("New version of the launcher available: %s (downloaded from %s)\n", updateVersion.c_str(), updateUrl.c_str());
-			Log("Initiating update");
-			DoSelfUpdate(updateVersion, updateUrl);
-		}
-		else {
-			Log("KO");
-			if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
-				LogError("Error encountered while checking for availability of launcher update");
-				switch (downloadReleasesResult) {
-				case Github::DOWNLOAD_AS_STRING_BAD_CURL:
-					LogError("Unable to initialize cURL connection");
-					break;
-
-				case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
-					LogError("Unable to perform cURL request");
-					break;
-
-				case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
-					LogError("Invalid response");
-					break;
-
-				case Github::DOWNLOAD_AS_STRING_NO_NAME:
-					LogError("Release has no \"name\" field (although you should not be seeing this error, report it as a bug");
-					break;
-
-				default:
-					LogError("Unexpected error %d: report it as a bug", downloadReleasesResult);
-					break;
-				}
+		if (!_installationManager.CheckIsaacVersion()) {
+			if (_repentogonLaunchModeIdx != -1) {
+				_launchMode->Delete(_repentogonLaunchModeIdx);
 			}
+			return;
+		}
+
+		auto installationState = _installationManager.CheckRepentogonInstallation(false, false);
+		bool checkUpdates = (installationState != InstallationManager::REPENTOGON_INSTALLATION_CHECK_LEGACY);
+		if (installationState == InstallationManager::REPENTOGON_INSTALLATION_CHECK_KO) {
+			if (PromptRepentogonInstallation()) {
+				_installationManager.InstallLatestRepentogon(true, _options.unstableUpdates);
+				_installationManager.CheckRepentogonInstallation(true, false);
+			}
+
+			checkUpdates = false;
 		}
 
 		if (checkUpdates && _options.update) {
-			DownloadAndInstallRepentogon(false);
+			Log("Checking for Repentogon updates...");
+			rapidjson::Document release;
+			if (!_installationManager.CheckRepentogonUpdates(release, _options.unstableUpdates, false)) {
+				Log("Repentogon is up-to-date");
+			}
+			else {
+				Log("An update is available. Updating Repentogon...");
+				_installationManager.InstallRepentogon(release);
+				_installationManager.CheckRepentogonInstallation(false, false);
+			}
 		}
 	}
 
 	void MainFrame::DoSelfUpdate(std::string const& version, std::string const& url) {
-		SelfUpdateErrorCode result = _selfUpdater.DoSelfUpdate(version, url);
+		SelfUpdateErrorCode result = _installationManager._selfUpdater.DoSelfUpdate(version, url);
 		HandleSelfUpdateResult(result);
 	}
 
@@ -712,103 +456,6 @@ namespace Launcher {
 		wxMessageDialog dialog(this, "No valid REPENTOGON installation found.\nDo you want to install now ?", "REPENTOGON Installation", wxYES_NO | wxCANCEL);
 		int result = dialog.ShowModal();
 		return result == wxID_OK || result == wxID_YES;
-	}
-
-	bool MainFrame::CheckIsaacInstallation() {
-		Log("Checking Isaac installation...");
-		if (!_installation.CheckIsaacInstallation()) {
-			LogError("Unable to find isaac-ng.exe");
-			return false;
-		}
-
-		return true;
-	}
-
-	bool MainFrame::CheckIsaacVersion() {
-		Log("Checking Isaac version...");
-		fs::Version const* version = _installation.GetIsaacVersion();
-		if (!version) {
-			LogError("Unknown Isaac version. REPENTOGON will not launch.");
-			return false;
-		}
-
-		Log("Identified Isaac version %s: ", version->version);
-		if (!version->valid) {
-			LogError("this version of the game does not support REPENTOGON.");
-		}
-		else {
-			Log("this version of the game is compatible with REPENTOGON.");
-		}
-
-		return version->valid;
-	}
-
-	bool MainFrame::CheckRepentogonInstallation() {
-		Log("Checking Repentogon installation...");
-		if (_installation.CheckRepentogonInstallation()) {
-			Log("Found a valid Repentogon installation: ");
-			Log("\tZHL version: %s", _installation.GetZHLVersion().c_str());
-			Log("\tRepentogon version: %s", _installation.GetRepentogonVersion().c_str());
-
-			if (_installation.GetRepentogonInstallationState() == fs::REPENTOGON_INSTALLATION_STATE_LEGACY) {
-				LogWarn("\tFound legacy dsound.dll");
-
-			}
-
-			return true;
-		}
-		else {
-			Log("Found no valid installation of Repentogon: ");
-			std::vector<fs::FoundFile> const& files = _installation.GetRepentogonInstallationFilesState();
-			for (fs::FoundFile const& file : files) {
-				if (file.found) {
-					Log("\t%s: found", file.filename.c_str());
-				}
-				else {
-					Log("\t%s: not found", file.filename.c_str());
-				}
-			}
-
-			bool zhlVersionAvailable = false, repentogonVersionAvailable = false;
-			if (_installation.WasLibraryLoaded(fs::LOADABLE_DLL_ZHL)) {
-				std::string const& zhlVersion = _installation.GetZHLVersion();
-				if (zhlVersion.empty()) {
-					Log("\tlibzhl.dll: unable to find version");
-				}
-				else {
-					zhlVersionAvailable = true;
-					Log("\tlibzhl.dll: found version %s", zhlVersion.c_str());
-				}
-			}
-			else {
-				Log("\tlibzhl.dll: Unable to load");
-			}
-
-			if (_installation.WasLibraryLoaded(fs::LOADABLE_DLL_REPENTOGON)) {
-				std::string const& repentogonVersion = _installation.GetRepentogonVersion();
-				if (repentogonVersion.empty()) {
-					Log("\tzhlRepentogon.dll: unable to find version");
-				}
-				else {
-					repentogonVersionAvailable = true;
-					Log("\tzhlRepentogon.dll: found version %s", repentogonVersion.c_str());
-				}
-			}
-			else {
-				Log("\tzhlRepentogon.dll: Unable to load");
-			}
-
-			if (zhlVersionAvailable && repentogonVersionAvailable) {
-				if (_installation.RepentogonZHLVersionMatch()) {
-					Log("\tZHL / Repentogon version match");
-				}
-				else {
-					Log("\tZHL / Repentogon version mismatch");
-				}
-			}
-
-			return false;
-		}
 	}
 
 	void MainFrame::Log(const char* fmt, ...) {
@@ -905,106 +552,59 @@ namespace Launcher {
 		box->Insert(wxString("--"), pos++);
 		box->SetValue("--");
 		int variant = 0;
-		for (const char* name : levelNames) {
-			if (!name)
-				continue;
-
+		const char** name = &(IsaacInterface::levelNames[0]);
+		while (*name) {
 			wxString s;
 			int level = 1 + 2 * (variant / 5);
-			box->Insert(s.Format("%s I (%d.%d)", name, level, variant % 5), pos++, (void*)nullptr);
-			box->Insert(s.Format("%s II (%d.%d)", name, level + 1, variant % 5), pos++, (void*)nullptr);
+			box->Insert(s.Format("%s I (%d.%d)", *name, level, variant % 5), pos++, (void*)nullptr);
+			box->Insert(s.Format("%s II (%d.%d)", *name, level + 1, variant % 5), pos++, (void*)nullptr);
 
 			++variant;
+			++name;
 		}
 
-		for (const char* name : uniqueLevelNames) {
-			if (!name)
-				continue;
-			box->Insert(wxString(name), pos++, (void*)nullptr);
+		name = &(IsaacInterface::uniqueLevelNames[0]);
+		while (*name) {
+			box->Insert(wxString(*name), pos++, (void*)nullptr);
+			++name;
 		}
 
 		return box;
 	}
 
 	void MainFrame::InitializeOptions() {
-		INIReader reader(std::string("launcher.ini"));
-		if (reader.ParseError() == -1) {
-			Log("No configuration file found, using defaults");
-			_options.console = Defaults::console;
-			_options.levelStage = Defaults::levelStage;
-			_options.luaDebug = Defaults::luaDebug;
-			_options.luaHeapSize = Defaults::luaHeapSize;
-			_options.mode = _hasRepentogon ? LAUNCH_MODE_REPENTOGON : LAUNCH_MODE_VANILLA;
-			_options.stageType = Defaults::stageType;
-			_options.unstableUpdates = Defaults::unstableUpdates;
-			// _options.update = Defaults::update;
+		std::string configurationFile = _installationManager._installation.GetLauncherConfigurationPath();
+		char readerMem[sizeof(INIReader)];
 
-			wxMessageDialog dialog(this, "Do you want to have the launcher automatically update Repentogon?\n(Warning: this will be applied **immediately**)", "Auto-updates", wxYES_NO | wxCANCEL);
+		bool invokeReader = false;
+		if (!configurationFile.empty() && Filesystem::FileExists(configurationFile.c_str())) {
+			new (readerMem) INIReader(configurationFile);
+			invokeReader = true;
+		}
+
+		INIReader* reader = reinterpret_cast<INIReader*>(readerMem);
+		if (!invokeReader || reader->ParseError() == -1) {
+			if (!invokeReader) {
+				LogError("No configuration file found, using defaults");
+			}
+			else {
+				LogError("Malformed configuration file found (%s), using defaults", configurationFile.c_str());
+			}
+
+			wxMessageDialog dialog(this, "Do you want to have the launcher automatically update Repentogon?\n(Selecting \"Yes\" will immediately update Repentogon to the latest versions)", "Automatic Repentogon updates", wxYES_NO | wxCANCEL);
 			int result = dialog.ShowModal();
-			_options.update = (result == wxID_OK || result == wxID_YES);
+
+			wxMessageDialog unstableDialog(this, "Do you want to download unstable updates ?\n(If you are not a modder, you probably don't want this)", "Unstable Repentogon updates", wxYES_NO | wxCANCEL);
+			int unstableResult = unstableDialog.ShowModal();
+
+			_options.InitializeDefaults(this, result == wxID_OK || result == wxID_YES,
+				result == wxID_OK || result == wxID_YES, 
+				_installationManager.IsValidRepentogonInstallation(true));
 		}
 		else {
 			Log("Found configuration file launcher.ini");
-			_options.console = reader.GetBoolean(Sections::repentogon, Keys::console, Defaults::console);
-			_options.levelStage = reader.GetInteger(Sections::vanilla, Keys::levelStage, Defaults::levelStage);
-			_options.luaDebug = reader.GetBoolean(Sections::vanilla, Keys::luaDebug, Defaults::luaDebug);
-			_options.luaHeapSize = reader.GetInteger(Sections::vanilla, Keys::luaHeapSize, Defaults::luaHeapSize);
-			_options.stageType = reader.GetInteger(Sections::vanilla, Keys::stageType, Defaults::stageType);
-			_options.mode = (LaunchMode)reader.GetInteger(Sections::shared, Keys::launchMode, LAUNCH_MODE_REPENTOGON);
-			_options.update = reader.GetBoolean(Sections::repentogon, Keys::update, Defaults::update);
-			_options.unstableUpdates = reader.GetBoolean(Sections::shared, Keys::unstableUpdates, Defaults::unstableUpdates);
-
-			if (_options.mode != LAUNCH_MODE_REPENTOGON && _options.mode != LAUNCH_MODE_VANILLA) {
-				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.mode, Keys::launchMode);
-				if (_hasRepentogon) {
-					_options.mode = LAUNCH_MODE_REPENTOGON;
-				}
-				else {
-					_options.mode = LAUNCH_MODE_VANILLA;
-				}
-			}
-
-			if (_options.luaHeapSize < 0) {
-				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.luaHeapSize, Keys::luaHeapSize.c_str());
-				_options.luaHeapSize = Defaults::luaHeapSize;
-			}
-
-			if (_options.levelStage < IsaacInterface::STAGE_NULL || _options.levelStage > IsaacInterface::STAGE8) {
-				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.levelStage, Keys::levelStage.c_str());
-				_options.levelStage = Defaults::levelStage;
-				_options.stageType = Defaults::stageType;
-			}
-
-			if (_options.stageType < IsaacInterface::STAGETYPE_ORIGINAL || _options.stageType > IsaacInterface::STAGETYPE_REPENTANCE_B) {
-				LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", _options.stageType, Keys::stageType.c_str());
-				_options.stageType = Defaults::stageType;
-			}
-
-			if (_options.stageType == IsaacInterface::STAGETYPE_GREEDMODE) {
-				LogWarn("Value 3 (Greed mode) for %s field in launcher.ini is deprecated since Repentance."
-						"Overriding with default", Keys::stageType.c_str());
-				_options.stageType = Defaults::stageType;
-			}
-
-			// Validate stage type for Chapter 4.
-			if (_options.levelStage == IsaacInterface::STAGE4_1 || _options.levelStage == IsaacInterface::STAGE4_2) {
-				if (_options.stageType == IsaacInterface::STAGETYPE_REPENTANCE_B) {
-					LogWarn("Invalid value %d for %s field associated with value %d "
-							"for %s field in launcher.ini. Overriding with default", _options.stageType, Keys::levelStage.c_str(),
-							_options.stageType, Keys::stageType.c_str());
-					_options.stageType = Defaults::stageType;
-				}
-			}
-
-			// Validate stage type for Chapters > 4.
-			if (_options.levelStage >= IsaacInterface::STAGE4_3 && _options.levelStage <= IsaacInterface::STAGE8) {
-				if (_options.stageType != IsaacInterface::STAGETYPE_ORIGINAL) {
-					LogWarn("Invalid value %d for %s field associated with value %d "
-							"for %s field in launcher.ini. Overriding with default", _options.levelStage, Keys::levelStage.c_str(),
-							_options.stageType, Keys::stageType.c_str());
-					_options.stageType = Defaults::stageType;
-				}
-			}
+			_options.InitializeFromConfig(this, *reader,
+				_installationManager.IsValidRepentogonInstallation(true));
 		}
 		
 		InitializeGUIFromOptions();
@@ -1040,7 +640,7 @@ namespace Launcher {
 			std::string levelName;
 			if (level <= IsaacInterface::STAGE4_2) {
 				/* To find the level name, divide level by two to get the chapter - 1, then add the stage type. */
-				levelName = levelNames[((level - 1) / 2) * 5 + type];
+				levelName = IsaacInterface::levelNames[((level - 1) / 2) * 5 + type];
 				if (level % 2 == 0) {
 					levelName += " II";
 				}
@@ -1053,7 +653,7 @@ namespace Launcher {
 				levelName += std::string(buffer);
 			}
 			else {
-				levelName = uniqueLevelNames[level - IsaacInterface::STAGE4_3];
+				levelName = IsaacInterface::uniqueLevelNames[level - IsaacInterface::STAGE4_3];
 			}
 			value = levelName;
 		}
@@ -1072,152 +672,23 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::WriteLauncherConfiguration() {
-		FILE* f = fopen("launcher.ini", "w");
-		if (!f) {
-			LogError("Unable to open file to write launcher configuration, skpping");
-			return;
-		}
-
-		fprintf(f, "[%s]\n", Sections::repentogon.c_str());
-		fprintf(f, "%s = %d\n", Keys::console.c_str(), _options.console);
-		fprintf(f, "%s = %d\n", Keys::update.c_str(), _options.update);
-
-		fprintf(f, "[%s]\n", Sections::vanilla.c_str());
-		fprintf(f, "%s = %d\n", Keys::levelStage.c_str(), _options.levelStage);
-		fprintf(f, "%s = %d\n", Keys::stageType.c_str(), _options.stageType);
-		fprintf(f, "%s = %d\n", Keys::luaHeapSize.c_str(), _options.luaHeapSize);
-		fprintf(f, "%s = %d\n", Keys::luaDebug.c_str(), _options.luaDebug);
-		
-		fprintf(f, "[%s]\n", Sections::shared.c_str());
-		fprintf(f, "%s = %d\n", Keys::launchMode.c_str(), _options.mode);
-
-		fclose(f);
-	}
-
-	bool MainFrame::DoRepentogonUpdate(rapidjson::Document& response) {
-		Threading::Monitor<Github::GithubDownloadNotification> monitor;
-		std::future<RepentogonUpdateResult> result = std::async(std::launch::async, 
-			&Launcher::Updater::UpdateRepentogon, &_updater, std::ref(response), &monitor);
-		size_t totalDownloadSize = 0;
-		while (result.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
-			while (std::optional<Github::GithubDownloadNotification> message = monitor.Get()) {
-				switch (message->type) {
-				case Github::GH_NOTIFICATION_INIT_CURL:
-					Log("[Updater] Initializing cURL connection to %s", std::get<std::string>(message->data).c_str());
-					break;
-
-				case Github::GH_NOTIFICATION_INIT_CURL_DONE:
-					Log("[Updater] Initialized cURL connection to %s", std::get<std::string>(message->data).c_str());
-					break;
-
-				case Github::GH_NOTIFICATION_CURL_PERFORM:
-					Log("[Updater] Performing cURL request to %s", std::get<std::string>(message->data).c_str());
-					break;
-
-				case Github::GH_NOTIFICATION_CURL_PERFORM_DONE:
-					Log("[Updater] Performed cURL request to %s", std::get<std::string>(message->data).c_str());
-					break;
-
-				case Github::GH_NOTIFICATION_DATA_RECEIVED:
-					totalDownloadSize += std::get<size_t>(message->data);
-					Log("[Updater] Downloaded %lu bytes", totalDownloadSize);
-					break;
-
-				case Github::GH_NOTIFICATION_PARSE_RESPONSE:
-					Log("[Updater] Parsing result of cURL request from %s", std::get<std::string>(message->data).c_str());
-					break;
-
-				case Github::GH_NOTIFICATION_PARSE_RESPONSE_DONE:
-					Log("[Updater] Parsed result of cURL request from %s", std::get<std::string>(message->data).c_str());
-					break;
-
-				case Github::GH_NOTIFICATION_DONE:
-					Log("[Updater] Successfully downloaded content from %s", std::get<std::string>(message->data).c_str());
-					break;
-
-				default:
-					LogError("[Updater] Unexpected asynchronous notification (id = %d)", message->type);
-					break;
-				}
+	void MainFrame::ForceUpdate(wxCommandEvent& event) {
+		Log("Forcibly updating Repentogon to the latest version");
+		if (_installationManager.IsLegacyRepentogonInstallation()) {
+			if (!_installationManager.UninstallLegacyRepentogon() && 
+				Filesystem::FileExists((_installationManager._installation.GetIsaacInstallationFolder() + "/dsound.dll").c_str())) {
+				LogWarn("[Force update] Identified a legacy Repentogon installation, but couldn't remove dsound.dll. Repentogon may not work after the update");
 			}
 		}
 
-		RepentogonUpdateState const& state = _updater.GetRepentogonUpdateState();
-		Launcher::RepentogonUpdateResult updateResult = result.get();
-		switch (updateResult) {
-		case REPENTOGON_UPDATE_RESULT_MISSING_ASSET:
-			LogError("Could not install Repentogon: bad assets in release information\n");
-			LogError("Found hash.txt: %s\n", state.hashOk ? "yes" : "no");
-			LogError("Found REPENTOGON.zip: %s\n", state.zipOk ? "yes" : "no");
-			break;
-
-		case REPENTOGON_UPDATE_RESULT_DOWNLOAD_ERROR:
-			LogError("Could not install Repentogon: download error\n");
-			LogError("Downloaded hash.txt: %s\n", state.hashFile ? "yes" : "no");
-			LogError("Downloaded REPENTOGON.zip: %s\n", state.zipFile ? "yes" : "no");
-			break;
-
-		case REPENTOGON_UPDATE_RESULT_BAD_HASH:
-			LogError("Could not install Repentogon: bad archive hash\n");
-			LogError("Expected hash \"%s\", got \"%s\"\n", state.hash.c_str(), state.zipHash.c_str());
-			break;
-
-		case REPENTOGON_UPDATE_RESULT_EXTRACT_FAILED:
-		{
-			int i = 0;
-			LogError("Could not install Repentogon: error while extracting archive\n");
-			for (auto const& [filename, success] : state.unzipedFiles) {
-				if (filename.empty()) {
-					LogError("Could not extract file %d from the archive\n", i);
-				}
-				else {
-					LogError("Extracted %s: %s\n", filename.c_str(), success ? "yes" : "no");
-				}
-			}
-			break;
-		}
-
-		case REPENTOGON_UPDATE_RESULT_OK:
-			Log("Successfully installed latest Repentogon release\n");
-			break;
-
-		default:
-			LogError("Unknown error code from Updater::UpdateRepentogon: %d\n", updateResult);
-		}
-
-		return updateResult == REPENTOGON_UPDATE_RESULT_OK;
-	}
-
-	void MainFrame::ForceUpdate(wxCommandEvent& event) { 
-		DownloadAndInstallRepentogon(true);
-	}
-
-	void MainFrame::DownloadAndInstallRepentogon(bool force) {
-		rapidjson::Document document;
-		if (!DoCheckRepentogonUpdates(document, force)) {
-			return;
-		}
-
-		DoRepentogonUpdate(document);
-	}
-
-	bool MainFrame::DoCheckRepentogonUpdates(rapidjson::Document& document, 
-		bool force) {
-		Threading::Monitor<Github::GithubDownloadNotification> monitor;
-		Github::VersionCheckResult result = _updater.CheckRepentogonUpdates(document, _installation, &monitor);
-		if (result == Github::VERSION_CHECK_NEW)
-			return true;
-
-		if (result == Github::VERSION_CHECK_UTD)
-			return force;
-
-		return false;
+		wxButton* source = dynamic_cast<wxButton*>(event.GetEventObject());
+		_installationManager.InstallLatestRepentogon(true, source->GetId() == WINDOW_BUTTON_FORCE_UNSTABLE_UPDATE);
+		_installationManager.CheckRepentogonInstallation(false, true);
 	}
 
 	Launcher::fs::ConfigurationFileLocation MainFrame::PromptConfigurationFileLocation() {
 		wxString message("The launcher was not able to find a configuration file. If this is your first run, it is normal.\n");
-		std::string saveFolder = _installation.GetSaveFolder();
+		std::string saveFolder = _installationManager._installation.GetSaveFolder();
 		if (saveFolder.empty()) {
 			message += "The launcher was not able to find your user profile directory. As such, the configuration fille will be created next to the launcher.";
 			wxMessageDialog dialog(this, message, "Information", wxOK);
@@ -1228,7 +699,7 @@ namespace Launcher {
 			message += "The launcher will proceed to create its configuration file.\n\n"
 				"You can decide whether you want that file to be installed next to the launcher, or in the same folder as the Repentance save files\n"
 				"The launcher identified your Repentance save folder as: ";
-			message += _installation.GetSaveFolder();
+			message += _installationManager._installation.GetSaveFolder();
 			wxString options[] = {
 				"Install next to launcher",
 				"Install in Repentance save folder"
@@ -1275,5 +746,25 @@ namespace Launcher {
 		if (result) {
 			*result = textCtrl;
 		}
+	}
+
+	bool MainFrame::PromptLauncherUpdate(std::string const& version, std::string const& url) {
+		std::ostringstream s;
+		s << "An update is available for the launcher.\n" <<
+			"It will update from version " << Launcher::version << " to version " << version << ".\n" <<
+			"(You may also download manually from " << url << ").\n" <<
+			"Do you want to update now ?";
+		wxMessageDialog modal(this, s.str(), "Update Repentogon's Launcher ?", wxYES_NO);
+		int result = modal.ShowModal();
+		return result == wxID_YES || result == wxID_OK;
+	}
+
+	bool MainFrame::PromptLegacyUninstall() {
+		std::ostringstream s;
+		s << "An unsupported build of Repentogon is currently installed and must be removed in order to upgrade to the latest Repentgon version.\n"
+			"Proceed with its uninstallation?";
+		wxMessageDialog modal(this, s.str(), "Uninstall legacy Repentogon installation?", wxYES_NO);
+		int result = modal.ShowModal();
+		return result == wxID_YES || result == wxID_OK;
 	}
 }

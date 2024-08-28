@@ -24,7 +24,8 @@
 #include "zip.h"
 
 namespace Launcher {
-	/* GitHub URL of the latest releases of Repentogon. */
+	static const char* RepentogonReleasesURL = "https://api.github.com/repos/TeamREPENTOGON/REPENTOGON/releases";
+	/* GitHub URL of the latest release of Repentogon. */
 	static const char* RepentogonURL = "https://api.github.com/repos/TeamREPENTOGON/REPENTOGON/releases/latest";
 	static const char* RepentogonZipName = "REPENTOGON.zip";
 	static const char* HashName = "hash.txt";
@@ -39,8 +40,9 @@ namespace Launcher {
 
 	Github::VersionCheckResult Updater::CheckRepentogonUpdates(rapidjson::Document& doc,
 		fs::Installation const& installation,
+		bool allowPreReleases,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
-		Github::DownloadAsStringResult fetchResult = FetchRepentogonUpdates(doc, monitor);
+		Github::DownloadAsStringResult fetchResult = FetchRepentogonUpdates(doc, allowPreReleases, monitor);
 		if (fetchResult != Github::DOWNLOAD_AS_STRING_OK) {
 			return Github::VERSION_CHECK_ERROR;
 		}
@@ -53,11 +55,42 @@ namespace Launcher {
 	}
 
 	Github::DownloadAsStringResult Updater::FetchRepentogonUpdates(rapidjson::Document& response,
+		bool allowPreReleases,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
-		return Github::FetchReleaseInfo(RepentogonURL, response, monitor);
+		if (!allowPreReleases) {
+			return Github::FetchReleaseInfo(RepentogonURL, response, monitor);
+		}
+		else {
+			std::string allReleases;
+			Github::DownloadAsStringResult allReleasesResult = Github::DownloadAsString(RepentogonReleasesURL, allReleases, nullptr);
+			if (allReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
+				Logger::Error("Unable to download list of all Repentogon releases: %d\n", allReleasesResult);
+				return Github::FetchReleaseInfo(RepentogonURL, response, monitor);
+			}
+
+			rapidjson::Document asJson;
+			asJson.Parse(allReleases.c_str());
+
+			if (asJson.HasParseError()) {
+				Logger::Error("Unable to parse list of all Repentogon releases as JSON\n");
+				return Github::FetchReleaseInfo(RepentogonURL, response, monitor);
+			}
+
+			auto releases = asJson.GetArray();
+			for (int i = 0; i < releases.Size(); ++i) {
+				auto const& release = releases[i];
+				if (release["prerelease"].GetBool()) {
+					return Github::FetchReleaseInfo(release["url"].GetString(), response, monitor);
+				}
+			}
+
+			Logger::Warn("No prerelease found, defaulting to latest release");
+			return Github::FetchReleaseInfo(RepentogonURL, response, monitor);
+		}
 	}
 
 	RepentogonUpdateResult Updater::UpdateRepentogon(rapidjson::Document& data,
+		const char* outputDir,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
 		_repentogonUpdateState.Clear();
 
@@ -80,7 +113,11 @@ namespace Launcher {
 		}
 
 		_repentogonUpdateState.phase = REPENTOGON_UPDATE_PHASE_UNPACK;
-		if (!ExtractRepentogon()) {
+		if (!outputDir) {
+			return REPENTOGON_UPDATE_RESULT_INVALID_OUTPUT_DIR;
+		}
+
+		if (!ExtractRepentogon(outputDir)) {
 			Logger::Error("Updater::UpdateRepentogon: extraction failed\n");
 			return REPENTOGON_UPDATE_RESULT_EXTRACT_FAILED;
 		}
@@ -216,20 +253,17 @@ namespace Launcher {
 
 		std::string zipHash;
 		try {
-			zipHash = Sha256::Sha256F(RepentogonZipName, true);
+			zipHash = Sha256::Sha256F(RepentogonZipName);
 		}
 		catch (std::exception& e) {
 			Logger::Fatal("Updater::CheckRepentogonIntegrity: exception while hashing %s: %s\n", RepentogonZipName, e.what());
 			throw;
 		}
 
-		std::transform(zipHash.begin(), zipHash.end(), zipHash.begin(), ::toupper);
-		std::transform(hash, hash + len, hash, ::toupper);
-
 		_repentogonUpdateState.hash = hash;
 		_repentogonUpdateState.zipHash = zipHash;
 
-		if (strcmp(hash, zipHash.c_str())) {
+		if (!Sha256::Equals(hash, zipHash.c_str())) {
 			Logger::Error("Updater::CheckRepentogonIntegrity: hash mismatch: expected \"%s\", got \"%s\"\n", zipHash.c_str(), hash);
 			return false;
 		}
@@ -237,7 +271,17 @@ namespace Launcher {
 		return true;
 	}
 
-	bool Updater::ExtractRepentogon() {
+	bool Updater::ExtractRepentogon(const char* outputDir) {
+		if (!outputDir) {
+			Logger::Error("Updater::ExtractRepentogon: NULL output folder\n");
+			return false;
+		}
+		
+		if (!Filesystem::FolderExists(outputDir)) {
+			Logger::Error("Updater::ExtractRepentogon: invalid output folder %s\n", outputDir);
+			return false;
+		}
+
 		std::vector<std::tuple<std::string, bool>>& filesState = _repentogonUpdateState.unzipedFiles;
 		int error;
 		zip_t* zip = zip_open(RepentogonZipName, ZIP_RDONLY | ZIP_CHECKCONS, &error);
@@ -248,6 +292,7 @@ namespace Launcher {
 
 		bool ok = true;
 		int nFiles = zip_get_num_entries(zip, 0);
+		std::string outputDirBase(outputDir);
 		for (int i = 0; i < nFiles; ++i) {
 			zip_file_t* file = zip_fopen_index(zip, i, 0);
 			if (!file) {
@@ -276,7 +321,10 @@ namespace Launcher {
 				continue;
 			}
 
-			FILE* output = fopen(name, "wb");
+			std::string outputPath(outputDirBase);
+			outputPath += "/";
+			outputPath += name;
+			FILE* output = fopen(outputPath.c_str(), "wb");
 			if (!output) {
 				Logger::Error("Updater::ExtractRepentogon: cannot create file %s\n", name);
 				ok = false;
@@ -298,6 +346,10 @@ namespace Launcher {
 
 				fwrite(buffer, count, 1, output);
 				count = zip_fread(file, buffer, 4096);
+			}
+
+			if (fileOk) {
+				Logger::Info("Updater::ExtractRepentogon: successfully extracted %s to %s\n", name, outputPath.c_str());
 			}
 
 			filesState.push_back(std::make_tuple(name, fileOk));

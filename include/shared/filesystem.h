@@ -12,8 +12,8 @@ namespace Filesystem {
 	bool CreateFileHierarchy(const char* name);
 
 	/* Check if a folder with the given name exists. Return true on success,
-		 * false on failure.
-		 */
+	 * false on failure.
+	 */
 	bool FolderExists(const char* name);
 
 	/* Check that a file with the given name exists. Return true on success,
@@ -38,4 +38,7 @@ namespace Filesystem {
 	};
 
 	SaveFolderResult GetIsaacSaveFolder(std::string* saveFolder);
+
+	/* Remove a file. Return false on failure, true on success. */
+	bool RemoveFile(const char* filename);
 }

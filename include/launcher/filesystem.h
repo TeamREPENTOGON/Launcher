@@ -19,6 +19,18 @@ namespace Launcher {
 		static constexpr const char* launcherConfigFile = "repentogon_launcher.ini";
 		static constexpr const char* defaultRepentogonFolder = "repentogon";
 
+		namespace Configuration {
+			// Sections
+			static constexpr const char* GeneralSection = "General";
+
+			// Keys (General section)
+			static constexpr const char* IsaacFolderKey = "IsaacFolder";
+			static constexpr const char* RepentogonFolderKey = "RepentogonFolder";
+
+			// Default values (General section)
+			static constexpr const char* EmptyPath = "__empty__";
+		}
+
 		struct Version {
 			/* Hash of a given version. */
 			const char* hash;
@@ -127,6 +139,7 @@ namespace Launcher {
 
 			void SetLauncherConfigurationPath(ConfigurationFileLocation loc);
 			bool SetIsaacInstallationFolder(std::string const& folder);
+			void WriteLauncherConfigurationFile();
 
 			RepentogonInstallationState GetRepentogonInstallationState() const;
 			Version const* GetIsaacVersion() const;

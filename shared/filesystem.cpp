@@ -96,4 +96,8 @@ namespace Filesystem {
 		*saveFolder = std::move(path);
 		return SAVE_FOLDER_OK;
 	}
+
+	bool RemoveFile(const char* filename) {
+		return DeleteFileA(filename) != 0;
+	}
 }

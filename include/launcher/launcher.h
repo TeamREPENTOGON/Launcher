@@ -1,5 +1,9 @@
 #pragma once
 
+#include "inih/cpp/INIReader.h"
+#include "launcher/filesystem.h"
+#include "shared/loggable_gui.h"
+
 enum LaunchMode {
 	LAUNCH_MODE_VANILLA,
 	LAUNCH_MODE_REPENTOGON
@@ -18,6 +22,10 @@ struct IsaacOptions {
 	int levelStage;
 	int stageType;
 	int luaHeapSize;
+
+	void InitializeDefaults(ILoggableGUI* gui, bool allowUpdates, bool allowUnstableUpdates, bool validRepentogon);
+	void InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bool validRepentogon);
+	void WriteConfiguration(ILoggableGUI* gui, Launcher::fs::Installation const& installation);
 };
 
 namespace Launcher {

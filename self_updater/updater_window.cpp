@@ -1,5 +1,6 @@
 #include <WinSock2.h>
 
+#include <chrono>
 #include <future>
 
 #include "wx/cmdline.h"
@@ -33,7 +34,9 @@ namespace Updater {
 
 		Updater* frame = new Updater();
 		frame->Show();
-		frame->DoUpdate();
+		std::thread t(&Updater::DoUpdate, frame);
+		t.detach();
+		// frame->DoUpdate();
 		return true;
 	}
 
@@ -70,16 +73,16 @@ namespace Updater {
 		if (!parser.Found("l", &params.lockFilePath)) {
 			wxMessageDialog dialog(NULL, "No lock file specified, please run from the launcher", "Fatal error");
 			dialog.ShowModal();
-			// exit(-1);
+			exit(-1);
 		}
 	}
 
-	Updater::Updater() : wxFrame(NULL, -1, "REPENTOGON Launcher Updater") {
+	Updater::Updater() : wxFrame(NULL, wxID_ANY, "REPENTOGON Launcher Updater") {
 		SetSize(1024, 650);
 		wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 		SetSizer(sizer);
-		_logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1), wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH);
-		sizer->Add(_logWindow, 1, wxEXPAND | wxLEFT | wxTOP | wxBOTTOM | wxRIGHT, 20);
+		_logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, 400), wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH);
+		sizer->Add(_logWindow, wxSizerFlags().Expand().Proportion(1).Border(wxLEFT | wxRIGHT | wxBOTTOM | wxTOP, 20));
 		SetBackgroundColour(wxColour(237, 237, 237));
 	}
 
@@ -142,6 +145,7 @@ namespace Updater {
 			{ NULL, "" }
 		};
 
+		std::chrono::steady_clock::time_point lastReceived = std::chrono::steady_clock::now();
 		while (future.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready && 
 			std::any_of(monitorAndName, monitorAndName + 2, [](auto const& monitor) -> bool { return !monitor.done;  })) {
 			for (auto s = monitorAndName; s->monitor; ++s) {
@@ -164,9 +168,16 @@ namespace Updater {
 						break;
 
 					case Github::GH_NOTIFICATION_DATA_RECEIVED:
+					{
 						totalDownloadSize += std::get<size_t>(message->data);
-						Log("[%s] Downloaded %lu bytes\n", s->name.c_str(), totalDownloadSize);
+
+						std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+						if (std::chrono::duration_cast<std::chrono::nanoseconds>(now - lastReceived).count() > 100000000) {
+							Log("[%s] Downloaded %lu bytes\n", s->name.c_str(), totalDownloadSize);
+							lastReceived = now;
+						}
 						break;
+					}
 
 					case Github::GH_NOTIFICATION_PARSE_RESPONSE:
 						Log("[%s] Parsing result of cURL request from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());

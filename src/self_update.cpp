@@ -94,7 +94,7 @@ namespace Launcher {
 		fclose(updateState);
 
 		char cli[4096] = { 0 };
-		int printfCount = snprintf(cli, 4096, "--debug --lock-file=\"%s\" --from=\"%s\" --to=\"%s\" --url=\"%s\"", 
+		int printfCount = snprintf(cli, 4096, "--lock-file=\"%s\" --from=\"%s\" --to=\"%s\" --url=\"%s\"", 
 			updateStatePath.c_str(), Launcher::version, version.c_str(), url.c_str());
 		if (printfCount < 0) {
 			return SELF_UPDATE_RUN_UPDATER_ERR_GENERATE_CLI;
@@ -120,9 +120,11 @@ namespace Launcher {
 	}
 
 	SelfUpdateRunUpdaterResult RunUpdaterFinalize(HANDLE child) {
-		DWORD waitResult = WaitForInputIdle(child, 2000);
+		// DWORD waitResult = WaitForInputIdle(child, 10000);
+		DWORD waitResult = 0;
 		switch (waitResult) {
 		case 0:
+			Logger::Info("RunUpdaterFinalize: WaitForInputIdle finished\n");
 			ExitProcess(0);
 			break;
 

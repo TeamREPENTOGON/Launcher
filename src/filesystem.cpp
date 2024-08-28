@@ -3,6 +3,7 @@
 #include <Psapi.h>
 #include <UserEnv.h>
 
+#include <fstream>
 #include <functional>
 #include <sstream>
 #include <stdexcept>
@@ -22,7 +23,6 @@ namespace Launcher::fs {
 	 */
 	static const char* mandatoryFileNames[] = {
 		"libzhl.dll",
-		"repentogonLauncher.dll",
 		"zhlRepentogon.dll",
 		"freetype.dll",
 		NULL
@@ -58,7 +58,8 @@ namespace Launcher::fs {
 	Version const* GetIsaacVersionFromHash(const char* hash) {
 		Version const* version = knownVersions;
 		while (version->version) {
-			if (!strcmp(hash, version->hash)) {
+			if (Sha256::Equals(hash, version->hash)) {
+				Logger::Info("GetIsaacVersionFromHash: source hash %s equals version hash %s (%s)\n", hash, version->hash, version->version);
 				return version;
 			}
 
@@ -103,7 +104,7 @@ namespace Launcher::fs {
 		}
 
 		try {
-			std::string hash = Sha256::Sha256F(fullPath.c_str(), false);
+			std::string hash = Sha256::Sha256F(fullPath.c_str());
 			_isaacVersion = GetIsaacVersionFromHash(hash.c_str());
 		}
 		catch (std::runtime_error& e) {
@@ -126,8 +127,24 @@ namespace Launcher::fs {
 	}
 
 	bool Installation::CheckRepentogonInstallation() {
+		std::string repentogonFolder = _repentogonFolder;
+
 		if (_repentogonFolder.empty()) {
-			return false;
+			// Assume legacy installation.
+			if (_isaacFolder.empty()) {
+				Logger::Error("Repentogon folder not specified in configuration file or configuration file absent, and no Isaac folder specified: assuming no Repentogon installation\n");
+				return false;
+			}
+
+			repentogonFolder = _isaacFolder;
+			Logger::Warn("Repentogon folder not specified in configuration file or configuration file absent: assuming legacy Repentogon installation\n");
+		}
+		else {
+			if (_isaacFolder.empty()) {
+				Logger::Fatal("Repentogon folder found (%s), but no Isaac folder specified, invalid state\n", _repentogonFolder.c_str());
+				throw std::runtime_error("Invalid launcher state: cannot have a Repentogon folder and no Isaac folder");
+				return false;
+			}
 		}
 
 		_repentogonFiles.clear();
@@ -135,7 +152,7 @@ namespace Launcher::fs {
 		const char** mandatoryFile = mandatoryFileNames;
 		bool ok = true;
 		while (*mandatoryFile) {
-			std::string fullName = _repentogonFolder + *mandatoryFile;
+			std::string fullName = repentogonFolder + *mandatoryFile;
 			FoundFile& file = _repentogonFiles.emplace_back();
 			file.filename = *mandatoryFile;
 			file.found = Filesystem::FileExists(fullName.c_str());
@@ -153,7 +170,7 @@ namespace Launcher::fs {
 			return false;
 		}
 
-		ScoppedModule zhl(LoadLib((_repentogonFolder + "libzhl.dll").c_str(), LOADABLE_DLL_ZHL));
+		ScoppedModule zhl(LoadLib((repentogonFolder + "libzhl.dll").c_str(), LOADABLE_DLL_ZHL));
 		if (!zhl.Get()) {
 			Logger::Error("Updater::CheckRepentogonInstallation: Failed to load libzhl.dll (%d)\n", GetLastError());
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
@@ -162,7 +179,7 @@ namespace Launcher::fs {
 
 		Logger::Info("Updater::CheckRepentogonInstallation: loaded libzhl.dll\n");
 
-		ScoppedModule repentogon(LoadLib((_repentogonFolder + "zhlRepentogon.dll").c_str(), LOADABLE_DLL_REPENTOGON));
+		ScoppedModule repentogon(LoadLib((repentogonFolder + "zhlRepentogon.dll").c_str(), LOADABLE_DLL_REPENTOGON));
 		if (!repentogon.Get()) {
 			Logger::Error("Updater::CheckRepentogonInstallation: Failed to load zhlRepentogon.dll (%d)\n", GetLastError());
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
@@ -175,50 +192,60 @@ namespace Launcher::fs {
 		if (!zhlVersion) {
 			Logger::Warn("Updater::CheckRepentogonInstallation: libzhl.dll does not export __ZHL_VERSION\n");
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
 		}
-
-		Logger::Info("Updater::CheckRepentogonInstallation: found __ZHL_VERSION at %p\n", zhlVersion);
+		else {
+			Logger::Info("Updater::CheckRepentogonInstallation: found __ZHL_VERSION at %p\n", zhlVersion);
+		}
 
 		FARPROC repentogonVersion = GetProcAddress(repentogon.Get(), "__REPENTOGON_VERSION");
 		if (!repentogonVersion) {
 			Logger::Warn("Updater::CheckRepentogonInstallation: zhlRepentogon.dll does not export __REPENTOGON_VERSION\n");
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
 		}
-
-		Logger::Info("Updater::CheckRepentogonInstallation: found __REPENTOGON_VERSION at %p\n", repentogonVersion);
+		else {
+			Logger::Info("Updater::CheckRepentogonInstallation: found __REPENTOGON_VERSION at %p\n", repentogonVersion);
+		}
 
 		const char** zhlVersionStr = (const char**)zhlVersion;
 		const char** repentogonVersionStr = (const char**)repentogonVersion;
 
-		if (!ValidateVersionString(zhl.Get(), zhlVersionStr, _zhlVersion)) {
-			Logger::Error("Updater::CheckRepentogonInstallation: malformed libzhl.dll, __ZHL_VERSION extends past the module's boundaries\n");
-			MessageBoxA(NULL, "Alert",
-				"Your build of libzhl.dll is malformed\n"
-				"If you downloaded ZHL and/or Repentogon without using the launcher, the legacy updater or without going through GitHub, you may be exposing yourself to risks\n"
-				"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
-				"You may be prompted to download the latest release",
-				MB_ICONEXCLAMATION);
+		if (zhlVersion) {
+			if (!ValidateVersionString(zhl.Get(), zhlVersionStr, _zhlVersion)) {
+				Logger::Error("Updater::CheckRepentogonInstallation: malformed libzhl.dll, __ZHL_VERSION extends past the module's boundaries\n");
+				MessageBoxA(NULL, "Alert",
+					"Your build of libzhl.dll is malformed\n"
+					"If you downloaded ZHL and/or Repentogon without using the launcher, the legacy updater or without going through GitHub, you may be exposing yourself to risks\n"
+					"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
+					"You may be prompted to download the latest release",
+					MB_ICONEXCLAMATION);
+				_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+				return false;
+			}
+			else {
+				Logger::Info("Updater::CheckRepentogonInstallation: identified ZHL version %s\n", *zhlVersionStr);
+			}
+		}
+
+		if (repentogonVersion) {
+			if (!ValidateVersionString(repentogon.Get(), repentogonVersionStr, _repentogonVersion)) {
+				Logger::Error("Updater::CheckRepentogonInstallation: malformed zhlRepentogon.dll, __ZHL_VERSION extends past the module's boundaries\n");
+				MessageBoxA(NULL, "Alert",
+					"Your build of zhlRepentogon.dll is malformed\n"
+					"If you downloaded ZHL and/or Repentogon without using the launcher, the legacy updater or without going through GitHub, you may be exposing yourself to risks\n"
+					"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
+					"You may be prompted to download the latest release",
+					MB_ICONEXCLAMATION);
+				_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+				return false;
+			}
+
+			Logger::Info("Updater::CheckRepentogonInstallation: identified Repentogon version %s\n", *repentogonVersionStr);
+		}
+
+		if (!zhlVersion || !repentogonVersion) {
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 			return false;
 		}
-
-		Logger::Info("Updater::CheckRepentogonInstallation: identified ZHL version %s\n", *zhlVersionStr);
-
-		if (!ValidateVersionString(repentogon.Get(), repentogonVersionStr, _repentogonVersion)) {
-			Logger::Error("Updater::CheckRepentogonInstallation: malformed zhlRepentogon.dll, __ZHL_VERSION extends past the module's boundaries\n");
-			MessageBoxA(NULL, "Alert",
-				"Your build of zhlRepentogon.dll is malformed\n"
-				"If you downloaded ZHL and/or Repentogon without using the launcher, the legacy updater or without going through GitHub, you may be exposing yourself to risks\n"
-				"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
-				"You may be prompted to download the latest release",
-				MB_ICONEXCLAMATION);
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-			return false;
-		}
-
-		Logger::Info("Updater::CheckRepentogonInstallation: identified Repentogon version %s\n", *repentogonVersionStr);
 
 		_zhlVersion = *zhlVersionStr;
 		_repentogonVersion = *repentogonVersionStr;
@@ -233,7 +260,7 @@ namespace Launcher::fs {
 
 		_repentogonZHLVersionMatch = true;
 
-		if (Filesystem::FileExists((_repentogonFolder + "dsound.dll").c_str())) {
+		if (Filesystem::FileExists((_isaacFolder + "dsound.dll").c_str())) {
 			_installationState = REPENTOGON_INSTALLATION_STATE_LEGACY;
 		}
 		else {
@@ -258,10 +285,13 @@ namespace Launcher::fs {
 	}
 
 	HMODULE Installation::LoadLib(const char* name, LoadableDlls dll) {
-		/* Library must be loaded using IMAGE_RESOURCE in order to sanitize it
-		 * using GetModuleInformation() later.
+		/* Ideally, we should load using LOAD_LIBRARY_AS_IMAGE_RESOURCE, however
+		 * this causes GetProcAddress to not work. DONT_RESOLVE_DLL_REFERENCED, 
+		 * though deprecated, it the safest I can come up with, barring a full
+		 * load of the DLL (that will fail because Lua5.4.dll is not in the
+		 * PATH), or scanning the DLL myself (come on GetProcAddress, just work).
 		 */
-		HMODULE lib = LoadLibraryExA(name, NULL, LOAD_LIBRARY_AS_IMAGE_RESOURCE);
+		HMODULE lib = LoadLibraryExA(name, NULL, DONT_RESOLVE_DLL_REFERENCES);
 		if (!lib) {
 			return NULL;
 		}
@@ -388,42 +418,29 @@ namespace Launcher::fs {
 	}
 
 	IsaacInstallationPathInitResult Installation::SearchConfigurationFile() {
-		if (Filesystem::FileExists(launcherConfigFile)) {
-			std::string path = (Filesystem::GetCurrentDirectory_() + "\\" + launcherConfigFile);
-			IsaacInstallationPathInitResult parseRes = ProcessConfigurationFile(path.c_str());
-			if (parseRes != INSTALLATION_PATH_INIT_OK) {
-				Logger::Error("Error while opening/parsing the launcher configuration file\n");
-				return parseRes;
-			}
+		std::string path = _saveFolder;
+		if (path.empty()) {
+			return INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR;
+		}
 
-			_configurationPath = std::move(path);
-			Logger::Info("Found configuration file %s\n", _configurationPath.c_str());
+		path += "\\";
+		path += launcherConfigFile;
+		_configurationPath = std::move(path);
+
+		if (!Filesystem::FileExists(_configurationPath.c_str())) {
+			Logger::Error("No launcher configuration file found in Repentance save folder\n");
+			return INSTALLATION_PATH_INIT_ERR_NO_CONFIG;
+		}
+
+		IsaacInstallationPathInitResult parseRes = ProcessConfigurationFile(_configurationPath);
+		if (parseRes != INSTALLATION_PATH_INIT_OK) {
+			Logger::Error("Error while opening/parsing the launcher configuration file\n");
 			return parseRes;
 		}
-		else {
-			std::string path = _saveFolder;
-			if (path.empty()) {
-				return INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR;
-			}
 
-			path += "\\";
-			path += launcherConfigFile;
-
-			if (!Filesystem::FileExists(path.c_str())) {
-				Logger::Error("No launcher configuration file found in Repentance save folder\n");
-				return INSTALLATION_PATH_INIT_ERR_NO_CONFIG;
-			}
-
-			IsaacInstallationPathInitResult parseRes = ProcessConfigurationFile(path);
-			if (parseRes != INSTALLATION_PATH_INIT_OK) {
-				Logger::Error("Error while opening/parsing the launcher configuration file\n");
-				return parseRes;
-			}
-
-			_configurationPath = std::move(path);
-			Logger::Info("Found configuration file %s\n", _configurationPath.c_str());
-			return parseRes;
-		}
+		
+		Logger::Info("Found configuration file %s\n", _configurationPath.c_str());
+		return parseRes;
 	}
 
 	IsaacInstallationPathInitResult Installation::SearchIsaacInstallationPath() {
@@ -472,5 +489,34 @@ namespace Launcher::fs {
 		_repentogonFolder = std::move(repentogonFolder);
 		Logger::Info("Found Repentogon installation folder %s\n", _repentogonFolder.c_str());
 		return INSTALLATION_PATH_INIT_OK;
+	}
+
+	void Installation::WriteLauncherConfigurationFile() {
+		if (_configurationPath.empty()) {
+			Logger::Fatal("Installation::WriteLauncherConfigurationFile called, but configuration path was not properly initialized before\n");
+			throw std::runtime_error("Inconsistent runtime state: attempted to write launcher configuration without a valid path");
+		}
+
+		if (_isaacFolder.empty()) {
+			Logger::Fatal("Installation::WriteLauncherConfigurationFile: _isaacFolder is empty\n");
+			throw std::runtime_error("Inconsistent runtime state: attempted to write launcher configuration without a valid Isaac folder");
+		}
+
+		std::ofstream configuration(_configurationPath, std::ios::out);
+		configuration << "[" << fs::Configuration::GeneralSection << "]" << std::endl;
+		configuration << fs::Configuration::IsaacFolderKey << " = " << _isaacFolder << std::endl;
+		configuration.close();
+
+		_configurationFile.reset(new INIReader(_configurationPath));
+		if (int line = _configurationFile->ParseError(); line != 0) {
+			Logger::Fatal("Installation::WriteLauncherConfigurationFile: error while rereading configuration file\n");
+			if (line == -1) {
+				Logger::Fatal("Unable to open configuration file %s\n", _configurationPath.c_str());
+			}
+			else {
+				Logger::Fatal("Parse error on line %d of configuration file %s\n", line, _configurationPath.c_str());
+			}
+			throw std::runtime_error("Error while writing configuration file");
+		}
 	}
 }

@@ -46,9 +46,9 @@ namespace Updater {
 	}
 
 	bool UpdaterBackend::CheckHashConsistency(const char* zipFile, const char* hash) {
-		std::string fileHash = Sha256::Sha256F(zipFile, true);
+		std::string fileHash = Sha256::Sha256F(zipFile);
 		Logger::Info("UpdaterBackend::CheckHashConsistencty: fileHash = %s (%lu), hash = %s (%lu)\n", fileHash.c_str(), strlen(fileHash.c_str()), hash, strlen(hash));
-		return strcmp(fileHash.c_str(), hash) == 0;
+		return Sha256::Equals(fileHash.c_str(), hash);
 	}
 
 	bool UpdaterBackend::DownloadUpdate(LauncherUpdateData* data) {

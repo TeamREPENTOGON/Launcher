@@ -63,7 +63,9 @@ namespace Launcher {
 		/* Update failed: hash of REPENTOGON.zip is invalid. */
 		REPENTOGON_UPDATE_RESULT_BAD_HASH,
 		/* Update failed: error during extraction. */
-		REPENTOGON_UPDATE_RESULT_EXTRACT_FAILED
+		REPENTOGON_UPDATE_RESULT_EXTRACT_FAILED,
+		/* Update failed: invalid output folder. */
+		REPENTOGON_UPDATE_RESULT_INVALID_OUTPUT_DIR
 	};
 
 	/* Helper class used to perform all the tasks related to updating.
@@ -89,6 +91,7 @@ namespace Launcher {
 		 */
 		Github::VersionCheckResult CheckRepentogonUpdates(rapidjson::Document& response, 
 			fs::Installation const& installation,
+			bool allowPreReleases,
 			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 
 		/* Update the installation of Repentogon. 
@@ -101,11 +104,14 @@ namespace Launcher {
 		 * The base parameter should be the result of querying the latest 
 		 * release, as provided by a successful call to CheckRepentogonUpdates().
 		 * 
+		 * The outputDir indicates in which folder the archive should be extracted.
+		 * 
 		 * The function returns REPENTOGON_UPDATE_RESULT_OK if the entire update
 		 * process was successful, a REPENTOGON_UPDATE_RESULT_* constant 
 		 * otherwise.
 		 */
 		RepentogonUpdateResult UpdateRepentogon(rapidjson::Document& base,
+			const char* outputDir,
 			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 
 		RepentogonUpdateState const& GetRepentogonUpdateState() const;
@@ -137,12 +143,15 @@ namespace Launcher {
 
 		/* Extract the content of the Repentogon archive. 
 		 * 
+		 * The content of the archive are extracted in outputDir.
+		 * 
 		 * Return true if the extraction is successful, false otherwise.
 		 */
-		bool ExtractRepentogon();
+		bool ExtractRepentogon(const char* outputDir);
 
 		/* Fetch the JSON of the latest Repentogon release. */
 		Github::DownloadAsStringResult FetchRepentogonUpdates(rapidjson::Document& result,
+			bool allowPreReleases,
 			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 	};
 }
