@@ -7,7 +7,6 @@
 
 #ifndef WX_PRECOMP
 	#include <wx/wx.h>
-	#include <wx/gbsizer.h>
 #endif
 
 #include "curl/curl.h"
@@ -20,21 +19,18 @@
 #include "shared/loggable_gui.h"
 
 namespace Launcher {
-	class MainFrame;
-
 	enum Windows {
 		WINDOW_COMBOBOX_LEVEL,
 		WINDOW_COMBOBOX_LAUNCH_MODE,
 		WINDOW_CHECKBOX_REPENTOGON_CONSOLE,
 		WINDOW_CHECKBOX_REPENTOGON_UPDATES,
+		WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES,
 		WINDOW_CHECKBOX_VANILLA_LUADEBUG,
 		WINDOW_TEXT_VANILLA_LUAHEAPSIZE,
 		WINDOW_BUTTON_LAUNCH_BUTTON,
-		WINDOW_BUTTON_FORCE_UPDATE,
-		WINDOW_BUTTON_FORCE_UNSTABLE_UPDATE,
 		WINDOW_BUTTON_SELECT_ISAAC,
 		WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER,
-		WINDOW_BUTTON_SELF_UPDATE
+		WINDOW_BUTTON_ADVANCED_OPTIONS
 	};
 
 	class App : public wxApp {
@@ -43,8 +39,20 @@ namespace Launcher {
 		void ParseCommandLine();
 	};
 
+	class AdvancedOptionsWindow;
+
 	class MainFrame : public wxFrame, public ILoggableGUI {
 	public:
+		friend class AdvancedOptionsWindow;
+
+		enum AdvancedOptionsEvents {
+			ADVANCED_EVENT_NONE,
+			ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE,
+			ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE,
+			ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE,
+			ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE
+		};
+
 		MainFrame();
 		~MainFrame();
 
@@ -64,7 +72,6 @@ namespace Launcher {
 		void AddLaunchOptions();
 		void AddRepentogonOptions();
 		void AddVanillaOptions();
-		void AddAdvancedOptions();
 
 		void AddLauncherConfigurationTextField(const char* intro, 
 			const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
@@ -81,7 +88,6 @@ namespace Launcher {
 
 		bool PromptLauncherUpdate(std::string const& version, std::string const& url);
 
-		
 		void DoSelfUpdate(std::string const& version, std::string const& url);
 		void HandleSelfUpdateResult(SelfUpdateErrorCode const& code);
 
@@ -103,8 +109,11 @@ namespace Launcher {
 		void OnLauchModeSelect(wxCommandEvent& event);
 		void OnCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
-		void OnSelfUpdateClick(wxCommandEvent& event);
-		void ForceUpdate(wxCommandEvent& event);
+		void OnAdvancedOptionsClick(wxCommandEvent& event);
+
+		void ForceSelfUpdate(bool unstable);
+		void ForceRepentogonUpdate(bool unstable);
+
 		void Launch(wxCommandEvent& event);
 		void Inject();
 
@@ -134,11 +143,11 @@ namespace Launcher {
 		void HandleLauncherUpdates(bool allowDrafts);
 
 		IsaacOptions _options;
-		// wxGridBagSizer* _optionsGrid;
-		wxBoxSizer* _optionsSizer;
-		wxBoxSizer* _configurationSizer;
-		wxBoxSizer* _advancedSizer;
+		wxStaticBoxSizer* _optionsSizer;
+		wxStaticBoxSizer* _configurationSizer;
 		wxCheckBox* _console;
+		wxCheckBox* _updates;
+		wxCheckBox* _unstableRepentogon;
 		wxCheckBox* _luaDebug;
 		wxComboBox* _levelSelect;
 		wxComboBox* _launchMode;
@@ -146,10 +155,10 @@ namespace Launcher {
 		wxStaticBox* _optionsBox;
 		wxStaticBox* _configurationBox;
 		wxStaticBox* _repentogonOptions;
-		wxStaticBox* _advancedOptions;
 		wxTextCtrl* _isaacFileText;
 		wxTextCtrl* _repentogonInstallFolderText;
 		int _repentogonLaunchModeIdx = -1;
+		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
 
 		std::mutex _logMutex;
 		wxTextCtrl* _logWindow;

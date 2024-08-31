@@ -3,7 +3,7 @@ project (Launcher CXX)
 set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/;${CMAKE_MODULE_PATH}")
 
-option (LAUNCHER_TESTING "Build testing version instead of release version" OFF)
+option (LAUNCHER_UNSTABLE "Build unstable version instead of release version" OFF)
 
 # Stupid MSVC
 add_compile_definitions (_CRT_SECURE_NO_WARNINGS)
@@ -71,7 +71,7 @@ add_custom_command (TARGET updater POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $
 
 add_dependencies (REPENTOGONLauncher updater)
 
-if (LAUNCHER_TESTING)
-    add_subdirectory (testing)
-    target_compile_definitions (REPENTOGONLauncher PRIVATE LAUNCHER_TESTING)
+if (LAUNCHER_UNSTABLE)
+    # add_subdirectory (testing)
+    target_compile_definitions (REPENTOGONLauncher PRIVATE LAUNCHER_UNSTABLE)
 endif()
