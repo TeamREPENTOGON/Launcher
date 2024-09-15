@@ -32,4 +32,4 @@ namespace Launcher {
 	static constexpr const char* version = "alpha";
 }
 
-void Launch(IsaacOptions const& options);
+void Launch(const char* path, IsaacOptions const& options);

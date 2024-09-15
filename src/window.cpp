@@ -346,7 +346,7 @@ namespace Launcher {
 		Log("\t\tLua heap size: %dM", _options.luaHeapSize);
 
 		_options.WriteConfiguration(this, _installationManager._installation);
-		::Launch(_options);
+		::Launch(_isaacFileText->GetValue().c_str().AsChar(), _options);
 	}
 
 	void MainFrame::InitializeIsaacFolderPath(bool needIsaacFolder, bool canWriteConfiguration) {
@@ -365,7 +365,7 @@ namespace Launcher {
 			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
 		}
 		else {
-			OnFileSelected(_installationManager._installation.GetIsaacInstallationFolder() + "isaac.ng.exe", 
+			OnFileSelected(_installationManager._installation.GetIsaacInstallationFolder() + "isaac-ng.exe", 
 				NoIsaacColor, _isaacFileText, NoIsaacText);
 		}
 	}

@@ -23,6 +23,7 @@ struct LoaderData {
 	decltype(FreeLibrary)* freeLibrary;
 	decltype(GetProcAddress)* getProcAddress;
 	char stringTable[STRING_MAX][200];
+	bool withConsole;
 
 	void InitializeStringTable();
 };

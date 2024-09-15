@@ -8,6 +8,7 @@
 #include <ctime>
 
 #include <chrono>
+#include <filesystem>
 
 #include <wx/wx.h>
 
@@ -27,16 +28,13 @@
  * 
  * Return true of the initialization was sucessful, false otherwise.
  */
-static int FirstStageInit(struct IsaacOptions const* options, HANDLE* process, void** page,
+static int FirstStageInit(const char* path, struct IsaacOptions const* options, HANDLE* process, void** page,
 	size_t* functionOffset, size_t* paramOffset, PROCESS_INFORMATION* processInfo);
 
 static void GenerateCLI(const struct IsaacOptions* options, char cli[256]);
 
 void GenerateCLI(const struct IsaacOptions* options, char cli[256]) {
 	memset(cli, 0, sizeof(cli));
-	if (options->console) {
-		strcat(cli, "--console ");
-	}
 
 	if (options->luaDebug) {
 		strcat(cli, "--luadebug ");
@@ -62,7 +60,7 @@ void GenerateCLI(const struct IsaacOptions* options, char cli[256]) {
 	}
 }
 
-DWORD CreateIsaac(struct IsaacOptions const* options, PROCESS_INFORMATION* processInfo) {
+DWORD CreateIsaac(const char* path, struct IsaacOptions const* options, PROCESS_INFORMATION* processInfo) {
 	STARTUPINFOA startupInfo;
 	memset(&startupInfo, 0, sizeof(startupInfo));
 
@@ -71,7 +69,12 @@ DWORD CreateIsaac(struct IsaacOptions const* options, PROCESS_INFORMATION* proce
 	char cli[256];
 	GenerateCLI(options, cli);
 
-	DWORD result = CreateProcessA("isaac-ng.exe", cli, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &startupInfo, processInfo);
+	std::filesystem::path filepath(path);
+	std::filesystem::path parent = filepath.parent_path();
+	const char* currentDirectory = parent.string().c_str();
+	Logger::Info("Creating process with path %s, lpCurrentDirectory = %s\n", path, currentDirectory);
+
+	DWORD result = CreateProcessA(path, cli, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, filepath.parent_path().string().c_str(), &startupInfo, processInfo);
 	if (result == 0) {
 		Logger::Error("Failed to create process: %d\n", GetLastError());
 		return -1;
@@ -83,8 +86,8 @@ DWORD CreateIsaac(struct IsaacOptions const* options, PROCESS_INFORMATION* proce
 	return result;
 }
 
-#pragma code_seg(push, r1, ".trampo")
-int UpdateMemory(HANDLE process, PROCESS_INFORMATION const* processInfo, void** page, size_t* functionOffset, size_t* paramOffset) {
+// #pragma code_seg(push, r1, ".trampo")
+int UpdateMemory(struct IsaacOptions const* options, HANDLE process, PROCESS_INFORMATION const* processInfo, void** page, size_t* functionOffset, size_t* paramOffset) {
 	HMODULE self = GetModuleHandle(NULL);
 	PIMAGE_NT_HEADERS ntHeaders = ImageNtHeader(self);
 	char* base = (char*)&(ntHeaders->OptionalHeader);
@@ -118,6 +121,7 @@ int UpdateMemory(HANDLE process, PROCESS_INFORMATION const* processInfo, void** 
 	data.loadLibraryA = LOAD_CAST(LoadLibraryA);
 #undef LOAD_CAST
 	data.InitializeStringTable();
+	data.withConsole = options->console;
 
 	/* Allocate enough space to copy the entire section containing the function 
 	 * and add enough room to copy an instance of LoaderData.
@@ -140,10 +144,22 @@ int UpdateMemory(HANDLE process, PROCESS_INFORMATION const* processInfo, void** 
 		return -1;
 	}
 
-	DWORD dummy;
-	ok = VirtualProtectEx(process, NULL, headers->Misc.VirtualSize, PAGE_EXECUTE_READ, &dummy);
+	MEMORY_BASIC_INFORMATION info;
+	void* baseAddr = NULL;
+	ok = VirtualQueryEx(process, remotePage, &info, sizeof(info));
 	if (!ok) {
-		Logger::Warn("Unable to change protection on pages to RX (from RWX): %d\n", GetLastError());
+		Logger::Warn("Unable to get information about the allocated pages: %d\n", GetLastError());
+	}
+	else {
+		baseAddr = info.BaseAddress;
+	}
+
+	if (baseAddr != NULL) {
+		DWORD dummy;
+		ok = VirtualProtectEx(process, baseAddr, headers->Misc.VirtualSize, PAGE_EXECUTE_READ, &dummy);
+		if (!ok) {
+			Logger::Warn("Unable to change protection on pages to RX (from RWX): %d\n", GetLastError());
+		}
 	}
 
 	*page = remotePage;
@@ -152,12 +168,15 @@ int UpdateMemory(HANDLE process, PROCESS_INFORMATION const* processInfo, void** 
 	*paramOffset = headers->Misc.VirtualSize;
 	return 0;
 }
-#pragma code_seg(pop, r1)
+// #pragma code_seg(pop, r1)
 
-int FirstStageInit(struct IsaacOptions const* options, HANDLE* outProcess, void** page, 
+int FirstStageInit(const char* path, struct IsaacOptions const* options, HANDLE* outProcess, void** page, 
 	size_t* functionOffset, size_t* paramOffset, PROCESS_INFORMATION* processInfo) {
 	Logger::Info("Starting injector\n");
-	DWORD processId = CreateIsaac(options, processInfo);
+	DWORD processId = CreateIsaac(path, options, processInfo);
+	if (processId == -1) {
+		return -1;
+	}
 	
 	HANDLE process = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
 		FALSE, processInfo->dwProcessId);
@@ -169,7 +188,7 @@ int FirstStageInit(struct IsaacOptions const* options, HANDLE* outProcess, void*
 		Logger::Info("Acquired handle to isaac-ng.exe, process ID = %d\n", processInfo->dwProcessId);
 	}
 
-	if (UpdateMemory(process, processInfo, page, functionOffset, paramOffset)) {
+	if (UpdateMemory(options, process, processInfo, page, functionOffset, paramOffset)) {
 		return -1;
 	}
 
@@ -213,7 +232,7 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	return 0;
 }
 
-int InjectIsaac(int updates, int console, int lua_debug, int level_stage, int stage_type, int lua_heap_size) {
+int InjectIsaac(const char* path, int updates, int console, int lua_debug, int level_stage, int stage_type, int lua_heap_size) {
 	HANDLE process;
 	void* remotePage;
 	size_t functionOffset, paramOffset;
@@ -226,7 +245,7 @@ int InjectIsaac(int updates, int console, int lua_debug, int level_stage, int st
 	options.stageType = stage_type;
 	options.luaHeapSize = lua_heap_size;
 
-	if (FirstStageInit(&options, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
+	if (FirstStageInit(path, &options, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
 		return -1;
 	}
 
@@ -264,8 +283,8 @@ bool Launcher::App::OnInit() {
 	return true;
 }
 
-void Launch(IsaacOptions const& options) {
-	InjectIsaac(options.update, options.console, options.luaDebug,
+void Launch(const char* path, IsaacOptions const& options) {
+	InjectIsaac(path, options.update, options.console, options.luaDebug,
 		options.levelStage, options.stageType, options.luaHeapSize);
 }
 

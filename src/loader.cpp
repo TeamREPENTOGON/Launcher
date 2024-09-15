@@ -10,7 +10,7 @@
 #define INIT_STR(KEY, VALUE) strcpy(stringTable[KEY], VALUE)
 
 void LoaderData::InitializeStringTable() {
-	INIT_STR(STRING_LAUNCHER, "zhlLauncher.dll");
+	INIT_STR(STRING_LAUNCHER, "zhlLoader.dll");
 	INIT_STR(STRING_LAUNCH, "Launch");
 }
 
@@ -50,13 +50,13 @@ __declspec(safebuffers) static DWORD WINAPI LoadDLLs(LPVOID param) {
 		return LOAD_DLL_ERR_NO_LAUNCHER;
 	}
 
-	int(*init)() = (int(*)())env->getProcAddress(launcher, STR(STRING_LAUNCH));
+	int(*init)(bool) = (int(*)(bool))env->getProcAddress(launcher, STR(STRING_LAUNCH));
 	if (!init) {
 		env->freeLibrary(launcher);
 		return LOAD_DLL_ERR_NO_LAUNCH;
 	}
 
-	if (init()) {
+	if (init(env->withConsole)) {
 		env->freeLibrary(launcher);
 		return LOAD_DLL_ERR_LAUNCH;
 	}
