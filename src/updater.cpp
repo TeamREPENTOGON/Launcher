@@ -77,15 +77,12 @@ namespace Launcher {
 			}
 
 			auto releases = asJson.GetArray();
-			for (int i = 0; i < releases.Size(); ++i) {
-				auto const& release = releases[i];
-				if (release["prerelease"].GetBool()) {
-					return Github::FetchReleaseInfo(release["url"].GetString(), response, monitor);
-				}
+			if (releases.Empty()) {
+				Logger::Error("Trying to download a new Repentogon release, but none available\n");
+				return Github::DOWNLOAD_AS_STRING_INVALID_JSON;
 			}
 
-			Logger::Warn("No prerelease found, defaulting to latest release");
-			return Github::FetchReleaseInfo(RepentogonURL, response, monitor);
+			return Github::FetchReleaseInfo(releases[0]["url"].GetString(), response, monitor);
 		}
 	}
 
