@@ -22,8 +22,9 @@ namespace Launcher::fs {
 	 * to be considered a valid Repentogon installation.
 	 */
 	static const char* mandatoryFileNames[] = {
-		"libzhl.dll",
-		"zhlRepentogon.dll",
+		Libraries::zhl,
+		Libraries::repentogon,
+		Libraries::loader,
 		"freetype.dll",
 		NULL
 	};
@@ -31,28 +32,9 @@ namespace Launcher::fs {
 	Version const knownVersions[] = {
 		{ "04469d0c3d3581936fcf85bea5f9f4f3a65b2ccf96b36310456c9626bac36dc6", "v1.7.9b.J835 (Steam)", true },
 		{ "d00523d04dd43a72071f1d936e5ff34892da20800d32f05a143eba0a4fe29361", "Dummy (Test Suite)", true },
+		{ "31846486979cfa07c8c968221553052c3ff603518681ca11912d445f96ca9404", "v1.7.9b.J835 (Steamless, no binding section)", true },
+		{ "530b4d2accef833b8dbf6f1a9f781fe1e051c1916ca5acdb579df05a34640627", "v1.7.9b.J835 (Steamless, with binding section)", true },
 		{ NULL, NULL, false }
-	};
-
-	/* RAII-style class that automatically unloads a module upon destruction. */
-	class ScoppedModule {
-	public:
-		ScoppedModule(HMODULE mod) : _module(mod) {
-
-		}
-
-		~ScoppedModule() {
-			if (_module) {
-				FreeLibrary(_module);
-			}
-		}
-
-		HMODULE Get() const {
-			return _module;
-		}
-
-	private:
-		HMODULE _module = NULL;
 	};
 
 	Version const* GetIsaacVersionFromHash(const char* hash) {
@@ -94,18 +76,22 @@ namespace Launcher::fs {
 	}
 
 	bool Installation::CheckIsaacInstallation() {
+		Logger::Info("Checking Isaac installation...\n");
 		if (_isaacFolder.empty()) {
+			Logger::Info("No Isaac folder found\n");
 			return false;
 		}
 
 		std::string fullPath = (_isaacFolder + "\\") + isaacExecutable;
 		if (!Filesystem::FileExists(fullPath.c_str())) {
+			Logger::Error("No isaac-ng.exe file in %s\n", fullPath.c_str());
 			return false;
 		}
 
 		try {
 			std::string hash = Sha256::Sha256F(fullPath.c_str());
 			_isaacVersion = GetIsaacVersionFromHash(hash.c_str());
+			Logger::Info("Computed hash of isaac-ng.exe: %s\n", hash.c_str());
 		}
 		catch (std::runtime_error& e) {
 			Logger::Error("Updater::CheckIsaacInstallation: exception: %s\n", e.what());
@@ -121,6 +107,59 @@ namespace Launcher::fs {
 		if (!CheckIsaacInstallation()) {
 			_isaacFolder = backup;
 			return false;
+		}
+
+		return true;
+	}
+
+	ScopedModule Installation::LoadModule(const char* shortName, const char* path, LoadableDlls dll) {
+		HMODULE lib = LoadLib(path, dll);
+		ScopedModule module(lib);
+		if (!module) {
+			Logger::Error("Installation::LoadModule: Failed to load %s (%d)\n", shortName, GetLastError());
+			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+		} else {
+			Logger::Info("Installation::LoadModule: Loaded %s\n", shortName);
+		}
+
+		return module;
+	}
+
+	FARPROC Installation::RetrieveSymbol(HMODULE module, const char* libname, const char* symbol) {
+		FARPROC result = GetProcAddress(module, symbol);
+		if (!result) {
+			Logger::Warn("Installation::RetrieveSymbol: %s does not export %s\n", libname, symbol);
+			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+		}
+		else {
+			Logger::Info("Installation::RetrieveSymbol: found %s at %p\n", symbol, result);
+		}
+
+		return result;
+	}
+
+	bool Installation::ValidateVersionSymbol(HMODULE module, const char* libname, const char* symbolName, 
+		FARPROC symbol, std::string& target) {
+		const char** version = (const char**)symbol;
+		if (version) {
+			if (!ValidateVersionString(module, version, target)) {
+				char buffer[4096];
+				Logger::Error("Installation::ValidateVersionSymbol: malformed %s, %s extends past the module's boundaries\n", libname, symbolName);
+				snprintf(buffer, 4096, "Your build of %s is malformed\n"
+					"If you downloaded ZHL and/or Repentogon without using either the launcher, the legacy updater or without going through Github "
+					"you may be exposing yourself to risks\n"
+					"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
+					"Depending on your exact configuration, the launcher may prompt you to download the latest Repentogon release automatically.",
+					libname);
+				MessageBoxA(NULL, "Alert",
+					buffer,
+					MB_ICONEXCLAMATION);
+				_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+				return false;
+			}
+			else {
+				Logger::Info("Identified %s version %s\n", libname, target.c_str());
+			}
 		}
 
 		return true;
@@ -170,89 +209,45 @@ namespace Launcher::fs {
 			return false;
 		}
 
-		ScoppedModule zhl(LoadLib((repentogonFolder + "libzhl.dll").c_str(), LOADABLE_DLL_ZHL));
-		if (!zhl.Get()) {
-			Logger::Error("Updater::CheckRepentogonInstallation: Failed to load libzhl.dll (%d)\n", GetLastError());
+		ScopedModule loader = LoadModule(Libraries::loader, (repentogonFolder + Libraries::loader).c_str(), LOADABLE_DLL_ZHL_LOADER);
+		if (!loader) {
+			return false;
+		}
+
+		ScopedModule zhl = LoadModule(Libraries::zhl, (repentogonFolder + Libraries::zhl).c_str(), LOADABLE_DLL_LIBZHL);
+		if (!zhl) {
+			return false;
+		}
+
+		ScopedModule repentogon = LoadModule(Libraries::repentogon, (repentogonFolder + Libraries::repentogon).c_str(), LOADABLE_DLL_REPENTOGON);
+		if (!repentogon) {
+			return false;
+		}
+
+		FARPROC zhlVersion			= RetrieveSymbol(zhl,			Libraries::zhl,			Symbols::zhlVersion);
+		FARPROC repentogonVersion	= RetrieveSymbol(repentogon,	Libraries::repentogon,	Symbols::repentogonVersion);
+		FARPROC loaderVersion		= RetrieveSymbol(loader,		Libraries::loader,		Symbols::loaderVersion);
+
+		if (!zhlVersion || !repentogonVersion || !loaderVersion) {
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 			return false;
 		}
 
-		Logger::Info("Updater::CheckRepentogonInstallation: loaded libzhl.dll\n");
-
-		ScoppedModule repentogon(LoadLib((repentogonFolder + "zhlRepentogon.dll").c_str(), LOADABLE_DLL_REPENTOGON));
-		if (!repentogon.Get()) {
-			Logger::Error("Updater::CheckRepentogonInstallation: Failed to load zhlRepentogon.dll (%d)\n", GetLastError());
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+		if (!ValidateVersionSymbol(loader, Libraries::loader, Symbols::loaderVersion, loaderVersion, _zhlLoaderVersion)) {
 			return false;
 		}
 
-		Logger::Info("Updater::CheckRepentogonInstallation: loaded zhlRepentogon.dll\n");
-
-		FARPROC zhlVersion = GetProcAddress(zhl.Get(), "__ZHL_VERSION");
-		if (!zhlVersion) {
-			Logger::Warn("Updater::CheckRepentogonInstallation: libzhl.dll does not export __ZHL_VERSION\n");
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-		}
-		else {
-			Logger::Info("Updater::CheckRepentogonInstallation: found __ZHL_VERSION at %p\n", zhlVersion);
-		}
-
-		FARPROC repentogonVersion = GetProcAddress(repentogon.Get(), "__REPENTOGON_VERSION");
-		if (!repentogonVersion) {
-			Logger::Warn("Updater::CheckRepentogonInstallation: zhlRepentogon.dll does not export __REPENTOGON_VERSION\n");
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-		}
-		else {
-			Logger::Info("Updater::CheckRepentogonInstallation: found __REPENTOGON_VERSION at %p\n", repentogonVersion);
-		}
-
-		const char** zhlVersionStr = (const char**)zhlVersion;
-		const char** repentogonVersionStr = (const char**)repentogonVersion;
-
-		if (zhlVersion) {
-			if (!ValidateVersionString(zhl.Get(), zhlVersionStr, _zhlVersion)) {
-				Logger::Error("Updater::CheckRepentogonInstallation: malformed libzhl.dll, __ZHL_VERSION extends past the module's boundaries\n");
-				MessageBoxA(NULL, "Alert",
-					"Your build of libzhl.dll is malformed\n"
-					"If you downloaded ZHL and/or Repentogon without using the launcher, the legacy updater or without going through GitHub, you may be exposing yourself to risks\n"
-					"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
-					"You may be prompted to download the latest release",
-					MB_ICONEXCLAMATION);
-				_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-				return false;
-			}
-			else {
-				Logger::Info("Updater::CheckRepentogonInstallation: identified ZHL version %s\n", *zhlVersionStr);
-			}
-		}
-
-		if (repentogonVersion) {
-			if (!ValidateVersionString(repentogon.Get(), repentogonVersionStr, _repentogonVersion)) {
-				Logger::Error("Updater::CheckRepentogonInstallation: malformed zhlRepentogon.dll, __ZHL_VERSION extends past the module's boundaries\n");
-				MessageBoxA(NULL, "Alert",
-					"Your build of zhlRepentogon.dll is malformed\n"
-					"If you downloaded ZHL and/or Repentogon without using the launcher, the legacy updater or without going through GitHub, you may be exposing yourself to risks\n"
-					"As a precaution, the launcher will not allow you to start Repentogon until you download a clean copy\n"
-					"You may be prompted to download the latest release",
-					MB_ICONEXCLAMATION);
-				_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-				return false;
-			}
-
-			Logger::Info("Updater::CheckRepentogonInstallation: identified Repentogon version %s\n", *repentogonVersionStr);
-		}
-
-		if (!zhlVersion || !repentogonVersion) {
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+		if (!ValidateVersionSymbol(zhl, Libraries::zhl, Symbols::zhlVersion, zhlVersion, _zhlVersion)) {
 			return false;
 		}
 
-		_zhlVersion = *zhlVersionStr;
-		_repentogonVersion = *repentogonVersionStr;
+		if (!ValidateVersionSymbol(repentogon, Libraries::repentogon, Symbols::repentogonVersion, repentogonVersion, _repentogonVersion)) {
+			return false;
+		}
 
-		if (_zhlVersion != _repentogonVersion) {
-			Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, Repentogon version %s)\n",
-				_zhlVersion.c_str(), _repentogonVersion.c_str());
+		if (_zhlVersion != _repentogonVersion || _repentogonVersion != _zhlLoaderVersion) {
+			Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, ZHL loader version %s, Repentogon version %s)\n",
+				_zhlVersion.c_str(), _zhlLoaderVersion.c_str(), _repentogonVersion.c_str());
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 			_repentogonZHLVersionMatch = false;
 			return false;
@@ -349,6 +344,10 @@ namespace Launcher::fs {
 
 	std::string const& Installation::GetRepentogonVersion() const {
 		return _repentogonVersion;
+	}
+
+	std::string const& Installation::GetZHLLoaderVersion() const {
+		return _zhlLoaderVersion;
 	}
 
 	std::string const& Installation::GetZHLVersion() const {

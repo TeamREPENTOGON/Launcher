@@ -278,9 +278,9 @@ namespace Launcher {
 	bool InstallationManager::UninstallLegacyRepentogon() {
 		_gui->Log("Uninstalling legacy Repentogon installation...");
 
-		std::string dsound = _installation.GetIsaacInstallationFolder() + "/dsound.dll";
-		std::string zhl = _installation.GetIsaacInstallationFolder() + "/libzhl.dll";
-		std::string repentogon = _installation.GetIsaacInstallationFolder() + "/zhlRepentogon.dll";
+		std::string dsound = _installation.GetIsaacInstallationFolder() + "/" + "dsound.dll";
+		std::string zhl = _installation.GetIsaacInstallationFolder() + "/" + fs::Libraries::zhl;
+		std::string repentogon = _installation.GetIsaacInstallationFolder() + "/" + fs::Libraries::repentogon;
 
 		bool dsoundOk = RemoveFile(dsound.c_str()),
 			zhlOk = RemoveFile(zhl.c_str()),
@@ -313,20 +313,20 @@ namespace Launcher {
 				_gui->LogError("Errors encountered while removing legacy Repentogon installation");
 				_gui->LogError("%s/dsound.dll still exists: please remove it manually",
 					_installation.GetIsaacInstallationFolder().c_str());
-				return REPENTOGON_INSTALLATION_CHECK_KO_LEGACY;
+				return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_KO_LEGACY);
 			}
 			else {
 				_gui->LogWarn("Errors encountered while removing legacy Repentogon installation");
 				_gui->LogWarn("%s/dsound.dll was removed: you may safely launch Repentogon from the launcher",
 					_installation.GetIsaacInstallationFolder().c_str());
 				// Return KO to prompt the installation of newer Repentogon
-				return REPENTOGON_INSTALLATION_CHECK_KO;
+				return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_KO);
 			}
 		}
 		else {
 			_gui->Log("Successfully uninstalled legacy Repentogon installation");
 			// Return KO to prompt the installation of newer Repentogon
-			return REPENTOGON_INSTALLATION_CHECK_KO;
+			return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_KO);
 		}
 	}
 
@@ -343,10 +343,10 @@ namespace Launcher {
 					_gui->LogWarn("Newly installed version of Repentogon is a legacy (dsound.dll based) installation.\n");
 					_gui->LogWarn("This may indicate a broken release process on Repentogon's side. Please check with the devs.\n");
 					DisplayRepentogonFilesVersion(1, isUpdate);
-					return REPENTOGON_INSTALLATION_CHECK_LEGACY;
+					return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_LEGACY);
 				}
 				else {
-					return ManageLegacyInstallation();
+					return GetSetRepentogonInstallationState(ManageLegacyInstallation());
 				}
 			}
 			else {
@@ -363,11 +363,11 @@ namespace Launcher {
 				DisplayRepentogonFilesVersion(1, isUpdate);
 			}
 
-			return REPENTOGON_INSTALLATION_CHECK_OK;
+			return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_OK);
 		}
 		else {
 			DebugDumpBrokenRepentogonInstallation();
-			return REPENTOGON_INSTALLATION_CHECK_KO;
+			return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_KO);
 		}
 	}
 
@@ -397,9 +397,27 @@ namespace Launcher {
 		}
 	}
 
+	void InstallationManager::DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, fs::LoadableDlls dll,
+		std::string const& (fs::Installation::* ptr)() const, bool* found) {
+		_gui->LogNoNL("\tLoad status of %s (%s): ", context, libname);
+		if (_installation.WasLibraryLoaded(dll)) {
+			std::string const& version = (_installation.*ptr)();
+			if (version.empty()) {
+				_gui->Log("unable to find version");
+			}
+			else {
+				*found = true;
+				_gui->Log("found version %s", version.c_str());
+			}
+		}
+		else {
+			_gui->Log("unable to load");
+		}
+	}
+
 	void InstallationManager::DebugDumpBrokenRepentogonInstallation() {
 		_gui->Log("Found no valid installation of Repentogon");
-		_gui->Log("\tRequired DLLs found / not found:");
+		_gui->Log("\tRequired files found / not found:");
 		std::vector<fs::FoundFile> const& files = _installation.GetRepentogonInstallationFilesState();
 		for (fs::FoundFile const& file : files) {
 			if (file.found) {
@@ -410,38 +428,12 @@ namespace Launcher {
 			}
 		}
 
-		bool zhlVersionAvailable = false, repentogonVersionAvailable = false;
-		_gui->LogNoNL("\tLoad status of the ZHL DLL (libzhl.dll): ");
-		if (_installation.WasLibraryLoaded(fs::LOADABLE_DLL_ZHL)) {
-			std::string const& zhlVersion = _installation.GetZHLVersion();
-			if (zhlVersion.empty()) {
-				_gui->Log("unable to find version");
-			}
-			else {
-				zhlVersionAvailable = true;
-				_gui->Log("found version %s", zhlVersion.c_str());
-			}
-		}
-		else {
-			_gui->Log("unable to load");
-		}
+		bool zhlVersionAvailable = false, repentogonVersionAvailable = false, zhlLoaderVersionAvailable = false;
+		DebugDumpBrokenRepentogonInstallationDLL("the ZHL DLL",			fs::Libraries::zhl,			fs::LOADABLE_DLL_LIBZHL,		&fs::Installation::GetZHLVersion,			&zhlVersionAvailable);
+		DebugDumpBrokenRepentogonInstallationDLL("the ZHL loader DLL",	fs::Libraries::loader,		fs::LOADABLE_DLL_ZHL_LOADER,	&fs::Installation::GetZHLLoaderVersion,		&zhlLoaderVersionAvailable);
+		DebugDumpBrokenRepentogonInstallationDLL("the Repentogon DLL",	fs::Libraries::repentogon,	fs::LOADABLE_DLL_REPENTOGON,	&fs::Installation::GetRepentogonVersion,	&repentogonVersionAvailable);
 
-		_gui->LogNoNL("\tLoad status of the Repentogon DLL (zhlRepentogon.dll): ");
-		if (_installation.WasLibraryLoaded(fs::LOADABLE_DLL_REPENTOGON)) {
-			std::string const& repentogonVersion = _installation.GetRepentogonVersion();
-			if (repentogonVersion.empty()) {
-				_gui->Log("unable to find version");
-			}
-			else {
-				repentogonVersionAvailable = true;
-				_gui->Log("found version %s", repentogonVersion.c_str());
-			}
-		}
-		else {
-			_gui->Log("unable to load");
-		}
-
-		if (zhlVersionAvailable && repentogonVersionAvailable) {
+		if (zhlVersionAvailable && repentogonVersionAvailable && zhlLoaderVersionAvailable) {
 			if (_installation.RepentogonZHLVersionMatch()) {
 				_gui->Log("\tZHL / Repentogon version match");
 			}

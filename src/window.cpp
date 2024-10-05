@@ -412,6 +412,7 @@ namespace Launcher {
 		if (!_installationManager.CheckIsaacVersion()) {
 			if (_repentogonLaunchModeIdx != -1) {
 				_launchMode->Delete(_repentogonLaunchModeIdx);
+				DisableRepentogonOptions();
 			}
 			return;
 		}
@@ -421,7 +422,7 @@ namespace Launcher {
 		if (installationState == InstallationManager::REPENTOGON_INSTALLATION_CHECK_KO) {
 			if (PromptRepentogonInstallation()) {
 				_installationManager.InstallLatestRepentogon(true, _options.unstableUpdates);
-				_installationManager.CheckRepentogonInstallation(true, false);
+				installationState = _installationManager.CheckRepentogonInstallation(true, false);
 			}
 
 			checkUpdates = false;
@@ -436,8 +437,20 @@ namespace Launcher {
 			else {
 				Log("An update is available. Updating Repentogon...");
 				_installationManager.InstallRepentogon(release);
-				_installationManager.CheckRepentogonInstallation(false, false);
+				installationState = _installationManager.CheckRepentogonInstallation(false, false);
 			}
+		}
+
+		if (installationState != InstallationManager::REPENTOGON_INSTALLATION_CHECK_OK) {
+			if (installationState == InstallationManager::REPENTOGON_INSTALLATION_CHECK_LEGACY) {
+				Log("Legacy installation of Repentogon found. Repentogon will work, but the launcher cannot configure it.");
+			}
+			else {
+				LogWarn("No valid installation of Repentogon found.");
+			}
+
+			LogWarn("Disabling Repentogon configuration options");
+			DisableRepentogonOptions();
 		}
 	}
 
@@ -665,6 +678,13 @@ namespace Launcher {
 		else {
 			_repentogonOptions->Enable(false);
 			// _console->Enable(false);
+		}
+	}
+
+	void MainFrame::DisableRepentogonOptions() {
+		_repentogonOptions->Disable();
+		if (_repentogonLaunchModeIdx) {
+			_launchMode->Delete(_repentogonLaunchModeIdx);
 		}
 	}
 

@@ -5,6 +5,10 @@ set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/;${CMAKE_MODULE_PATH}")
 
 option (LAUNCHER_UNSTABLE "Build unstable version instead of release version" OFF)
 
+if (NOT CMAKE_LAUNCHER_VERSION)
+  set (CMAKE_LAUNCHER_VERSION "dev")
+endif()
+
 # Stupid MSVC
 add_compile_definitions (_CRT_SECURE_NO_WARNINGS)
 

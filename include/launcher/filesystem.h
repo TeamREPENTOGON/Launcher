@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "inih/cpp/INIReader.h"
+#include "shared/scoped_module.h"
 
 /* filesystem.cpp
  *
@@ -18,6 +19,18 @@ namespace Launcher {
 		static constexpr const char* isaacExecutable = "isaac-ng.exe";
 		static constexpr const char* launcherConfigFile = "repentogon_launcher.ini";
 		static constexpr const char* defaultRepentogonFolder = "repentogon";
+
+		namespace Libraries {
+			static constexpr const char* loader = "zhlLoader.dll";
+			static constexpr const char* zhl = "libzhl.dll";
+			static constexpr const char* repentogon = "zhlRepentogon.dll";
+		}
+
+		namespace Symbols {
+			static constexpr const char* zhlVersion = "__ZHL_VERSION";
+			static constexpr const char* repentogonVersion = "__REPENTOGON_VERSION";
+			static constexpr const char* loaderVersion = "__ZHL_LOADER_VERSION";
+		}
 
 		namespace Configuration {
 			// Sections
@@ -41,7 +54,8 @@ namespace Launcher {
 		};
 
 		enum LoadableDlls {
-			LOADABLE_DLL_ZHL,
+			LOADABLE_DLL_ZHL_LOADER,
+			LOADABLE_DLL_LIBZHL,
 			LOADABLE_DLL_REPENTOGON,
 			LOADABLE_DLL_MAX
 		};
@@ -137,6 +151,11 @@ namespace Launcher {
 			 */
 			bool CheckRepentogonInstallation();
 
+			ScopedModule LoadModule(const char* shortName, const char* path, LoadableDlls dll);
+			FARPROC RetrieveSymbol(HMODULE module, const char* libname, const char* symbol);
+			bool ValidateVersionSymbol(HMODULE module, const char* libname, const char* symbolName, 
+				FARPROC versionSymbol, std::string& target);
+
 			void SetLauncherConfigurationPath(ConfigurationFileLocation loc);
 			bool SetIsaacInstallationFolder(std::string const& folder);
 			void WriteLauncherConfigurationFile();
@@ -147,6 +166,7 @@ namespace Launcher {
 			std::vector<FoundFile> const& GetRepentogonInstallationFilesState() const;
 			std::string const& GetRepentogonVersion() const;
 			std::string const& GetZHLVersion() const;
+			std::string const& GetZHLLoaderVersion() const;
 			bool RepentogonZHLVersionMatch() const;
 
 			std::string const& GetSaveFolder() const;
@@ -165,7 +185,11 @@ namespace Launcher {
 			std::string _repentogonVersion;
 			/* Version of ZHL that is installed. Empty if the info cannot be found. */
 			std::string _zhlVersion;
-			/* Whether the versions of ZHL and Repentogon match. False by default. */
+			/* Version of the ZHL loader that is installed. Empty if the info 
+			 * cannot be found. 
+			 */
+			std::string _zhlLoaderVersion;
+			/* Whether the versions of ZHL, the ZHL loader and Repentogon match. False by default. */
 			bool _repentogonZHLVersionMatch = false;
 			/* SHA-256 hash of the zhlRepentogon.dll found on the disk. NULL if the
 			 * info cannot be found.

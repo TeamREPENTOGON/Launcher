@@ -81,6 +81,8 @@ namespace Launcher {
 		 * broken.
 		 */
 		void DebugDumpBrokenRepentogonInstallation();
+		void DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, fs::LoadableDlls dll,
+			std::string const& (fs::Installation::* ptr)() const, bool* found);
 		void DisplayRepentogonFilesVersion(int tabs, bool isUpdate);
 
 		bool InstallRepentogon(rapidjson::Document& document);
@@ -129,6 +131,7 @@ namespace Launcher {
 			return _repentogonInstallationState == REPENTOGON_INSTALLATION_CHECK_LEGACY;
 		}
 
+
 	public:
 		fs::Installation _installation;
 		Updater _updater;
@@ -139,6 +142,11 @@ namespace Launcher {
 		std::string _zhlVersion;
 		std::string _repentogonVersion;
 		RepentogonInstallationCheckResult _repentogonInstallationState = REPENTOGON_INSTALLATION_CHECK_NONE;
+
+		inline RepentogonInstallationCheckResult GetSetRepentogonInstallationState(RepentogonInstallationCheckResult state) {
+			_repentogonInstallationState = state;
+			return _repentogonInstallationState;
+		}
 	};
 
 }
