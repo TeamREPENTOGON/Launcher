@@ -336,6 +336,7 @@ namespace Launcher {
 			if (!isUpdate) {
 				_zhlVersion = _installation.GetZHLVersion();
 				_repentogonVersion = _installation.GetRepentogonVersion();
+				_zhlLoaderVersion = _installation.GetZHLLoaderVersion();
 			}
 
 			if (_installation.GetRepentogonInstallationState() == fs::REPENTOGON_INSTALLATION_STATE_LEGACY) {
@@ -377,6 +378,18 @@ namespace Launcher {
 		}
 
 		_gui->LogNoNL("ZHL version: %s", _installation.GetZHLVersion().c_str());
+		if (isUpdate) {
+			_gui->Log(" (updated from %s)", _zhlVersion.c_str());
+		}
+		else {
+			_gui->Log("\n");
+		}
+
+		for (int i = 0; i < tabs; ++i) {
+			_gui->LogNoNL("\t");
+		}
+
+		_gui->LogNoNL("ZHL loader version: %s", _installation.GetZHLLoaderVersion().c_str());
 		if (isUpdate) {
 			_gui->Log(" (updated from %s)", _zhlVersion.c_str());
 		}

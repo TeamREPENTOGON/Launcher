@@ -140,6 +140,7 @@ namespace Launcher {
 	private:
 		ILoggableGUI* _gui;
 		std::string _zhlVersion;
+		std::string _zhlLoaderVersion;
 		std::string _repentogonVersion;
 		RepentogonInstallationCheckResult _repentogonInstallationState = REPENTOGON_INSTALLATION_CHECK_NONE;
 
