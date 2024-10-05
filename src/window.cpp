@@ -142,8 +142,8 @@ namespace Launcher {
 		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "));
 
 		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE);
-		_repentogonLaunchModeIdx = _launchMode->Insert("Repentogon", 0, (void*)nullptr);
-		_launchMode->Insert("Vanilla", 0, (void*)nullptr);
+		_repentogonLaunchModeIdx = _launchMode->Append("Repentogon");
+		_launchMode->Append("Vanilla");
 		_launchMode->SetValue("Repentogon");
 
 		box->Add(_launchMode);
@@ -683,9 +683,10 @@ namespace Launcher {
 
 	void MainFrame::DisableRepentogonOptions() {
 		_repentogonOptions->Disable();
-		if (_repentogonLaunchModeIdx) {
+		if (_repentogonLaunchModeIdx != -1) {
 			_launchMode->Delete(_repentogonLaunchModeIdx);
 		}
+		_launchMode->SetValue("Vanilla");
 	}
 
 	void MainFrame::ForceRepentogonUpdate(bool unstable) {
