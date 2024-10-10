@@ -10,10 +10,12 @@ namespace Launcher {
 	}
 
 	InstallationManager::SelfUpdateResult InstallationManager::HandleSelfUpdateResult(SelfUpdateErrorCode const& updateResult) {
-		std::ostringstream err, info;
+		std::ostringstream err, warn, info;
 		bool isError = updateResult.base != SELF_UPDATE_UP_TO_DATE;
+		bool isWarn = false;
 		bool timedout = updateResult.base == SELF_UPDATE_SELF_UPDATE_FAILED &&
-			updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT;
+			(updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT || 
+				updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING);
 		switch (updateResult.base) {
 		case SELF_UPDATE_UPDATE_CHECK_FAILED:
 			err << "Error while checking for available launcher updates: ";
@@ -68,6 +70,10 @@ namespace Launcher {
 		case SELF_UPDATE_SELF_UPDATE_FAILED:
 			err << "Error while launching self-updater: ";
 			switch (updateResult.detail.runUpdateResult) {
+			case SELF_UPDATE_RUN_UPDATER_ERR_NO_PIPE:
+				err << "unable to create pipe to communicate with self-updater";
+				break;
+
 			case SELF_UPDATE_RUN_UPDATER_ERR_OPEN_LOCK_FILE:
 				err << "error while opening internal lock file";
 				break;
@@ -84,17 +90,26 @@ namespace Launcher {
 				err << "error while opening self-updater process handle";
 				break;
 
-			case SELF_UPDATE_RUN_UPDATER_ERR_WAIT:
-				err << "error while waiting for self-updater ready";
+			case SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_IO_PENDING:
+				err << "self-updater in an invalid state (both connected and not connected)";
 				break;
 
-			case SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT:
-				Logger::Error("Self-updater timed out while waiting availability\n");
-				err << "timedout while waiting for self-updater ready";
+			case SELF_UPDATE_RUN_UPDATER_ERR_READFILE_ERROR:
+				err << "unknown error while checking for availability of self-updater";
 				break;
 
-			case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT:
+			case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_PING:
+				err << "invalid message sent by self-updater";
+				break;
+
+			case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_RESUME:
 				err << "attempted to resume an update that was not started";
+				break;
+
+			case SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT:
+			case SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING:
+				isWarn = true;
+				warn << "Timed out while waiting for availability of the self-updater";
 				break;
 			}
 			break;
@@ -109,7 +124,12 @@ namespace Launcher {
 		}
 
 		if (isError) {
-			_gui->LogError("%s", err.str().c_str());
+			if (isWarn) {
+				_gui->LogWarn("%s", warn.str().c_str());
+			}
+			else {
+				_gui->LogError("%s", err.str().c_str());
+			}
 		}
 		else {
 			_gui->Log("%s", info.str().c_str());
@@ -130,11 +150,11 @@ namespace Launcher {
 		}
 
 		switch (resumeResult.detail.runUpdateResult) {
-		case SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT:
+		case SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT:
 			_gui->LogError("Timedout while waiting for self-updater ready (retry %d/%d)", currentRetry, maxRetries);
 			return true;
 
-		case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT:
+		case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_RESUME:
 			_gui->LogError("Attempted to resume an update that was not started");
 			return false;
 

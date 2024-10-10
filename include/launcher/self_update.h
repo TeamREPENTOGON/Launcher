@@ -23,19 +23,26 @@ namespace Launcher {
 
 	/* No OK result as the process terminates if everything goes well. */
 	enum SelfUpdateRunUpdaterResult {
+		SELF_UPDATE_RUN_UPDATER_ERR_NO_PIPE,
 		SELF_UPDATE_RUN_UPDATER_ERR_OPEN_LOCK_FILE,
 		SELF_UPDATE_RUN_UPDATER_ERR_GENERATE_CLI,
 		SELF_UPDATE_RUN_UPDATER_ERR_CREATE_PROCESS,
 		SELF_UPDATE_RUN_UPDATER_ERR_OPEN_PROCESS,
-		SELF_UPDATE_RUN_UPDATER_ERR_WAIT_TIMEOUT,
-		SELF_UPDATE_RUN_UPDATER_ERR_WAIT,
-		SELF_UPDATE_RUN_UPDATER_ERR_INVALID_WAIT
+		SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_IO_PENDING,
+		SELF_UPDATE_RUN_UPDATER_ERR_READFILE_ERROR,
+		SELF_UPDATE_RUN_UPDATER_ERR_INVALID_PING,
+		SELF_UPDATE_RUN_UPDATER_ERR_INVALID_RESUME,
+		SELF_UPDATE_RUN_UPDATER_ERR_READ_OVERFLOW,
+		SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT,
+		SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING
 	};
 
 	/* No OK result as the process terminates if everything goes well. */
 	enum SelfUpdateResult {
 		/* Everything up-to-date. */
 		SELF_UPDATE_UP_TO_DATE,
+		/* Attempted a full update while previous attempt is still in progress. */
+		SELF_UPDATE_STILLBORN_CHILD,
 		/* General error when checking for updates. */
 		SELF_UPDATE_UPDATE_CHECK_FAILED,
 		/* General error when extracting the self updater. */
@@ -101,6 +108,8 @@ namespace Launcher {
 
 		/* Resume a self update that timed out while waiting for the updater. */
 		SelfUpdateErrorCode ResumeSelfUpdate();
+
+		void AbortSelfUpdate(bool reset);
 
 	private:
 		rapidjson::Document _releasesInfo;
