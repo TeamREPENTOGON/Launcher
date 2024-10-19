@@ -13,6 +13,7 @@ namespace Updater {
 		_toVersion = to;
 		_url = url;
 		_lockFileName = lockFile;
+		_state = UPDATE_STATE_INIT;
 	}
 
 	UpdateState UpdaterBackend::GetUpdateState() const {
@@ -20,14 +21,14 @@ namespace Updater {
 	}
 
 	UpdateStartupCheckResult UpdaterBackend::DoStartupCheck() {
-		if (!_lockFile) {
+		/* if (!_lockFile) {
 			return UPDATE_STARTUP_CHECK_INVALID_FILE;
 		}
 
 		int result = fscanf(_lockFile, "%d", &_state);
 		if (result != 1) {
 			return UPDATE_STARTUP_CHECK_INVALID_CONTENT;
-		}
+		} */
 
 		if (_state != UPDATE_STATE_INIT) {
 			return UPDATE_STARTUP_CHECK_INVALID_STATE;

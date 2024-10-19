@@ -8,6 +8,7 @@
 #include "shared/externals.h"
 #include "shared/github.h"
 #include "shared/logger.h"
+#include "self_updater/synchronization.h"
 #include "self_updater/updater_window.h"
 
 namespace Externals {
@@ -27,7 +28,7 @@ namespace Updater {
 	char Updater::_printBuffer[Updater::BUFF_SIZE] = { 0 };
 
 	bool App::OnInit() {
-		Logger::Init("self_updater.log", "w");
+		Logger::Init("self_updater.log", true);
 		Externals::Init();
 
 		ParseArgs();
@@ -275,6 +276,13 @@ namespace Updater {
 		Log("Updating the REPENTOGON launcher\n");
 		Log("Update scheduled from version %s to version %s\n", params.from.c_str().AsChar(), params.to.c_str().AsChar());
 		Log("Using lock file %s\n", params.lockFilePath.c_str().AsChar());
+
+		Log("Closing the launcher... ");
+		Synchronization::SynchronizationResult syncResult = Synchronization::SynchronizeWithLauncher();
+		if (!ProcessSynchronizationResult(syncResult)) {
+			return false;
+		}
+
 		Log("Downloading release from %s\n", params.url.c_str().AsChar());
 
 		new (&_updater) UpdaterBackend(params.lockFilePath.c_str().AsChar(), 
@@ -289,7 +297,72 @@ namespace Updater {
 		LauncherUpdateData updateData;
 		bool downloadResult = DownloadUpdate(&updateData);
 		PostDownloadChecks(downloadResult, &updateData);
+
+		Log("Successfully downloaded release");
 		return true;
+	}
+
+	bool Updater::ProcessSynchronizationResult(Synchronization::SynchronizationResult result) {
+		if (result != Synchronization::SYNCHRONIZATION_OK) {
+			Log("KO");
+		}
+		else {
+			Log("OK");
+			return true;
+		}
+
+		namespace s = Synchronization;
+		std::ostringstream stream;
+
+		switch (result) {
+		case s::SYNCHRONIZATION_ERR_CANNOT_OPEN_PIPE:
+			stream << "Unable to open communication channel with launcher";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_SEND_PING:
+			stream << "Unable to send hello to launcher";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_RECV_PONG:
+			stream << "No hello received from launcher";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_INVALID_PONG:
+			stream << "Invalid hello received from launcher";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_SEND_PID_REQUEST:
+			stream << "Unable to send PID request to launcher";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_RECV_PID_ANSWER:
+			stream << "Invalid PID response from launcher";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_RECV_PID:
+			stream << "Invalid PID received from launcher";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_OPEN_PROCESS:
+			stream << "Unable to get access to launcher process";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_TERMINATE_PROCESS:
+			stream << "Unable to close launcher process";
+			break;
+
+		case s::SYNCHRONIZATION_ERR_WAIT_PROCESS:
+			stream << "Timed out while waiting for launcher to close";
+			break;
+
+		default:
+			LogError("Unknown error (%d)\n", result);
+			return false;
+		}
+
+		stream << ". Check log file for details";
+		LogError(stream.str().c_str());
+		return false;
 	}
 
 	void Updater::Log(const char* fmt, ...) {

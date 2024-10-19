@@ -3,6 +3,7 @@
 #include "wx/wx.h"
 
 #include "self_updater/updater.h"
+#include "self_updater/synchronization.h"
 
 namespace Updater {
 	class App : public wxApp {
@@ -20,6 +21,7 @@ namespace Updater {
 		Updater();
 
 		bool DoUpdate();
+		bool ProcessSynchronizationResult(Synchronization::SynchronizationResult result);
 
 	private:
 		wxTextCtrl* _logWindow;

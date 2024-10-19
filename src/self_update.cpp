@@ -150,7 +150,7 @@ namespace Launcher {
 	SelfUpdateRunUpdaterResult RunUpdater(std::string const& url, std::string const& version) {
 		std::string updateStatePath = "repentogon_launcher_self_updater_state";
 
-		{
+		/* {
 			FILE* updateState = fopen(updateStatePath.c_str(), "wb");
 			if (!updateState) {
 				return SELF_UPDATE_RUN_UPDATER_ERR_OPEN_LOCK_FILE;
@@ -159,7 +159,7 @@ namespace Launcher {
 			fprintf(updateState, "%d", ::Updater::UpdateState::UPDATE_STATE_INIT);
 			fflush(updateState);
 			fclose(updateState);
-		}
+		} */
 
 		HANDLE pipe = CreateNamedPipeA(Comm::PipeName, PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
 			PIPE_TYPE_BYTE, 1, 1024, 1024, 0, NULL);
@@ -221,7 +221,7 @@ namespace Launcher {
 				if (lastError == ERROR_IO_PENDING) {
 					Logger::Error("HandleUpdaterCommunication: received ERROR_IO_PENDING in ConnectNamedPipe\n");
 					AbortSelfUpdate(true);
-					return;
+					return SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_IO_PENDING;
 				}
 
 				if (lastError == ERROR_PIPE_CONNECTED) {
@@ -252,6 +252,7 @@ namespace Launcher {
 			GetOverlappedResult(updateState.pipe, &updateState.commState.readOverlapped, &nRead, TRUE);
 
 			if (nRead == ReadBufferLength) {
+				Logger::Error("HandleUpdaterCommunication: overflow when reading from pipe\n");
 				AbortSelfUpdate(true);
 				return SELF_UPDATE_RUN_UPDATER_ERR_READ_OVERFLOW;
 			}
@@ -262,8 +263,11 @@ namespace Launcher {
 
 			if (shouldAbort) {
 				AbortSelfUpdate(true);
+				return SELF_UPDATE_RUN_UPDATER_ERR_MESSAGE_ERROR;
 			}
 		}
+
+		return SELF_UPDATE_RUN_UPDATER_OK;
 	}
 
 	void AbortSelfUpdate(bool reset) {
@@ -388,8 +392,7 @@ namespace Launcher {
 
 		if (WriteMessage(pipe, Comm::LauncherHello, strlen(Comm::LauncherHello), &result)) {
 			result.base = MESSAGE_PROCESS_BASE_OK;
-			updateState.commState.Configure(
-				SELF_UPDATE_COMM_WAIT_PROCESS_ID_REQUEST,
+			updateState.commState.Configure(SELF_UPDATE_COMM_WAIT_PROCESS_ID_REQUEST,
 				strlen(Comm::UpdaterRequestPID),
 				MessageUpdaterRequestPID,
 				"request for launcher PID"
