@@ -16,6 +16,12 @@ namespace Launcher {
 		bool timedout = updateResult.base == SELF_UPDATE_SELF_UPDATE_FAILED &&
 			(updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT || 
 				updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING);
+		bool progressing = updateResult.base == SELF_UPDATE_SYNCHRONIZATION_IN_PROGRESS;
+
+		if (progressing) {
+			return SELF_UPDATE_PARTIAL;
+		}
+
 		switch (updateResult.base) {
 		case SELF_UPDATE_UPDATE_CHECK_FAILED:
 			err << "Error while checking for available launcher updates: ";
@@ -90,10 +96,6 @@ namespace Launcher {
 				err << "error while opening self-updater process handle";
 				break;
 
-			case SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_IO_PENDING:
-				err << "self-updater in an invalid state (both connected and not connected)";
-				break;
-
 			case SELF_UPDATE_RUN_UPDATER_ERR_READFILE_ERROR:
 				err << "unknown error while checking for availability of self-updater";
 				break;
@@ -106,10 +108,23 @@ namespace Launcher {
 				err << "attempted to resume an update that was not started";
 				break;
 
+			case SELF_UPDATE_RUN_UPDATER_ERR_STILL_ALIVE:
+				err << "launcher was not properly terminated by updater";
+				break;
+
 			case SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT:
 			case SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING:
 				isWarn = true;
 				warn << "Timed out while waiting for availability of the self-updater";
+				break;
+
+			case SELF_UPDATE_RUN_UPDATER_OK:
+				isError = false;
+				info << "Synchronizing the launcher and the updater...";
+				break;
+
+			default:
+				err << "Unknown error " << updateResult.detail.runUpdateResult << " while attempting self update";
 				break;
 			}
 			break;
@@ -119,7 +134,7 @@ namespace Launcher {
 			break;
 
 		default:
-			_gui->LogError("Unknown error %d while attempting self update", (int)updateResult.base);
+			_gui->LogError("Unknown error category %d while attempting self update", updateResult.base);
 			break;
 		}
 
@@ -135,35 +150,11 @@ namespace Launcher {
 			_gui->Log("%s", info.str().c_str());
 		}
 
-		if (!timedout) {
+		if (!timedout && !progressing) {
 			return isError ? SELF_UPDATE_ERR : SELF_UPDATE_UTD;
 		}
 
 		return SELF_UPDATE_PARTIAL;
-	}
-
-	bool InstallationManager::ResumeSelfUpdate(int currentRetry, int maxRetries) {
-		SelfUpdateErrorCode resumeResult = _selfUpdater.ResumeSelfUpdate();
-		if (resumeResult.base != SELF_UPDATE_SELF_UPDATE_FAILED) {
-			_gui->LogError("Unexpected error category %d when retrying self-update, aborting", resumeResult.base);
-			return false;
-		}
-
-		switch (resumeResult.detail.runUpdateResult) {
-		case SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT:
-			_gui->LogError("Timedout while waiting for self-updater ready (retry %d/%d)", currentRetry, maxRetries);
-			return true;
-
-		case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_RESUME:
-			_gui->LogError("Attempted to resume an update that was not started");
-			return false;
-
-		default:
-			_gui->LogError("Unexpected self-update error %d when retrying self-update, aborting", resumeResult.detail.runUpdateResult);
-			return false;
-		}
-
-		return false;
 	}
 
 	void InstallationManager::InitFolders(bool* needIsaacFolder, bool* canWriteConfiguration) {
@@ -598,5 +589,27 @@ namespace Launcher {
 			return force;
 
 		return false;
+	}
+
+	void InstallationManager::DoSelfUpdate(std::string const& version, std::string const& url) {
+		SelfUpdateErrorCode result = _selfUpdater.DoSelfUpdate(version, url);
+		if (HandleSelfUpdateResult(result) == SELF_UPDATE_PARTIAL) {
+			FinishSelfUpdate();
+		}
+	}
+
+	void InstallationManager::ForceSelfUpdate(bool unstable) {
+		_gui->Log("Performing self-update (forcibly triggered)");
+		Launcher::SelfUpdateErrorCode result = _selfUpdater.DoSelfUpdate(unstable, true);
+		if (HandleSelfUpdateResult(result) == SELF_UPDATE_PARTIAL) {
+			FinishSelfUpdate();
+		}
+	}
+
+	void InstallationManager::FinishSelfUpdate() {
+		while (_selfUpdater.ResumeSelfUpdate().base == SELF_UPDATE_SYNCHRONIZATION_IN_PROGRESS)
+			;
+
+		_gui->LogError("Unrecoverable error while performing self-update.");
 	}
 }

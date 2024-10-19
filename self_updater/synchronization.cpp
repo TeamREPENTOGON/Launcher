@@ -13,14 +13,19 @@ namespace Synchronization {
 		IO_RESULT_ERR_INCONSISTENT_TRANSFER
 	};
 
-	static IOResult ReadAndWait(HANDLE pipe, DWORD timeout, void* buffer, size_t size);
-	static IOResult WriteAndWait(const void* buffer, size_t size, HANDLE pipe, DWORD timeout);
+	static IOResult ReadAndWait(HANDLE pipe, DWORD timeout, void* buffer, DWORD size);
+	static IOResult WriteAndWait(const void* buffer, DWORD size, HANDLE pipe, DWORD timeout);
 	static IOResult WaitOverlapped(HANDLE pipe, OVERLAPPED* overlapped, DWORD timeout, DWORD* nTransferred);
 
 	SynchronizationResult SynchronizeWithLauncher() {
+		if (!WaitNamedPipeA(Comm::PipeName, 10000)) {
+			return SYNCHRONIZATION_ERR_WAIT_PIPE_TIMEOUT;
+		}
+
 		HANDLE pipe = CreateFileA(Comm::PipeName, GENERIC_READ | GENERIC_WRITE, 0,
 			NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
 		if (pipe == INVALID_HANDLE_VALUE) {
+			Logger::Error("SynchronizeWithLauncher: unable to open pipe (%d)\n", GetLastError());
 			return SYNCHRONIZATION_ERR_CANNOT_OPEN_PIPE;
 		}
 
@@ -66,13 +71,14 @@ namespace Synchronization {
 			return SYNCHRONIZATION_ERR_INVALID_RECV_PID;
 		}
 
-		DWORD pid;
+		DWORD pid = 0;
 		if (IOResult res = ReadAndWait(pipe, 2000, &pid, sizeof(pid)); res != IO_RESULT_OK) {
 			Logger::Error("SynchronizeWithLauncher: error while receiving launcher pid (%d)\n", res);
 			CloseHandle(pipe);
 			return SYNCHRONIZATION_ERR_RECV_PID;
 		}
 
+		Logger::Info("SynchronizeWithLauncher: received PID %d\n", pid);
 		HANDLE launcher = OpenProcess(SYNCHRONIZE | PROCESS_TERMINATE, FALSE, pid);
 		if (launcher == NULL) {
 			Logger::Error("SynchronizeWithLauncher: failed to open launcher process (%d)\n", GetLastError());
@@ -101,12 +107,12 @@ namespace Synchronization {
 		return SYNCHRONIZATION_OK;
 	}
 
-	IOResult WriteAndWait(const void* buffer, size_t size, HANDLE pipe, DWORD timeout) {
+	IOResult WriteAndWait(const void* buffer, DWORD size, HANDLE pipe, DWORD timeout) {
 		OVERLAPPED overlapped;
 		memset(&overlapped, 0, sizeof(overlapped));
 
 		DWORD nWritten = 0;
-		BOOL result = WriteFile(pipe, buffer, size, NULL, &overlapped);
+		BOOL result = WriteFile(pipe, buffer, size, &nWritten, &overlapped);
 		if (result == FALSE) {
 			if (GetLastError() == ERROR_IO_PENDING) {
 				if (IOResult ioResult = WaitOverlapped(pipe, &overlapped, timeout, &nWritten); ioResult != IO_RESULT_OK) {
@@ -119,18 +125,19 @@ namespace Synchronization {
 		}
 
 		if (size != nWritten) {
+			Logger::Error("WriteAndWait: inconsistent write amount, expected %d, got %d\n", size, nWritten);
 			return IO_RESULT_ERR_INCONSISTENT_TRANSFER;
 		}
 
 		return IO_RESULT_OK;
 	}
 
-	IOResult ReadAndWait(HANDLE pipe, DWORD timeout, void* buffer, size_t size) {
+	IOResult ReadAndWait(HANDLE pipe, DWORD timeout, void* buffer, DWORD size) {
 		OVERLAPPED overlapped;
 		memset(&overlapped, 0, sizeof(overlapped));
 
 		DWORD nRead = 0;
-		BOOL result = ReadFile(pipe, buffer, size, NULL, &overlapped);
+		BOOL result = ReadFile(pipe, buffer, size, &nRead, &overlapped);
 
 		if (result == FALSE) {
 			if (GetLastError() == ERROR_IO_PENDING) {
@@ -144,6 +151,7 @@ namespace Synchronization {
 		}
 
 		if (nRead != size) {
+			Logger::Error("ReadAndWait: inconsistent read amount, expected %d, got %d\n", size, nRead);
 			return IO_RESULT_ERR_INCONSISTENT_TRANSFER;
 		}
 

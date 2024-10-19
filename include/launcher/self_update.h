@@ -29,12 +29,13 @@ namespace Launcher {
 		SELF_UPDATE_RUN_UPDATER_ERR_GENERATE_CLI,
 		SELF_UPDATE_RUN_UPDATER_ERR_CREATE_PROCESS,
 		SELF_UPDATE_RUN_UPDATER_ERR_OPEN_PROCESS,
-		SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_IO_PENDING,
+		SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_ERR,
 		SELF_UPDATE_RUN_UPDATER_ERR_READFILE_ERROR,
 		SELF_UPDATE_RUN_UPDATER_ERR_INVALID_PING,
 		SELF_UPDATE_RUN_UPDATER_ERR_INVALID_RESUME,
 		SELF_UPDATE_RUN_UPDATER_ERR_READ_OVERFLOW,
 		SELF_UPDATE_RUN_UPDATER_ERR_MESSAGE_ERROR,
+		SELF_UPDATE_RUN_UPDATER_ERR_STILL_ALIVE,
 		SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT,
 		SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING
 	};
@@ -50,15 +51,17 @@ namespace Launcher {
 		/* General error when extracting the self updater. */
 		SELF_UPDATE_EXTRACTION_FAILED,
 		/* General error when running the self updater. */
-		SELF_UPDATE_SELF_UPDATE_FAILED
+		SELF_UPDATE_SELF_UPDATE_FAILED,
+		/* Messages are being exchanged with the self updater. */
+		SELF_UPDATE_SYNCHRONIZATION_IN_PROGRESS
 	};
 
 	struct SelfUpdateErrorCode {
-		SelfUpdateResult base : 3;
+		SelfUpdateResult base;
 		union {
-			Github::DownloadAsStringResult fetchUpdatesResult : 8;
-			SelfUpdateExtractionResult extractionResult : 8;
-			SelfUpdateRunUpdaterResult runUpdateResult : 8;
+			Github::DownloadAsStringResult fetchUpdatesResult;
+			SelfUpdateExtractionResult extractionResult;
+			SelfUpdateRunUpdaterResult runUpdateResult;
 		} detail;
 	};
 

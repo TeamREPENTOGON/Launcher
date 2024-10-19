@@ -35,8 +35,6 @@ namespace Launcher {
 
 		InstallationManager(ILoggableGUI* gui);
 		SelfUpdateResult HandleSelfUpdateResult(SelfUpdateErrorCode const& result);
-		/* Return true if attempts should continue, false otherwise. */
-		bool ResumeSelfUpdate(int currentRetry, int maxRetries);
 
 		/* Initialize the folder in the filesystem structure.
 		 * 
@@ -54,6 +52,9 @@ namespace Launcher {
 		bool CheckIsaacVersion();
 		bool UninstallLegacyRepentogon();
 		bool RemoveFile(const char* file);
+
+		void DoSelfUpdate(std::string const& version, std::string const& url);
+		void ForceSelfUpdate(bool unstable);
 
 		enum RepentogonInstallationCheckResult {
 			REPENTOGON_INSTALLATION_CHECK_OK,
@@ -148,6 +149,8 @@ namespace Launcher {
 			_repentogonInstallationState = state;
 			return _repentogonInstallationState;
 		}
+
+		void FinishSelfUpdate();
 	};
 
 }

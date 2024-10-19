@@ -6,6 +6,7 @@
 
 #include "shared/github.h"
 #include "shared/monitor.h"
+#include "shared/sha256.h"
 
 namespace Updater {
 	enum UpdateState {
@@ -61,6 +62,10 @@ namespace Updater {
 		std::string _hashUrl;
 		std::string _hash;
 		Github::DownloadAsStringResult _hashDownloadResult;
+
+		inline void TrimHash() {
+			Sha256::Trim(_hash);
+		}
 	};
 
 	class UpdaterBackend {

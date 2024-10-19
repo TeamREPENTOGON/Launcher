@@ -301,30 +301,6 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::ForceSelfUpdate(bool unstable) {
-		Log("Performing self-update (forcibly triggered)");
-		Launcher::SelfUpdateErrorCode result = _installationManager._selfUpdater.DoSelfUpdate(unstable, true);
-		HandleSelfUpdateResult(result);
-	}
-
-	void MainFrame::HandleSelfUpdateResult(SelfUpdateErrorCode const& updateResult) {
-		InstallationManager::SelfUpdateResult result = _installationManager.HandleSelfUpdateResult(updateResult);
-		if (result == InstallationManager::SELF_UPDATE_PARTIAL) {
-			bool ok = true;
-			int currentRetry = 1;
-			int maxRetries = 3;
-			do {
-				wxDialog promptRetry(this, -1, "Retry update", wxDefaultPosition, wxDefaultSize, wxYES_NO, "Retry update ?");
-				int modalResult = promptRetry.ShowModal();
-				if (modalResult == 0) {
-					break;
-				}
-				ok = _installationManager.ResumeSelfUpdate(currentRetry, maxRetries);
-				++currentRetry;
-			} while (ok && currentRetry <= maxRetries);
-		}
-	}
-
 	void MainFrame::Launch(wxCommandEvent& event) {
 		Log("Launching the game with the following options:");
 		Log("\tRepentogon:");
@@ -375,7 +351,7 @@ namespace Launcher {
 		if (result.code == InstallationManager::SELF_UPDATE_CHECK_NEW) {
 			if (PromptLauncherUpdate(result.version, result.url)) {
 				Log("Initiating update");
-				DoSelfUpdate(result.version, result.url);
+				_installationManager.DoSelfUpdate(result.version, result.url);
 			}
 			else {
 				Log("Skipping self-updater as per user choice");
@@ -452,11 +428,6 @@ namespace Launcher {
 			LogWarn("Disabling Repentogon configuration options");
 			DisableRepentogonOptions();
 		}
-	}
-
-	void MainFrame::DoSelfUpdate(std::string const& version, std::string const& url) {
-		SelfUpdateErrorCode result = _installationManager._selfUpdater.DoSelfUpdate(version, url);
-		HandleSelfUpdateResult(result);
 	}
 
 	bool MainFrame::PromptRepentogonInstallation() {
@@ -795,11 +766,11 @@ namespace Launcher {
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE:
-			ForceSelfUpdate(true);
+			_installationManager.ForceSelfUpdate(true);
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE:
-			ForceSelfUpdate(false);
+			_installationManager.ForceSelfUpdate(false);
 			break;
 
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE:

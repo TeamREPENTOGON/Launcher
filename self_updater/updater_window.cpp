@@ -239,22 +239,11 @@ namespace Updater {
 			return false;
 		}
 		else {
-			Log("Successfully downloaded latest launcher version\n");
-			Log("Checking hash consistency... ");
+			Log("Checking release integrity...\n");
 
-			// Trim the hash as it may contain terminating characters (\r\n)
-			size_t i = 0;
-			while (i < data->_hash.size() && (data->_hash[i] >= 'A' && data->_hash[i] <= 'F') ||
-				(data->_hash[i] >= '0' && data->_hash[i] <= '9'))
-				++i;
-
-			if (i != data->_hash.size()) {
-				data->_hash.resize(i);
-			}
-
+			data->TrimHash();
 			if (!_updater.CheckHashConsistency(data->_zipFileName.c_str(), data->_hash.c_str())) {
-				Log("KO\n");
-				LogError("Hash mismatch: download was corrupted");
+				LogError("Hash mismatch: download was corrupted\n");
 				return false;
 			}
 			else {
@@ -277,7 +266,7 @@ namespace Updater {
 		Log("Update scheduled from version %s to version %s\n", params.from.c_str().AsChar(), params.to.c_str().AsChar());
 		Log("Using lock file %s\n", params.lockFilePath.c_str().AsChar());
 
-		Log("Closing the launcher... ");
+		Log("Closing the launcher...\n");
 		Synchronization::SynchronizationResult syncResult = Synchronization::SynchronizeWithLauncher();
 		if (!ProcessSynchronizationResult(syncResult)) {
 			return false;
@@ -296,18 +285,18 @@ namespace Updater {
 
 		LauncherUpdateData updateData;
 		bool downloadResult = DownloadUpdate(&updateData);
-		PostDownloadChecks(downloadResult, &updateData);
+		
+		if (!PostDownloadChecks(downloadResult, &updateData)) {
+			LogError("Error during release download\n");
+			return false;
+		}
 
-		Log("Successfully downloaded release");
+		Log("Successfully downloaded release\n");
 		return true;
 	}
 
 	bool Updater::ProcessSynchronizationResult(Synchronization::SynchronizationResult result) {
-		if (result != Synchronization::SYNCHRONIZATION_OK) {
-			Log("KO");
-		}
-		else {
-			Log("OK");
+		if (result == Synchronization::SYNCHRONIZATION_OK) {
 			return true;
 		}
 
@@ -315,6 +304,10 @@ namespace Updater {
 		std::ostringstream stream;
 
 		switch (result) {
+		case s::SYNCHRONIZATION_ERR_WAIT_PIPE_TIMEOUT:
+			stream << "Timeout while waiting for communication channel ready";
+			break;
+
 		case s::SYNCHRONIZATION_ERR_CANNOT_OPEN_PIPE:
 			stream << "Unable to open communication channel with launcher";
 			break;

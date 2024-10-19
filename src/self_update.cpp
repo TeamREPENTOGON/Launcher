@@ -62,6 +62,7 @@ namespace Launcher {
 		bool waiting = false;
 		bool connectedNotify = false;
 		OVERLAPPED connectOverlapped;
+		bool loopAndWait = false;
 
 		SelfUpdateCommunicationState commState;
 
@@ -72,7 +73,7 @@ namespace Launcher {
 
 		void Reset() {
 			selfUpdaterHandle = pipe = INVALID_HANDLE_VALUE;
-			pipeConnected = waiting = connectedNotify = false;
+			pipeConnected = waiting = connectedNotify = loopAndWait = false;
 			Init();
 		}
 	};
@@ -162,11 +163,13 @@ namespace Launcher {
 		} */
 
 		HANDLE pipe = CreateNamedPipeA(Comm::PipeName, PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED,
-			PIPE_TYPE_BYTE, 1, 1024, 1024, 0, NULL);
+			PIPE_TYPE_BYTE, 2, 1024, 1024, 0, NULL);
 		if (pipe == INVALID_HANDLE_VALUE) {
+			Logger::Error("RunUpdater: error while creating pipe (%d)\n", GetLastError());
 			return SELF_UPDATE_RUN_UPDATER_ERR_NO_PIPE;
 		}
 
+		Logger::Info("RunUpdater: created communication pipe (%p, %d)\n", pipe, GetLastError());
 		char cli[4096] = { 0 };
 		int printfCount = snprintf(cli, 4096, "--lock-file=\"%s\" --from=\"%s\" --to=\"%s\" --url=\"%s\"", 
 			updateStatePath.c_str(), Launcher::version, version.c_str(), url.c_str());
@@ -200,37 +203,35 @@ namespace Launcher {
 	}
 
 	SelfUpdateRunUpdaterResult HandleUpdaterCommunication() {
+		Logger::Info("HandleUpdaterCommunication\n");
 		if (!updateState.pipeConnected) {
-			BOOL waitResult = WaitNamedPipeA(Comm::PipeName, 1000);
-			if (!waitResult) {
-				Logger::Info("HandleUpdaterCommunication: WaitNamedPipeA timeout\n");
-				return SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT;
-			}
-			else {
-				updateState.pipeConnected = true;
-			}
-		}
-
-		if (!updateState.connectedNotify) {
-			Logger::Info("HandleUpdaterCommunication: self updater ready\n");
-			updateState.connectedNotify = true;
 			BOOL connectResult = ConnectNamedPipe(updateState.pipe, &updateState.connectOverlapped);
-			DWORD lastError = GetLastError();
-
-			if (connectResult == FALSE) {
-				if (lastError == ERROR_IO_PENDING) {
-					Logger::Error("HandleUpdaterCommunication: received ERROR_IO_PENDING in ConnectNamedPipe\n");
-					AbortSelfUpdate(true);
-					return SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_IO_PENDING;
+			if (!connectResult) {
+				DWORD error = GetLastError();
+				if (error == ERROR_IO_PENDING) {
+					DWORD dummy;
+					connectResult = GetOverlappedResultEx(updateState.pipe, &updateState.connectOverlapped, &dummy, 2000, FALSE);
+					if (!connectResult) {
+						error = GetLastError();
+						if (error == WAIT_TIMEOUT) {
+							Logger::Info("HandleUpdaterCommunication: timeout while waiting for client\n");
+							return SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT;
+						}
+						else {
+							Logger::Error("HandleUpdaterCommunication: unexpected error while waiting for client (%d)\n", error);
+							AbortSelfUpdate(true);
+							return SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_ERR;
+						}
+					}
 				}
-
-				if (lastError == ERROR_PIPE_CONNECTED) {
-					Logger::Info("HandleUpdaterCommunication: self updater connected (ERROR_PIPE_CONNECTED, this is normal)\n");
+				else if (error != ERROR_PIPE_CONNECTED) {
+					Logger::Error("HandleUpdaterCommunication: ConnectNamedPipe error (%d)\n", error);
+					return SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_ERR;
 				}
 			}
-			else {
-				Logger::Info("HandleUpdaterCommunication: self updater connected\n");
-			}
+
+			updateState.pipeConnected = true;
+			Logger::Info("HandleUpdaterCommunication: client connected\n");
 		}
 		
 		BOOL readResult = ReadFile(updateState.pipe, updateState.commState.buffer, updateState.commState.nextMessageLen, NULL, &updateState.commState.readOverlapped);
@@ -265,6 +266,15 @@ namespace Launcher {
 				AbortSelfUpdate(true);
 				return SELF_UPDATE_RUN_UPDATER_ERR_MESSAGE_ERROR;
 			}
+		}
+
+		if (updateState.loopAndWait) {
+			for (int count = 0; count < 10; ++count) {
+				Sleep(1000);
+			}
+
+			AbortSelfUpdate(true);
+			return SELF_UPDATE_RUN_UPDATER_ERR_STILL_ALIVE;
 		}
 
 		return SELF_UPDATE_RUN_UPDATER_OK;
@@ -351,6 +361,11 @@ namespace Launcher {
 		}
 
 		SelfUpdateRunUpdaterResult runResult = RunUpdater(url, version);
+		if (runResult == SELF_UPDATE_RUN_UPDATER_OK) {
+			result.base = SELF_UPDATE_SYNCHRONIZATION_IN_PROGRESS;
+			return result;
+		}
+
 		result.base = SELF_UPDATE_SELF_UPDATE_FAILED;
 		result.detail.runUpdateResult = runResult;
 
@@ -365,11 +380,15 @@ namespace Launcher {
 			return result;
 		}
 
-
 		SelfUpdateRunUpdaterResult runResult = HandleUpdaterCommunication();
 		/* Remember: if the above function returns, then the updater is not launched.
 		 * If the updater is launched, the function never returns.
 		 */
+
+		if (runResult == SELF_UPDATE_RUN_UPDATER_OK) {
+			result.base = SELF_UPDATE_SYNCHRONIZATION_IN_PROGRESS;
+			return result;
+		}
 
 		result.base = SELF_UPDATE_SELF_UPDATE_FAILED;
 		result.detail.runUpdateResult = runResult;
@@ -415,9 +434,11 @@ namespace Launcher {
 		}
 
 		if (WriteMessage(pipe, Comm::LauncherAnswerPID, strlen(Comm::LauncherAnswerPID), &result)) {
-			DWORD pid = GetProcessId(NULL);
+			DWORD pid = GetCurrentProcessId();
+			Logger::Info("MessageUpdaterRequestPID: sending PID %d\n", pid);
 			if (WriteMessage(pipe, &pid, sizeof(pid), &result)) {
 				result.base = MESSAGE_PROCESS_BASE_OK;
+				updateState.loopAndWait = true;
 			}
 		}
 

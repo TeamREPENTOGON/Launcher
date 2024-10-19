@@ -88,9 +88,6 @@ namespace Launcher {
 
 		bool PromptLauncherUpdate(std::string const& version, std::string const& url);
 
-		void DoSelfUpdate(std::string const& version, std::string const& url);
-		void HandleSelfUpdateResult(SelfUpdateErrorCode const& code);
-
 		/* Initialize the IsaacOptions structure. */
 		void InitializeOptions();
 		/* Initialize GUI components from the IsaacOptions structure. */
@@ -113,7 +110,6 @@ namespace Launcher {
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
 
-		void ForceSelfUpdate(bool unstable);
 		void ForceRepentogonUpdate(bool unstable);
 
 		void Launch(wxCommandEvent& event);
