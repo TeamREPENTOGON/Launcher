@@ -3,10 +3,14 @@
 #include <cstdio>
 
 #include <string>
+#include <vector>
 
 #include "shared/github.h"
 #include "shared/monitor.h"
 #include "shared/sha256.h"
+#include "shared/zip.h"
+
+#include "zip.h"
 
 namespace Updater {
 	enum UpdateState {
@@ -48,6 +52,23 @@ namespace Updater {
 		RELEASE_INFO_STATE_NO_HASH,
 		RELEASE_INFO_STATE_NO_ZIP,
 		RELEASE_INFO_STATE_NO_ASSETS
+	};
+
+	enum ExtractArchiveResultCode {
+		EXTRACT_ARCHIVE_OK,
+		EXTRACT_ARCHIVE_ERR_CANNOT_OPEN,
+		EXTRACT_ARCHIVE_ERR_ZIP_ERROR,
+		EXTRACT_ARCHIVE_ERR_FILE_EXTRACT,
+		EXTRACT_ARCHIVE_ERR_NO_EXE,
+		EXTRACT_ARCHIVE_ERR_OTHER
+	};
+
+	struct ExtractArchiveResult {
+		ExtractArchiveResultCode errCode;
+		std::string zipError;
+		std::vector<std::tuple<std::string, Zip::ExtractFileResult>> files;
+
+		void SetZipError(zip_error_t* z);
 	};
 
 	static constexpr const char* LauncherFileNameTemplate = "Launcher_%s.zip";
@@ -101,6 +122,8 @@ namespace Updater {
 		 * The function returns true if everything went well, false otherwise.
 		 */
 		bool DownloadUpdate(LauncherUpdateData* data);
+
+		ExtractArchiveResult ExtractArchive(const char* name);
 
 		bool CheckHashConsistency(const char* zipFile, const char* hash);
 

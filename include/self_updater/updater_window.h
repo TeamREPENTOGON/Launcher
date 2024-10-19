@@ -40,5 +40,7 @@ namespace Updater {
 		bool DoPreUpdateChecks();
 		bool DownloadUpdate(LauncherUpdateData* data);
 		bool PostDownloadChecks(bool downloadOk, LauncherUpdateData* data);
+		bool ExtractArchive(LauncherUpdateData* data);
+		[[noreturn]] void StartLauncher();
 	};
 }

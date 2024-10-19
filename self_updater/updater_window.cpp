@@ -291,8 +291,93 @@ namespace Updater {
 			return false;
 		}
 
-		Log("Successfully downloaded release\n");
+		if (!ExtractArchive(&updateData)) {
+			LogError("Error while extracting archive\n");
+			return false;
+		}
+
+		Log("Successfully downloaded and extracted new release\n");
+		StartLauncher();
+		// Needless, as StartLauncher does not return, but necessary for correction.
 		return true;
+	}
+
+	bool Updater::ExtractArchive(LauncherUpdateData* data) {
+		const char* filename = data->_zipFileName.c_str();
+		ExtractArchiveResult result = _updater.ExtractArchive(filename);
+		switch (result.errCode) {
+		case EXTRACT_ARCHIVE_OK:
+			Log("Sucessfully extracted new version\n");
+			return true;
+
+		case EXTRACT_ARCHIVE_ERR_NO_EXE:
+			LogError("Downloaded archive contains no exe\n");
+			break;
+
+		case EXTRACT_ARCHIVE_ERR_OTHER:
+			LogError("Unexpected error while extracting archive\n");
+			break;
+
+		case EXTRACT_ARCHIVE_ERR_CANNOT_OPEN:
+			LogError("Unable to open archive %s\n", filename);
+			break;
+
+		case EXTRACT_ARCHIVE_ERR_FILE_EXTRACT:
+			LogError("Errors encountered while extracting files\n");
+			break;
+
+		case EXTRACT_ARCHIVE_ERR_ZIP_ERROR:
+			LogError("libzip error encountered: %s\n", result.zipError.c_str());
+			break;
+
+		default:
+			LogError("Unknown error %d encountered\n", result.errCode);
+			break;
+		}
+
+		wxTextAttr red;
+		red.SetTextColour(*wxRED);
+
+		Log("", true, wxTextAttr(), "************ Archive content read before error ************");
+		for (auto const& [name, state] : result.files) {
+			Log("\t", false, wxTextAttr(), "%s: ", name.c_str());
+			switch (state) {
+			case Zip::EXTRACT_FILE_OK:
+				Log("", true, wxTextAttr(), "OK");
+				break;
+
+			case Zip::EXTRACT_FILE_ERR_ZIP_FREAD:
+				Log("", true, red, "error while reading file content");
+				break;
+
+			case Zip::EXTRACT_FILE_ERR_FOPEN:
+				Log("", true, red, "unable to open file on disk to write content");
+				break;
+
+			default:
+				Log("", true, red, "unknown error");
+				break;
+			}
+		}
+
+		return false;
+	}
+
+	void Updater::StartLauncher() {
+		STARTUPINFOA startupInfo;
+		PROCESS_INFORMATION processInfo;
+
+		memset(&startupInfo, 0, sizeof(startupInfo));
+		memset(&processInfo, 0, sizeof(processInfo));
+
+		char cli[] = "";
+		BOOL created = CreateProcessA("REPENTOGONLauncher.exe", cli, NULL, NULL, FALSE, 0, NULL, NULL, &startupInfo, &processInfo);
+		if (!created) {
+			Logger::Fatal("Unable to start launcher\n");
+			ExitProcess(-1);
+		}
+
+		ExitProcess(0);
 	}
 
 	bool Updater::ProcessSynchronizationResult(Synchronization::SynchronizationResult result) {

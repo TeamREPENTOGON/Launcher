@@ -3,7 +3,10 @@
 
 #include "shared/logger.h"
 #include "shared/sha256.h"
+#include "shared/zip.h"
 #include "self_updater/updater.h"
+
+#include "zip.h"
 
 namespace Updater {
 	UpdaterBackend::UpdaterBackend(const char* lockFile, const char* from,
@@ -126,5 +129,66 @@ namespace Updater {
 
 	const std::string& UpdaterBackend::GetLockFileName() const {
 		return _lockFileName;
+	}
+
+	ExtractArchiveResult UpdaterBackend::ExtractArchive(const char* name) {
+		ExtractArchiveResult result;
+
+		int error = 0;
+		zip_t* zip = zip_open(name, ZIP_RDONLY | ZIP_CHECKCONS, &error);
+
+		if (zip == NULL) {
+			zip_close(zip);
+			result.errCode = EXTRACT_ARCHIVE_ERR_CANNOT_OPEN;
+			return result;
+		}
+
+		bool extractError = false;
+		bool foundExe = false;
+
+		int nFiles = zip_get_num_files(zip);
+		for (int i = 0; i < nFiles; ++i) {
+			zip_file_t* file = zip_fopen_index(zip, i, 0);
+			if (!file) {
+				result.SetZipError(zip_get_error(zip));
+				zip_close(zip);
+				return result;
+			}
+
+			const char* name = zip_get_name(zip, i, 0);
+			if (!name) {
+				result.SetZipError(zip_get_error(zip));
+				zip_close(zip);
+				return result;
+			}
+
+			if (!strcmp(name, "REPENTOGONLauncher.exe")) {
+				foundExe = true;
+			}
+
+			Zip::ExtractFileResult extractFileResult = Zip::ExtractFile(zip, i, file, name);
+			result.files.push_back(std::make_tuple(std::string(name), extractFileResult));
+
+			if (!extractError) {
+				extractError = extractFileResult != Zip::EXTRACT_FILE_OK;
+			}
+		}
+
+		if (!foundExe) {
+			result.errCode = EXTRACT_ARCHIVE_ERR_NO_EXE;
+		}
+		else if (extractError) {
+			result.errCode = EXTRACT_ARCHIVE_ERR_FILE_EXTRACT;
+		}
+		else {
+			result.errCode = EXTRACT_ARCHIVE_OK;
+		}
+
+		return result;
+	}
+
+	void ExtractArchiveResult::SetZipError(zip_error_t* error) {
+		errCode = EXTRACT_ARCHIVE_ERR_ZIP_ERROR;
+		zipError = zip_error_strerror(error);
 	}
 }
