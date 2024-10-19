@@ -12,6 +12,19 @@ namespace Sha256 {
 	 * hash. */
 	std::string Sha256(const char* string, size_t size);
 
-	/* Compare two hashes, performing case conversion if needed. */
+	/* Compare two hashes, performing case conversion if needed.
+	 */
 	bool Equals(const char* lhs, const char* rhs);
+
+	/* Trim a hash string, removing trailing \n and \r, and leading whitespace
+	 * and tabulations.
+	 * If your "hash" contains other illegal characters, you should consider 
+	 * fixing whatever generates it.
+	 * 
+	 * The char* version returns a pointer into the same string, offset to remove
+	 * leading illegal characters, and with a \0 inserted to remove trailing
+	 * illegal characters.
+	 */
+	char* Trim(char* hash);
+	void Trim(std::string& hash);
 }

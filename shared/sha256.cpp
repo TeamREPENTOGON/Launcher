@@ -121,4 +121,40 @@ namespace Sha256 {
 		std::transform(right.begin(), right.end(), right.begin(), std::toupper);
 		return left == right;
 	}
+
+	char* Trim(char* str) {
+		size_t length = strlen(str);
+		int i = 0;
+		for (; i < length; ++i) {
+			char value = str[i];
+			if (!isspace(value) && value != '\t')
+				break;
+		}
+
+		char* result = str + i;
+
+		for (int j = length - 1; j >= i && j >= 0; --j) {
+			char value = str[j];
+			if (value != '\r' && value != '\n')
+				break;
+			str[j] = '\0';
+		}
+
+		return result;
+	}
+
+	void Trim(std::string& str) {
+		int i = 0;
+		int length = str.size();
+		while (i < length && (isspace(str[i]) || str[i] == '\t'))
+			++i;
+		str.erase(0, i);
+
+		length = str.size();
+		int j = length - 1;
+		while (j >= 0 && (str[j] == '\n' || str[j] == '\r'))
+			--j;
+
+		str.erase(j + 1, length - j - 1);
+	}
 }
