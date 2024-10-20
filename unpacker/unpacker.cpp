@@ -129,6 +129,22 @@ bool Unpacker::ExtractArchive(const char* name) {
 	return true;
 }
 
+void Unpacker::StartLauncher() {
+	STARTUPINFOA startup;
+	memset(&startup, 0, sizeof(startup));
+
+	PROCESS_INFORMATION info;
+	memset(&info, 0, sizeof(info));
+
+	char cli[] = { 0 };
+	BOOL created = CreateProcessA("REPENTOGONLauncher.exe", cli, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
+	if (!created) {
+		ExitProcess(-1);
+	}
+
+	ExitProcess(0);
+}
+
 int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	Logger::Init("unpacker.log");
 
@@ -142,6 +158,13 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 		Logger::Error("Error while extracing archive\n");
 		return -1;
 	}
+
+	if (!DeleteFileA(Comm::UnpackedArchiveName)) {
+		Logger::Error("Error while deleting archive (%d)\n", GetLastError());
+		return -1;
+	}
+
+	Unpacker::StartLauncher();
 
 	return 0;
 }
