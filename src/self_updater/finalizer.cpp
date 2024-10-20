@@ -123,7 +123,7 @@ namespace Updater {
 		}
 
 		unpacker = child;
-		pipe = pipe;
+		this->pipe = pipe;
 		
 		ConfigureNextMessage(MESSAGE_UNPACKER_HELLO, strlen(Comm::UpdaterHello), &Finalizer::ProcessHelloMessage, "waiting for hello from unpacker");
 
@@ -139,10 +139,12 @@ namespace Updater {
 		}
 
 		if (waitUntilDeath) {
+			Logger::Info("Finalizer::SynchronizeUnpacker: WaitUntilDeath\n");
 			WaitUntilDeath();
 			return FINALIZATION_COMM_ERR_STILL_ALIVE;
 		}
 		else {
+			Logger::Info("Finalizer::SynchronizeUnpacker: ProcessNextMessage\n");
 			FinalizationCommunicationResult result = ProcessNextMessage();
 
 			if (waitUntilDeath)
@@ -193,6 +195,7 @@ namespace Updater {
 			DWORD readError = GetLastError();
 			if (readError == ERROR_IO_PENDING) {
 				Logger::Info("Finalizer::ProcessNextMessage: %s...\n", messageContext);
+				Sleep(100);
 				return FINALIZATION_COMM_INFO_TIMEOUT;
 			}
 			else {
@@ -210,6 +213,7 @@ namespace Updater {
 			}
 
 			message[nRead] = '\0';
+			Logger::Info("Processing message %d\n", nextMessage);
 			MessageProcessResult messageResult = (this->*nextMessageFn)();
 			if (messageResult != MESSAGE_PROCESS_OK) {
 				Logger::Error("Finalizer::ProcessNextMessage: error while processing message %d (%d)\n",

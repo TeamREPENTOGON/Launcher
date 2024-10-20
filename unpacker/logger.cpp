@@ -1,4 +1,5 @@
 #include <cstdarg>
+#include <ctime>
 
 #include "unpacker/logger.h"
 
@@ -6,8 +7,15 @@ namespace Logger {
 	FILE* logFile = stdout;
 
 	void Log(const char* prefix, const char* fmt, va_list va) {
+		time_t now = time(nullptr);
+		tm* nowTm = localtime(&now);
+		char timeBuffer[4096];
+		strftime(timeBuffer, 4095, "[%Y-%m-%d %H:%M:%S] ", nowTm);
+
 		fprintf(logFile, prefix);
+		fprintf(logFile, timeBuffer);
 		vfprintf(logFile, fmt, va);
+		fflush(logFile);
 	}
 
 	void Init(const char* name) {

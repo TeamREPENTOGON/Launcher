@@ -15,6 +15,7 @@
 struct FileContent {
 	char* name = NULL;
 	char* buffer = NULL;
+	size_t buffLen = 0;
 
 	FileContent() {
 
@@ -28,15 +29,18 @@ struct FileContent {
 	FileContent(FileContent const&) = delete;
 	FileContent& operator=(FileContent const&) = delete;
 
-	FileContent(FileContent&& other) : name(other.name), buffer(other.buffer) {
+	FileContent(FileContent&& other) : name(other.name), buffer(other.buffer), buffLen(other.buffLen) {
 		other.name = other.buffer = NULL;
+		other.buffLen = 0;
 	}
 
 	FileContent& operator=(FileContent&& other) {
 		name = other.name;
 		buffer = other.buffer;
+		buffLen = other.buffLen;
 
 		other.name = other.buffer = NULL;
+		other.buffLen = 0;
 		return *this;
 	}
 };
@@ -106,6 +110,8 @@ bool Unpacker::ExtractArchive(const char* name) {
 		}
 
 		file.buffer[fileSize] = '\0';
+		file.buffLen = fileSize;
+		Logger::Info("Read %s of size %d\n", file.name, fileSize);
 		files.push_back(std::move(file));
 	}
 
@@ -118,7 +124,7 @@ bool Unpacker::ExtractArchive(const char* name) {
 			return false;
 		}
 
-		if (fwrite(fileDesc.buffer, strlen(fileDesc.buffer), 1, file) != 1) {
+		if (fwrite(fileDesc.buffer, fileDesc.buffLen, 1, file) != 1) {
 			Logger::Error("Error while extracting %s\n", fileDesc.name);
 			return false;
 		}
