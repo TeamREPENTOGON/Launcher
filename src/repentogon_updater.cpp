@@ -1,3 +1,4 @@
+#include <WinSock2.h>
 #include <Windows.h>
 #include <bcrypt.h>
 #include <Psapi.h>
@@ -19,7 +20,7 @@
 #include "shared/sha256.h"
 
 #include "launcher/filesystem.h"
-#include "launcher/updater.h"
+#include "launcher/repentogon_updater.h"
 
 #include "zip.h"
 
@@ -34,11 +35,11 @@ namespace Launcher {
 
 	}
 
-	Updater::Updater() {
+	RepentogonUpdater::RepentogonUpdater() {
 
 	}
 
-	Github::VersionCheckResult Updater::CheckRepentogonUpdates(rapidjson::Document& doc,
+	Github::VersionCheckResult RepentogonUpdater::CheckRepentogonUpdates(rapidjson::Document& doc,
 		fs::Installation const& installation,
 		bool allowPreReleases,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
@@ -54,7 +55,7 @@ namespace Launcher {
 		return Github::CheckUpdates(installation.GetZHLVersion().c_str(), "Repentogon", doc);
 	}
 
-	Github::DownloadAsStringResult Updater::FetchRepentogonUpdates(rapidjson::Document& response,
+	Github::DownloadAsStringResult RepentogonUpdater::FetchRepentogonUpdates(rapidjson::Document& response,
 		bool allowPreReleases,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
 		if (!allowPreReleases) {
@@ -86,26 +87,26 @@ namespace Launcher {
 		}
 	}
 
-	RepentogonUpdateResult Updater::UpdateRepentogon(rapidjson::Document& data,
+	RepentogonUpdateResult RepentogonUpdater::UpdateRepentogon(rapidjson::Document& data,
 		const char* outputDir,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
 		_repentogonUpdateState.Clear();
 
 		_repentogonUpdateState.phase = REPENTOGON_UPDATE_PHASE_CHECK_ASSETS;
 		if (!CheckRepentogonAssets(data)) {
-			Logger::Error("Updater::UpdateRepentogon: invalid assets\n");
+			Logger::Error("RepentogonUpdater::UpdateRepentogon: invalid assets\n");
 			return REPENTOGON_UPDATE_RESULT_MISSING_ASSET;
 		}
 
 		_repentogonUpdateState.phase = REPENTOGON_UPDATE_PHASE_DOWNLOAD;
 		if (!DownloadRepentogon(monitor)) {
-			Logger::Error("Updater::UpdateRepentogon: download failed\n");
+			Logger::Error("RepentogonUpdater::UpdateRepentogon: download failed\n");
 			return REPENTOGON_UPDATE_RESULT_DOWNLOAD_ERROR;
 		}
 
 		_repentogonUpdateState.phase = REPENTOGON_UPDATE_PHASE_CHECK_HASH;
 		if (!CheckRepentogonIntegrity()) {
-			Logger::Error("Updater::UpdateRepentogon: invalid zip\n");
+			Logger::Error("RepentogonUpdater::UpdateRepentogon: invalid zip\n");
 			return REPENTOGON_UPDATE_RESULT_BAD_HASH;
 		}
 
@@ -115,7 +116,7 @@ namespace Launcher {
 		}
 
 		if (!ExtractRepentogon(outputDir)) {
-			Logger::Error("Updater::UpdateRepentogon: extraction failed\n");
+			Logger::Error("RepentogonUpdater::UpdateRepentogon: extraction failed\n");
 			return REPENTOGON_UPDATE_RESULT_EXTRACT_FAILED;
 		}
 
@@ -123,20 +124,20 @@ namespace Launcher {
 		return REPENTOGON_UPDATE_RESULT_OK;
 	}
 
-	bool Updater::CheckRepentogonAssets(rapidjson::Document const& data) {
+	bool RepentogonUpdater::CheckRepentogonAssets(rapidjson::Document const& data) {
 		if (!data.HasMember("assets")) {
-			Logger::Error("Updater::CheckRepentogonAssets: no \"assets\" field\n");
+			Logger::Error("RepentogonUpdater::CheckRepentogonAssets: no \"assets\" field\n");
 			return false;
 		}
 
 		if (!data["assets"].IsArray()) {
-			Logger::Error("Updater::CheckRepentogonAssets: \"assets\" field is not an array\n");
+			Logger::Error("RepentogonUpdater::CheckRepentogonAssets: \"assets\" field is not an array\n");
 			return false;
 		}
 
 		rapidjson::GenericArray<true, rapidjson::Value> const& assets = data["assets"].GetArray();
 		if (assets.Size() < 2) {
-			Logger::Error("Updater::CheckRepentogonAssets: not enough assets\n");
+			Logger::Error("RepentogonUpdater::CheckRepentogonAssets: not enough assets\n");
 			return false;
 		}
 
@@ -153,14 +154,14 @@ namespace Launcher {
 				continue;
 
 			const char* name = asset["name"].GetString();
-			Logger::Info("Updater::CheckRepentogonAssets: asset %d -> %s\n", i, name);
+			Logger::Info("RepentogonUpdater::CheckRepentogonAssets: asset %d -> %s\n", i, name);
 			bool isHash = !strcmp(name, HashName);
 			bool isRepentogon = !strcmp(name, RepentogonZipName);
 			if (!isHash && !isRepentogon)
 				continue;
 
 			if (!asset.HasMember("browser_download_url") || !asset["browser_download_url"].IsString()) {
-				Logger::Warn("Updater::CheckRepentogonAssets: asset %s has no /invalid \"browser_download_url\" field\n");
+				Logger::Warn("RepentogonUpdater::CheckRepentogonAssets: asset %s has no /invalid \"browser_download_url\" field\n");
 				continue;
 			}
 
@@ -178,46 +179,46 @@ namespace Launcher {
 		}
 
 		if (!hasHash) {
-			Logger::Error("Updater::CheckRepentogonAssets: missing hash\n");
+			Logger::Error("RepentogonUpdater::CheckRepentogonAssets: missing hash\n");
 		}
 
 		if (!hasZip) {
-			Logger::Error("Updater::CheckRepentogonAssets: missing zip\n");
+			Logger::Error("RepentogonUpdater::CheckRepentogonAssets: missing zip\n");
 		}
 
 		return hasHash && hasZip;
 	}
 
-	bool Updater::DownloadRepentogon(
+	bool RepentogonUpdater::DownloadRepentogon(
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
 		if (Github::DownloadFile(HashName, _repentogonUpdateState.hashUrl.c_str(), monitor) != Github::DOWNLOAD_FILE_OK) {
-			Logger::Error("Updater::DownloadRepentogon: error while downloading hash\n");
+			Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading hash\n");
 			return false;
 		}
 
 		_repentogonUpdateState.hashFile = fopen(HashName, "r");
 		if (!_repentogonUpdateState.hashFile) {
-			Logger::Error("Updater::DownloadRepentogon: Unable to open %s for reading\n", HashName);
+			Logger::Error("RepentogonUpdater::DownloadRepentogon: Unable to open %s for reading\n", HashName);
 			return false;
 		}
 
 		if (Github::DownloadFile(RepentogonZipName, _repentogonUpdateState.zipUrl.c_str(), monitor) != Github::DOWNLOAD_FILE_OK) {
-			Logger::Error("Updater::DownloadRepentogon: error while downloading zip\n");
+			Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading zip\n");
 			return false;
 		}
 
 		_repentogonUpdateState.zipFile = fopen(RepentogonZipName, "r");
 		if (!_repentogonUpdateState.zipFile) {
-			Logger::Error("Updater::DownloadRepentogon: Unable to open %s for reading\n", RepentogonZipName);
+			Logger::Error("RepentogonUpdater::DownloadRepentogon: Unable to open %s for reading\n", RepentogonZipName);
 			return false;
 		}
 
 		return true;
 	}
 
-	bool Updater::CheckRepentogonIntegrity() {
+	bool RepentogonUpdater::CheckRepentogonIntegrity() {
 		if (!_repentogonUpdateState.hashFile || !_repentogonUpdateState.zipFile) {
-			Logger::Error("Updater::CheckRepentogonIntegrity: hash or archive not previously opened\n");
+			Logger::Error("RepentogonUpdater::CheckRepentogonIntegrity: hash or archive not previously opened\n");
 			return false;
 		}
 
@@ -225,7 +226,7 @@ namespace Launcher {
 		char* result = fgets(hash, 4096, _repentogonUpdateState.hashFile);
 
 		if (!result) {
-			Logger::Error("Updater::CheckRepentogonIntegrity: fgets error\n");
+			Logger::Error("RepentogonUpdater::CheckRepentogonIntegrity: fgets error\n");
 			return false;
 		}
 
@@ -235,7 +236,7 @@ namespace Launcher {
 			 */
 			char* nl = strchr(hash, '\n');
 			if (!nl) {
-				Logger::Error("Updater::CheckRepentogonIntegrity: no newline found, malformed hash\n");
+				Logger::Error("RepentogonUpdater::CheckRepentogonIntegrity: no newline found, malformed hash\n");
 				return false;
 			}
 
@@ -244,7 +245,7 @@ namespace Launcher {
 
 		size_t len = strlen(hash);
 		if (len != 64) {
-			Logger::Error("Updater::CheckRepentogonIntegrity: hash is not 64 characters\n");
+			Logger::Error("RepentogonUpdater::CheckRepentogonIntegrity: hash is not 64 characters\n");
 			return false;
 		}
 
@@ -253,7 +254,7 @@ namespace Launcher {
 			zipHash = Sha256::Sha256F(RepentogonZipName);
 		}
 		catch (std::exception& e) {
-			Logger::Fatal("Updater::CheckRepentogonIntegrity: exception while hashing %s: %s\n", RepentogonZipName, e.what());
+			Logger::Fatal("RepentogonUpdater::CheckRepentogonIntegrity: exception while hashing %s: %s\n", RepentogonZipName, e.what());
 			throw;
 		}
 
@@ -261,21 +262,21 @@ namespace Launcher {
 		_repentogonUpdateState.zipHash = zipHash;
 
 		if (!Sha256::Equals(hash, zipHash.c_str())) {
-			Logger::Error("Updater::CheckRepentogonIntegrity: hash mismatch: expected \"%s\", got \"%s\"\n", zipHash.c_str(), hash);
+			Logger::Error("RepentogonUpdater::CheckRepentogonIntegrity: hash mismatch: expected \"%s\", got \"%s\"\n", zipHash.c_str(), hash);
 			return false;
 		}
 
 		return true;
 	}
 
-	bool Updater::ExtractRepentogon(const char* outputDir) {
+	bool RepentogonUpdater::ExtractRepentogon(const char* outputDir) {
 		if (!outputDir) {
-			Logger::Error("Updater::ExtractRepentogon: NULL output folder\n");
+			Logger::Error("RepentogonUpdater::ExtractRepentogon: NULL output folder\n");
 			return false;
 		}
 		
 		if (!Filesystem::FolderExists(outputDir)) {
-			Logger::Error("Updater::ExtractRepentogon: invalid output folder %s\n", outputDir);
+			Logger::Error("RepentogonUpdater::ExtractRepentogon: invalid output folder %s\n", outputDir);
 			return false;
 		}
 
@@ -283,7 +284,7 @@ namespace Launcher {
 		int error;
 		zip_t* zip = zip_open(RepentogonZipName, ZIP_RDONLY | ZIP_CHECKCONS, &error);
 		if (!zip) {
-			Logger::Error("Updater::ExtractRepentogon: error %d while opening %s\n", error, RepentogonZipName);
+			Logger::Error("RepentogonUpdater::ExtractRepentogon: error %d while opening %s\n", error, RepentogonZipName);
 			return false;
 		}
 
@@ -293,7 +294,7 @@ namespace Launcher {
 		for (int i = 0; i < nFiles; ++i) {
 			zip_file_t* file = zip_fopen_index(zip, i, 0);
 			if (!file) {
-				Logger::Error("Updater::ExtractRepentogon: error opening file %d in archive\n", i);
+				Logger::Error("RepentogonUpdater::ExtractRepentogon: error opening file %d in archive\n", i);
 				ok = false;
 				zip_fclose(file);
 				filesState.push_back(std::make_tuple("", false));
@@ -303,7 +304,7 @@ namespace Launcher {
 			const char* name = zip_get_name(zip, i, 0);
 			if (!name) {
 				zip_error_t* error = zip_get_error(zip);
-				Logger::Error("Updater::ExtractRepentogon: error getting name of file %d in archive (%s)\n", i, zip_error_strerror(error));
+				Logger::Error("RepentogonUpdater::ExtractRepentogon: error getting name of file %d in archive (%s)\n", i, zip_error_strerror(error));
 				ok = false;
 				zip_fclose(file);
 				filesState.push_back(std::make_tuple("", false));
@@ -311,7 +312,7 @@ namespace Launcher {
 			}
 
 			if (!Filesystem::CreateFileHierarchy(name)) {
-				Logger::Error("Updater::ExtractRepentogon: cannot create intermediate folders for file %s\n", name);
+				Logger::Error("RepentogonUpdater::ExtractRepentogon: cannot create intermediate folders for file %s\n", name);
 				ok = false;
 				zip_fclose(file);
 				filesState.push_back(std::make_tuple(name, false));
@@ -323,7 +324,7 @@ namespace Launcher {
 			outputPath += name;
 			FILE* output = fopen(outputPath.c_str(), "wb");
 			if (!output) {
-				Logger::Error("Updater::ExtractRepentogon: cannot create file %s\n", name);
+				Logger::Error("RepentogonUpdater::ExtractRepentogon: cannot create file %s\n", name);
 				ok = false;
 				zip_fclose(file);
 				filesState.push_back(std::make_tuple(name, false));
@@ -335,7 +336,7 @@ namespace Launcher {
 			bool fileOk = true;
 			while (count != 0) {
 				if (count == -1) {
-					Logger::Error("Updater::ExtractRepentogon: error while reading %s\n", name);
+					Logger::Error("RepentogonUpdater::ExtractRepentogon: error while reading %s\n", name);
 					ok = false;
 					fileOk = false;
 					break;
@@ -346,7 +347,7 @@ namespace Launcher {
 			}
 
 			if (fileOk) {
-				Logger::Info("Updater::ExtractRepentogon: successfully extracted %s to %s\n", name, outputPath.c_str());
+				Logger::Info("RepentogonUpdater::ExtractRepentogon: successfully extracted %s to %s\n", name, outputPath.c_str());
 			}
 
 			filesState.push_back(std::make_tuple(name, fileOk));
@@ -358,7 +359,7 @@ namespace Launcher {
 		return ok;
 	}
 
-	RepentogonUpdateState const& Updater::GetRepentogonUpdateState() const {
+	RepentogonUpdateState const& RepentogonUpdater::GetRepentogonUpdateState() const {
 		return _repentogonUpdateState;
 	}
 

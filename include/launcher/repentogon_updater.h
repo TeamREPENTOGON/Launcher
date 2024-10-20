@@ -1,5 +1,6 @@
 #pragma once
 
+#include <WinSock2.h>
 #include <Windows.h>
 
 #include <chrono>
@@ -77,9 +78,9 @@ namespace Launcher {
 	 * Many functions return error codes that can be used to get extended error
 	 * information. This allows the class to be used outside the context of a GUI.
 	 */
-	class Updater {
+	class RepentogonUpdater {
 	public:
-		Updater();
+		RepentogonUpdater();
 
 		/* Check if a Repentogon update is available. 
 		 * 

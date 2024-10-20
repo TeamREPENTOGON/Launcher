@@ -20,19 +20,19 @@ namespace Updater {
 		 * Nothing stored inside.
 		 */
 		UPDATE_STATE_INIT,
-		/* Updater is ready to perform the download. 
+		/* RepentogonUpdater is ready to perform the download. 
 		 * CLI params stored within.
 		 */
 		UPDATE_STATE_READY,
-		/* Updater has downloaded the update. 
+		/* RepentogonUpdater has downloaded the update. 
 		 * Name of the zip is contained within. 
 		 */
 		UPDATE_STATE_DOWNLOADED,
-		/* Updater received invalid URL, update abandonned. 
+		/* RepentogonUpdater received invalid URL, update abandonned. 
 		 * URL contained within. 
 		 */
 		UPDATE_STATE_BAD_URL,
-		/* Updater received lock file in an invalid state.
+		/* RepentogonUpdater received lock file in an invalid state.
 		 * Previous state contained within. 
 		 */
 		UPDATE_STATE_INVALID_STATE
@@ -40,9 +40,6 @@ namespace Updater {
 
 	enum UpdateStartupCheckResult {
 		UPDATE_STARTUP_CHECK_OK,
-		UPDATE_STARTUP_CHECK_INVALID_FILE,
-		UPDATE_STARTUP_CHECK_INVALID_CONTENT,
-		UPDATE_STARTUP_CHECK_INVALID_STATE,
 		UPDATE_STARTUP_CHECK_CANNOT_FETCH_RELEASE,
 		UPDATE_STARTUP_CHECK_INVALID_RELEASE_INFO
 	};
@@ -56,7 +53,8 @@ namespace Updater {
 
 	enum ExtractArchiveResultCode {
 		EXTRACT_ARCHIVE_OK,
-		EXTRACT_ARCHIVE_ERR_CANNOT_OPEN,
+		EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_ZIP,
+		EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_BINARY_OUTPUT,
 		EXTRACT_ARCHIVE_ERR_ZIP_ERROR,
 		EXTRACT_ARCHIVE_ERR_FILE_EXTRACT,
 		EXTRACT_ARCHIVE_ERR_NO_EXE,
@@ -89,17 +87,17 @@ namespace Updater {
 		}
 	};
 
-	class UpdaterBackend {
+	class LauncherUpdater {
 	public:
 		// Nop.
-		UpdaterBackend() { }
-		UpdaterBackend(const char* lockFile, const char* from, const char* to, const char* url);
+		LauncherUpdater() { }
+		LauncherUpdater(const char* from, const char* to, const char* url);
 
-		UpdaterBackend(UpdaterBackend const&) = delete;
-		UpdaterBackend(UpdaterBackend&&) = delete;
+		LauncherUpdater(LauncherUpdater const&) = delete;
+		LauncherUpdater(LauncherUpdater&&) = delete;
 
-		UpdaterBackend& operator=(UpdaterBackend const&) = delete;
-		UpdaterBackend& operator=(UpdaterBackend&&) = delete;
+		LauncherUpdater& operator=(LauncherUpdater const&) = delete;
+		LauncherUpdater& operator=(LauncherUpdater&&) = delete;
 
 		/* Check that the backend is properly configured.
 		 * 
@@ -112,7 +110,6 @@ namespace Updater {
 		UpdateStartupCheckResult DoStartupCheck();
 
 		UpdateState GetUpdateState() const;
-		std::string const& GetLockFileName() const;
 
 		/* Download the update. 
 		 *
@@ -132,7 +129,6 @@ namespace Updater {
 		ReleaseInfoState GetReleaseInfoState() const;
 
 	private:
-		FILE* _lockFile = NULL;
 		std::string _lockFileName;
 		std::string _fromVersion;
 		std::string _toVersion;
@@ -140,8 +136,8 @@ namespace Updater {
 		std::string _hashUrl, _zipUrl;
 
 		rapidjson::Document _releaseInfo;
-		Github::DownloadAsStringResult _releaseDownloadResult;
-		ReleaseInfoState _releaseInfoState;
+		Github::DownloadAsStringResult _releaseDownloadResult = Github::DOWNLOAD_AS_STRING_OK;
+		ReleaseInfoState _releaseInfoState = ReleaseInfoState::RELEASE_INFO_STATE_OK;
 		UpdateState _state = UPDATE_STATE_NONE;
 
 		void GenerateArchiveFilename(LauncherUpdateData* data);

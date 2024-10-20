@@ -14,7 +14,8 @@
 #include "launcher/installation_manager.h"
 #include "launcher/launcher.h"
 #include "launcher/self_update.h"
-#include "launcher/updater.h"
+#include "launcher/repentogon_updater.h"
+#include "launcher/self_updater/launcher_update_manager.h"
 #include "rapidjson/document.h"
 #include "shared/loggable_gui.h"
 
@@ -56,8 +57,10 @@ namespace Launcher {
 		MainFrame();
 		~MainFrame();
 
+		void Log(const char* prefix, bool nl, const char* fmt, ...);
 		void LogNoNL(const char* fmt, ...);
 		void Log(const char* fmt, ...);
+		void LogInfo(const char* fmt, ...);
 		void LogWarn(const char* fmt, ...);
 		void LogError(const char* fmt, ...);
 		void PostInit();
@@ -136,6 +139,11 @@ namespace Launcher {
 		 * they want to remove all Repentogon related DLLs in the Isaac folder.
 		 */
 		bool PromptLegacyUninstall();
+
+		/* Check whether there is a launcher update file present in the current
+		 * folder.
+		 */
+		bool SanityCheckLauncherUpdate();
 
 		void InitializeIsaacFolderPath(bool needIsaacFolder, bool canWriteConfiguration);
 		void HandleLauncherUpdates(bool allowDrafts);

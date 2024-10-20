@@ -1,8 +1,9 @@
+#include <WinSock2.h>
 #include <Windows.h>
 
 #include "comm/messages.h"
-#include "shared/logger.h"
-#include "self_updater/synchronization.h"
+#include "unpacker/logger.h"
+#include "unpacker/synchronization.h"
 
 namespace Synchronization {
 	enum IOResult {

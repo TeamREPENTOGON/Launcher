@@ -2,6 +2,7 @@
 
 namespace Comm {
 	constexpr const char* PipeName = "\\\\.\\pipe\\repentogon_launcher_updater";
+	constexpr const char* UnpackedArchiveName = "launcher_update.bin";
 
 	constexpr const char* UpdaterHello = "Updater-Hello";
 	constexpr const char* LauncherHello = "Launcher-Hello";

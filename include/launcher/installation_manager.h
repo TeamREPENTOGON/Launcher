@@ -5,22 +5,15 @@
 #include <tuple>
 
 #include "launcher/filesystem.h"
-#include "launcher/updater.h"
+#include "launcher/repentogon_updater.h"
 #include "launcher/self_update.h"
+#include "launcher/self_updater/launcher_update_manager.h"
+#include "launcher/self_updater/finalizer.h"
 #include "shared/loggable_gui.h"
 
 namespace Launcher {
 	class InstallationManager {
 	public:
-		enum SelfUpdateResult {
-			/* Updater is up-to-date. */
-			SELF_UPDATE_UTD,
-			/* Error occured while attempting self update. */
-			SELF_UPDATE_ERR,
-			/* Self update started, but launcher timedout waiting for updater. */
-			SELF_UPDATE_PARTIAL
-		};
-
 		enum CheckSelfUpdateResultCode {
 			SELF_UPDATE_CHECK_UTD,
 			SELF_UPDATE_CHECK_NEW,
@@ -28,13 +21,14 @@ namespace Launcher {
 		};
 
 		struct CheckSelfUpdateResult {
-			CheckSelfUpdateResultCode code;
+			CheckSelfUpdateResultCode code = SELF_UPDATE_CHECK_UTD;
 			std::string url;
 			std::string version;
 		};
 
 		InstallationManager(ILoggableGUI* gui);
-		SelfUpdateResult HandleSelfUpdateResult(SelfUpdateErrorCode const& result);
+		bool HandleSelfUpdateResult(SelfUpdateErrorCode const& result);
+		void HandleFinalizationResult(Updater::FinalizationResult const& result);
 
 		/* Initialize the folder in the filesystem structure.
 		 * 
@@ -46,7 +40,6 @@ namespace Launcher {
 		 * to open the configuration file.
 		 */
 		void InitFolders(bool* needIsaacFolder, bool* canWriteConfiguration);
-		std::optional<std::string> ConfiguraIsaacPath();
 		bool CheckIsaacInstallation();
 		CheckSelfUpdateResult CheckSelfUpdates(bool allowPreReleases);
 		bool CheckIsaacVersion();
@@ -135,10 +128,11 @@ namespace Launcher {
 
 	public:
 		fs::Installation _installation;
-		Updater _updater;
+		RepentogonUpdater _updater;
 		SelfUpdater _selfUpdater;
 
 	private:
+		Updater::LauncherUpdateManager _launcherUpdateManager;
 		ILoggableGUI* _gui;
 		std::string _zhlVersion;
 		std::string _zhlLoaderVersion;

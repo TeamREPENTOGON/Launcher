@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdio>
 #include <future>
 #include <filesystem>
@@ -15,18 +16,20 @@
 #include "wx/filectrl.h"
 #include "wx/statline.h"
 
+#include "comm/messages.h"
 #include "curl/curl.h"
 #include "launcher/advanced_options_window.h"
 #include "launcher/filesystem.h"
 #include "launcher/isaac.h"
 #include "launcher/self_update.h"
+#include "launcher/version.h"
 #include "launcher/window.h"
 #include "shared/github.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
 #include "shared/monitor.h"
-#include "self_updater/updater_resources.h"
-#include "self_updater/updater.h"
+#include "unpacker/unpacker_resources.h"
+#include "launcher/self_updater/launcher_updater.h"
 
 #include "zip.h"
 #include "zipint.h"
@@ -67,7 +70,7 @@ namespace Launcher {
 
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 	
-	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"), 
+	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
 		_installationManager(this) {
 		memset(&_options, 0, sizeof(_options));
 		// _optionsGrid = new wxGridBagSizer(0, 20);
@@ -354,9 +357,16 @@ namespace Launcher {
 				_installationManager.DoSelfUpdate(result.version, result.url);
 			}
 			else {
-				Log("Skipping self-updater as per user choice");
+				Log("Skipping self-update as per user choice");
 			}
 		}
+		else {
+
+		}
+	}
+
+	bool MainFrame::SanityCheckLauncherUpdate() {
+		return Filesystem::FileExists(Comm::UnpackedArchiveName);
 	}
 
 	void MainFrame::PostInit() {
@@ -369,6 +379,12 @@ namespace Launcher {
 		Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::version);
 		std::string currentDir = Filesystem::GetCurrentDirectory_();
 		Log("Current directory is: %s", currentDir.c_str());
+
+		if (!SanityCheckLauncherUpdate()) {
+			LogWarn("Found launcher update file %s in the current folder."
+				"This may indicate a broken update. Deleting it.\n", Comm::UnpackedArchiveName);
+			Filesystem::RemoveFile(Comm::UnpackedArchiveName);
+		}
 		
 		HandleLauncherUpdates(true);
 
@@ -436,6 +452,35 @@ namespace Launcher {
 		return result == wxID_OK || result == wxID_YES;
 	}
 
+	void MainFrame::Log(const char* prefix, bool nl, const char* fmt, ...) {
+		char buffer[4096] = { 0 };
+		size_t prefixLen = strlen(prefix);
+		strncpy(buffer, prefix, 4096);
+
+		{
+			wxString text(buffer);
+			std::unique_lock<std::mutex> lck(_logMutex);
+			_logWindow->AppendText(text);
+
+			memset(buffer, 0, sizeof(buffer));
+		}
+
+		va_list va;
+		va_start(va, fmt);
+		int count = vsnprintf(buffer, 4096, fmt, va);
+		va_end(va);
+
+		if (count <= 0)
+			return;
+
+		wxString text(buffer);
+		if (buffer[count - 1] != '\n' && nl)
+			text += '\n';
+
+		std::unique_lock<std::mutex> lck(_logMutex);
+		_logWindow->AppendText(text);
+	}
+
 	void MainFrame::Log(const char* fmt, ...) {
 		char buffer[4096];
 		va_list va;
@@ -465,6 +510,25 @@ namespace Launcher {
 			return;
 
 		wxString text(buffer);
+		std::unique_lock<std::mutex> lck(_logMutex);
+		_logWindow->AppendText(text);
+	}
+
+	void MainFrame::LogInfo(const char* fmt, ...) {
+		char buffer[4096];
+		va_list va;
+		va_start(va, fmt);
+		int count = vsnprintf(buffer, 4096, fmt, va);
+		va_end(va);
+
+		if (count <= 0)
+			return;
+
+		wxString text(buffer);
+		text.Prepend("[INFO] ");
+		if (buffer[count - 1] != '\n')
+			text += '\n';
+
 		std::unique_lock<std::mutex> lck(_logMutex);
 		_logWindow->AppendText(text);
 	}

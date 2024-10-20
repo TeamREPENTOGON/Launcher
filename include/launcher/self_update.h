@@ -9,60 +9,25 @@
 #include "shared/github.h"
 
 namespace Launcher {
-	extern const char* SelfUpdaterExePath;
-
-	enum SelfUpdateExtractionResult {
-		SELF_UPDATE_EXTRACTION_OK,
-		SELF_UPDATE_EXTRACTION_ERR_RESOURCE_NOT_FOUND,
-		SELF_UPDATE_EXTRACTION_ERR_RESOURCE_LOAD_FAILED,
-		SELF_UPDATE_EXTRACTION_ERR_BAD_RESOURCE_SIZE,
-		SELF_UPDATE_EXTRACTION_ERR_RESOURCE_LOCK_FAILED,
-		SELF_UPDATE_EXTRACTION_ERR_OPEN_TEMPORARY_FILE,
-		SELF_UPDATE_EXTRACTION_ERR_WRITTEN_SIZE
-	};
-
-	/* No OK result as the process terminates if everything goes well. */
-	enum SelfUpdateRunUpdaterResult {
-		SELF_UPDATE_RUN_UPDATER_OK,
-		SELF_UPDATE_RUN_UPDATER_ERR_NO_PIPE,
-		SELF_UPDATE_RUN_UPDATER_ERR_OPEN_LOCK_FILE,
-		SELF_UPDATE_RUN_UPDATER_ERR_GENERATE_CLI,
-		SELF_UPDATE_RUN_UPDATER_ERR_CREATE_PROCESS,
-		SELF_UPDATE_RUN_UPDATER_ERR_OPEN_PROCESS,
-		SELF_UPDATE_RUN_UPDATER_ERR_CONNECT_ERR,
-		SELF_UPDATE_RUN_UPDATER_ERR_READFILE_ERROR,
-		SELF_UPDATE_RUN_UPDATER_ERR_INVALID_PING,
-		SELF_UPDATE_RUN_UPDATER_ERR_INVALID_RESUME,
-		SELF_UPDATE_RUN_UPDATER_ERR_READ_OVERFLOW,
-		SELF_UPDATE_RUN_UPDATER_ERR_MESSAGE_ERROR,
-		SELF_UPDATE_RUN_UPDATER_ERR_STILL_ALIVE,
-		SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT,
-		SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING
-	};
-
 	/* No OK result as the process terminates if everything goes well. */
 	enum SelfUpdateResult {
 		/* Everything up-to-date. */
 		SELF_UPDATE_UP_TO_DATE,
-		/* Attempted a full update while previous attempt is still in progress. */
-		SELF_UPDATE_STILLBORN_CHILD,
 		/* General error when checking for updates. */
 		SELF_UPDATE_UPDATE_CHECK_FAILED,
-		/* General error when extracting the self updater. */
-		SELF_UPDATE_EXTRACTION_FAILED,
-		/* General error when running the self updater. */
-		SELF_UPDATE_SELF_UPDATE_FAILED,
-		/* Messages are being exchanged with the self updater. */
-		SELF_UPDATE_SYNCHRONIZATION_IN_PROGRESS
+		/* Forced update has a valid candidate. */
+		SELF_UPDATE_CANDIDATE
+	};
+
+	struct CandidateVersion {
+		std::string version;
+		std::string url;
 	};
 
 	struct SelfUpdateErrorCode {
 		SelfUpdateResult base;
-		union {
-			Github::DownloadAsStringResult fetchUpdatesResult;
-			SelfUpdateExtractionResult extractionResult;
-			SelfUpdateRunUpdaterResult runUpdateResult;
-		} detail;
+		std::variant<Github::DownloadAsStringResult,
+			CandidateVersion> detail;
 	};
 
 	class SelfUpdater {
@@ -82,7 +47,7 @@ namespace Launcher {
 		bool IsSelfUpdateAvailable(bool allowDrafts, bool force, 
 			std::string& version, std::string& url, Github::DownloadAsStringResult* fetchReleaseResult);
 
-		/* Perform a self-update.
+		/* Select the target release for a self update.
 		 * 
 		 * The function will fetch the release data from GitHub, iterate through
 		 * the releases and pick the first valid one depending on whether it is
@@ -96,25 +61,9 @@ namespace Launcher {
 		 * if newer than the current one.
 		 * 
 		 * The function returns an extended error code that can designate 
-		 * multiple points of failure in the entire process, from fetching
-		 * the release data to starting the updater.
+		 * multiple points of failure in the entire process.
 		 */
-		SelfUpdateErrorCode DoSelfUpdate(bool allowDrafts, bool force);
-
-		/* Perform a self-update.
-		 * 
-		 * The function does not perform any checks: it extracts the updater and
-		 * launches it to update with the release available at the specified url.
-		 * 
-		 * The function returns an extended error code similar to the other 
-		 * version of DoSelfUpdate.
-		 */
-		SelfUpdateErrorCode DoSelfUpdate(std::string const& version, std::string const& url);
-
-		/* Resume a self update that timed out while waiting for the updater. */
-		SelfUpdateErrorCode ResumeSelfUpdate();
-
-		void AbortSelfUpdate(bool reset);
+		SelfUpdateErrorCode SelectReleaseTarget(bool allowDrafts, bool force);
 
 	private:
 		rapidjson::Document _releasesInfo;

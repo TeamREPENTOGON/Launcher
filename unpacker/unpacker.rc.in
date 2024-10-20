@@ -1,6 +1,6 @@
 // Microsoft Visual C++ generated resource script.
 //
-#include "self_updater/updater_resources.h"
+#include "unpacker/unpacker_resources.h"
 
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
@@ -27,7 +27,7 @@ LANGUAGE LANG_FRENCH, SUBLANG_FRENCH
 
 1 TEXTINCLUDE 
 BEGIN
-    "self_updater/updater_resources.h\0"
+    "unpacker/unpacker_resources.h\0"
 END
 
 2 TEXTINCLUDE 

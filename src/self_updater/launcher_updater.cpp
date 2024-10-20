@@ -1,42 +1,29 @@
 #include <iostream>
 #include <sstream>
 
+#include "comm/messages.h"
 #include "shared/logger.h"
+#include "shared/scoped_file.h"
 #include "shared/sha256.h"
 #include "shared/zip.h"
-#include "self_updater/updater.h"
+#include "launcher/self_updater/launcher_updater.h"
 
 #include "zip.h"
 
 namespace Updater {
-	UpdaterBackend::UpdaterBackend(const char* lockFile, const char* from,
+	LauncherUpdater::LauncherUpdater(const char* from,
 		const char* to, const char* url) {
-		_lockFile = fopen(lockFile, "r");
 		_fromVersion = from;
 		_toVersion = to;
 		_url = url;
-		_lockFileName = lockFile;
 		_state = UPDATE_STATE_INIT;
 	}
 
-	UpdateState UpdaterBackend::GetUpdateState() const {
+	UpdateState LauncherUpdater::GetUpdateState() const {
 		return _state;
 	}
 
-	UpdateStartupCheckResult UpdaterBackend::DoStartupCheck() {
-		/* if (!_lockFile) {
-			return UPDATE_STARTUP_CHECK_INVALID_FILE;
-		}
-
-		int result = fscanf(_lockFile, "%d", &_state);
-		if (result != 1) {
-			return UPDATE_STARTUP_CHECK_INVALID_CONTENT;
-		} */
-
-		if (_state != UPDATE_STATE_INIT) {
-			return UPDATE_STARTUP_CHECK_INVALID_STATE;
-		}
-
+	UpdateStartupCheckResult LauncherUpdater::DoStartupCheck() {
 		_releaseDownloadResult = Github::FetchReleaseInfo(_url.c_str(), _releaseInfo, nullptr);
 		if (_releaseDownloadResult != Github::DOWNLOAD_AS_STRING_OK) {
 			return UPDATE_STARTUP_CHECK_CANNOT_FETCH_RELEASE;
@@ -49,13 +36,13 @@ namespace Updater {
 		return UPDATE_STARTUP_CHECK_OK;
 	}
 
-	bool UpdaterBackend::CheckHashConsistency(const char* zipFile, const char* hash) {
+	bool LauncherUpdater::CheckHashConsistency(const char* zipFile, const char* hash) {
 		std::string fileHash = Sha256::Sha256F(zipFile);
-		Logger::Info("UpdaterBackend::CheckHashConsistencty: fileHash = %s (%lu), hash = %s (%lu)\n", fileHash.c_str(), strlen(fileHash.c_str()), hash, strlen(hash));
+		Logger::Info("LauncherUpdater::CheckHashConsistencty: fileHash = %s (%lu), hash = %s (%lu)\n", fileHash.c_str(), strlen(fileHash.c_str()), hash, strlen(hash));
 		return Sha256::Equals(fileHash.c_str(), hash);
 	}
 
-	bool UpdaterBackend::DownloadUpdate(LauncherUpdateData* data) {
+	bool LauncherUpdater::DownloadUpdate(LauncherUpdateData* data) {
 		PopulateUpdateData(data);
 
 		data->_hashDownloadResult = Github::DownloadAsString(data->_hashUrl.c_str(), data->_hash, &data->_hashMonitor);
@@ -65,25 +52,25 @@ namespace Updater {
 			data->_zipDownloadResult == Github::DOWNLOAD_FILE_OK;
 	}
 
-	void UpdaterBackend::GenerateArchiveFilename(LauncherUpdateData* data) {
+	void LauncherUpdater::GenerateArchiveFilename(LauncherUpdateData* data) {
 		char buffer[4096];
 		sprintf(buffer, LauncherFileNameTemplate, _releaseInfo["name"].GetString());
 		data->_zipFileName = buffer;
 	}
 
-	Github::DownloadAsStringResult UpdaterBackend::GetReleaseDownloadResult() const {
+	Github::DownloadAsStringResult LauncherUpdater::GetReleaseDownloadResult() const {
 		return _releaseDownloadResult;
 	}
 
-	rapidjson::Document const& UpdaterBackend::GetReleaseInfo() const {
+	rapidjson::Document const& LauncherUpdater::GetReleaseInfo() const {
 		return _releaseInfo;
 	}
 
-	ReleaseInfoState UpdaterBackend::GetReleaseInfoState() const {
+	ReleaseInfoState LauncherUpdater::GetReleaseInfoState() const {
 		return _releaseInfoState;
 	}
 
-	bool UpdaterBackend::ValidateReleaseInfo() {
+	bool LauncherUpdater::ValidateReleaseInfo() {
 		auto assets = _releaseInfo["assets"].GetArray();
 		bool foundZip = false, foundHash = false;
 
@@ -121,25 +108,38 @@ namespace Updater {
 		return true;
 	}
 
-	void UpdaterBackend::PopulateUpdateData(LauncherUpdateData* data) {
+	void LauncherUpdater::PopulateUpdateData(LauncherUpdateData* data) {
 		GenerateArchiveFilename(data);
 		data->_hashUrl = _hashUrl;
 		data->_zipUrl = _zipUrl;
 	}
 
-	const std::string& UpdaterBackend::GetLockFileName() const {
-		return _lockFileName;
-	}
+	ExtractArchiveResult LauncherUpdater::ExtractArchive(const char* name) {
+		class ScopedZip {
+		public:
+			ScopedZip(zip_t* zip) : _zip(zip) { }
+			~ScopedZip() { if (_zip) zip_close(_zip); }
 
-	ExtractArchiveResult UpdaterBackend::ExtractArchive(const char* name) {
+		private:
+			zip_t* _zip = nullptr;
+		};
+
 		ExtractArchiveResult result;
 
 		int error = 0;
 		zip_t* zip = zip_open(name, ZIP_RDONLY | ZIP_CHECKCONS, &error);
+		ScopedZip scopedZip(zip);
 
 		if (zip == NULL) {
-			zip_close(zip);
-			result.errCode = EXTRACT_ARCHIVE_ERR_CANNOT_OPEN;
+			result.errCode = EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_ZIP;
+			return result;
+		}
+
+		const char* outputName = Comm::UnpackedArchiveName;
+		FILE* output = fopen(outputName, "wb");
+		ScopedFile scopedFile(output);
+		if (!output) {
+			result.errCode = EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_BINARY_OUTPUT;
 			return result;
 		}
 
@@ -147,18 +147,17 @@ namespace Updater {
 		bool foundExe = false;
 
 		int nFiles = zip_get_num_files(zip);
+		fwrite(&nFiles, sizeof(nFiles), 1, output);
 		for (int i = 0; i < nFiles; ++i) {
 			zip_file_t* file = zip_fopen_index(zip, i, 0);
 			if (!file) {
 				result.SetZipError(zip_get_error(zip));
-				zip_close(zip);
 				return result;
 			}
 
 			const char* name = zip_get_name(zip, i, 0);
 			if (!name) {
 				result.SetZipError(zip_get_error(zip));
-				zip_close(zip);
 				return result;
 			}
 
@@ -166,11 +165,23 @@ namespace Updater {
 				foundExe = true;
 			}
 
-			Zip::ExtractFileResult extractFileResult = Zip::ExtractFile(zip, i, file, name);
-			result.files.push_back(std::make_tuple(std::string(name), extractFileResult));
+			size_t nameLength = strlen(name);
+			fwrite(&nameLength, sizeof(nameLength), 1, output);
+			fwrite(name, nameLength, 1, output);
 
-			if (!extractError) {
-				extractError = extractFileResult != Zip::EXTRACT_FILE_OK;
+			zip_stat_t fileStat;
+			int statResult = zip_stat_index(zip, i, 0, &fileStat);
+			if (statResult) {
+				result.files.push_back(std::make_tuple(std::string(name), Zip::EXTRACT_FILE_ERR_ZIP_STAT));
+				extractError = true;
+			}
+			else {
+				fwrite(&fileStat.size, sizeof(fileStat.size), 1, output);
+				Zip::ExtractFileResult extractFileResult = Zip::ExtractFile(zip, i, file, output);
+				result.files.push_back(std::make_tuple(std::string(name), extractFileResult));
+				if (!extractError) {
+					extractError = extractFileResult != Zip::EXTRACT_FILE_OK;
+				}
 			}
 		}
 

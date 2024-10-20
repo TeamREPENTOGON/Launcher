@@ -1,31 +1,142 @@
 #include <future>
 
 #include "launcher/installation_manager.h"
+#include "launcher/version.h"
+#include "launcher/self_updater/finalizer.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
 
 namespace Launcher {
-	InstallationManager::InstallationManager(ILoggableGUI* gui) : _gui(gui) {
+	InstallationManager::InstallationManager(ILoggableGUI* gui) : _gui(gui), _launcherUpdateManager(gui) {
 
 	}
 
-	InstallationManager::SelfUpdateResult InstallationManager::HandleSelfUpdateResult(SelfUpdateErrorCode const& updateResult) {
-		std::ostringstream err, warn, info;
-		bool isError = updateResult.base != SELF_UPDATE_UP_TO_DATE;
-		bool isWarn = false;
-		bool timedout = updateResult.base == SELF_UPDATE_SELF_UPDATE_FAILED &&
-			(updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT || 
-				updateResult.detail.runUpdateResult == SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING);
-		bool progressing = updateResult.base == SELF_UPDATE_SYNCHRONIZATION_IN_PROGRESS;
+	void InstallationManager::HandleFinalizationResult(Updater::FinalizationResult const& finalizationResult) {
+		struct ResultVisitor {
+			ResultVisitor(std::ostringstream* info, std::ostringstream* err, std::ostringstream* warn,
+				bool* isInfo, bool* isWarn) : info(info), err(err), warn(warn), 
+				isInfo(isInfo), isWarn(isWarn) {
 
-		if (progressing) {
-			return SELF_UPDATE_PARTIAL;
+			}
+
+			std::ostringstream *info, *err, *warn;
+			bool *isWarn, *isInfo;
+
+			void operator()(Updater::FinalizationExtractionResult code) {
+				*err << "Error while extracting the unpacker: ";
+				switch (code) {
+				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_NOT_FOUND:
+					*err << "unable to locate unpacker inside the launcher";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_LOAD_FAILED:
+					*err << "unable to load unpacker from the launcher";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_LOCK_FAILED:
+					*err << "unable to acquire resource lock on unpacker";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_BAD_RESOURCE_SIZE:
+					*err << "embedded unpacker has the wrong size";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_OPEN_TEMPORARY_FILE:
+					*err << "unable to open temporary file to extract unpacker";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_WRITTEN_SIZE:
+					*err << "unable to write self-updater on the disk";
+					break;
+				}
+			}
+
+			void operator()(Updater::FinalizationStartUnpackerResult code) {
+				*err << "Error while launching unpacker: ";
+				switch (code) {
+				case Updater::FINALIZATION_START_UNPACKER_ERR_NO_PIPE:
+					*err << "unable to create pipe to communicate with unpacker";
+					break;
+
+				case Updater::FINALIZATION_START_UNPACKER_ERR_CREATE_PROCESS:
+					*err << "error while creating unpacker process";
+					break;
+
+				case Updater::FINALIZATION_START_UNPACKER_ERR_OPEN_PROCESS:
+					*err << "error while opening unpacker process handle";
+					break;
+
+				default:
+					*err << "Unknown error " << code << " while launching unpacker";
+					break;
+				}
+			}
+
+			void operator()(Updater::FinalizationCommunicationResult code) {
+				switch (code) {
+				case Updater::FINALIZATION_COMM_ERR_READFILE_ERROR:
+					*err << "unknown error while checking for availability of self-updater";
+					break;
+
+				case Updater::FINALIZATION_COMM_ERR_INVALID_PING:
+					*err << "invalid message sent by self-updater";
+					break;
+
+				case Updater::FINALIZATION_COMM_ERR_INVALID_RESUME:
+					*err << "attempted to resume an update that was not started";
+					break;
+
+				case Updater::FINALIZATION_COMM_ERR_STILL_ALIVE:
+					*err << "launcher was not properly terminated by updater";
+					break;
+
+				case Updater::FINALIZATION_COMM_INFO_TIMEOUT:
+					*isWarn = true;
+					*warn << "Timed out while waiting for availability of the self-updater";
+					break;
+
+				case Updater::FINALIZATION_COMM_INTERNAL_OK:
+					*isInfo = true;
+					*info << "Synchronizing the launcher and the updater...";
+					break;
+				}
+			}
+		};
+
+		std::ostringstream info, err, warn;
+		bool isInfo = false, isWarn = false;
+
+		std::visit(ResultVisitor(&info, &err, &warn, &isInfo, &isWarn), finalizationResult);
+
+		if (isInfo) {
+			_gui->LogInfo(info.str().c_str());
+		}
+		else if (isWarn) {
+			_gui->LogWarn(warn.str().c_str());
+		}
+		else {
+			_gui->LogError(err.str().c_str());
+		}
+	}
+
+	bool InstallationManager::HandleSelfUpdateResult(SelfUpdateErrorCode const& updateResult) {
+		std::ostringstream err, info;
+		bool isInfo = false;
+
+		std::optional<Github::DownloadAsStringResult> downloadResult;
+		std::optional<CandidateVersion> candidate;
+
+		if (std::holds_alternative<Github::DownloadAsStringResult>(updateResult.detail)) {
+			downloadResult = std::get<Github::DownloadAsStringResult>(updateResult.detail);
+		}
+		else {
+			candidate = std::get<CandidateVersion>(updateResult.detail);
 		}
 
 		switch (updateResult.base) {
 		case SELF_UPDATE_UPDATE_CHECK_FAILED:
 			err << "Error while checking for available launcher updates: ";
-			switch (updateResult.detail.fetchUpdatesResult) {
+			switch (*downloadResult) {
 			case Github::DOWNLOAD_AS_STRING_BAD_CURL:
 				err << "error while initializing cURL";
 				break;
@@ -44,93 +155,14 @@ namespace Launcher {
 			}
 			break;
 
-		case SELF_UPDATE_EXTRACTION_FAILED:
-			err << "Error while extracting the self-updater: ";
-			switch (updateResult.detail.extractionResult) {
-			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_NOT_FOUND:
-				err << "unable to locate self-updater inside the launcher";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_LOAD_FAILED:
-				err << "unable to load self-updater from the launcher";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_RESOURCE_LOCK_FAILED:
-				err << "unable to acquire resource lock on self-updater";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_BAD_RESOURCE_SIZE:
-				err << "embedded self-updater has the wrong size";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_OPEN_TEMPORARY_FILE:
-				err << "unable to open temporary file to extract self-updater";
-				break;
-
-			case SELF_UPDATE_EXTRACTION_ERR_WRITTEN_SIZE:
-				err << "unable to write self-updater on the disk";
-				break;
-			}
-			break;
-
-		case SELF_UPDATE_SELF_UPDATE_FAILED:
-			err << "Error while launching self-updater: ";
-			switch (updateResult.detail.runUpdateResult) {
-			case SELF_UPDATE_RUN_UPDATER_ERR_NO_PIPE:
-				err << "unable to create pipe to communicate with self-updater";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_OPEN_LOCK_FILE:
-				err << "error while opening internal lock file";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_GENERATE_CLI:
-				err << "error while generating self-updater command line";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_CREATE_PROCESS:
-				err << "error while creating self-updater process";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_OPEN_PROCESS:
-				err << "error while opening self-updater process handle";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_READFILE_ERROR:
-				err << "unknown error while checking for availability of self-updater";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_PING:
-				err << "invalid message sent by self-updater";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_INVALID_RESUME:
-				err << "attempted to resume an update that was not started";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_ERR_STILL_ALIVE:
-				err << "launcher was not properly terminated by updater";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_INFO_WAIT_TIMEOUT:
-			case SELF_UPDATE_RUN_UPDATER_INFO_READFILE_IO_PENDING:
-				isWarn = true;
-				warn << "Timed out while waiting for availability of the self-updater";
-				break;
-
-			case SELF_UPDATE_RUN_UPDATER_OK:
-				isError = false;
-				info << "Synchronizing the launcher and the updater...";
-				break;
-
-			default:
-				err << "Unknown error " << updateResult.detail.runUpdateResult << " while attempting self update";
-				break;
-			}
-			break;
-
 		case SELF_UPDATE_UP_TO_DATE:
-			info << "Everything up-to-date (please report this as a bug: forced updates should never display this message)";
+			isInfo = true;
+			info << "Everything up-to-date";
+			break;
+
+		case SELF_UPDATE_CANDIDATE:
+			isInfo = true;
+			info << "A candidate release has been found: " << candidate->version << ", available at " << candidate->url;
 			break;
 
 		default:
@@ -138,23 +170,13 @@ namespace Launcher {
 			break;
 		}
 
-		if (isError) {
-			if (isWarn) {
-				_gui->LogWarn("%s", warn.str().c_str());
-			}
-			else {
-				_gui->LogError("%s", err.str().c_str());
-			}
+		if (isInfo) {
+			_gui->LogInfo(info.str().c_str());
 		}
 		else {
-			_gui->Log("%s", info.str().c_str());
+			_gui->LogError(err.str().c_str());
 		}
-
-		if (!timedout && !progressing) {
-			return isError ? SELF_UPDATE_ERR : SELF_UPDATE_UTD;
-		}
-
-		return SELF_UPDATE_PARTIAL;
+		return updateResult.base != SELF_UPDATE_UPDATE_CHECK_FAILED;
 	}
 
 	void InstallationManager::InitFolders(bool* needIsaacFolder, bool* canWriteConfiguration) {
@@ -471,7 +493,7 @@ namespace Launcher {
 		_gui->Log("Downloading Repentogon release %s...", response["name"].GetString());
 		Threading::Monitor<Github::GithubDownloadNotification> monitor;
 		std::future<RepentogonUpdateResult> result = std::async(std::launch::async,
-			&Launcher::Updater::UpdateRepentogon, &_updater, std::ref(response), _installation.GetIsaacInstallationFolder().c_str(), &monitor);
+			&Launcher::RepentogonUpdater::UpdateRepentogon, &_updater, std::ref(response), _installation.GetIsaacInstallationFolder().c_str(), &monitor);
 		size_t totalDownloadSize = 0;
 		std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now(),
 			lastReceived = now;
@@ -479,19 +501,19 @@ namespace Launcher {
 			while (std::optional<Github::GithubDownloadNotification> message = monitor.Get()) {
 				switch (message->type) {
 				case Github::GH_NOTIFICATION_INIT_CURL:
-					_gui->Log("[Updater] Initializing cURL connection to %s", std::get<std::string>(message->data).c_str());
+					_gui->Log("[RepentogonUpdater] Initializing cURL connection to %s", std::get<std::string>(message->data).c_str());
 					break;
 
 				case Github::GH_NOTIFICATION_INIT_CURL_DONE:
-					_gui->Log("[Updater] Initialized cURL connection to %s", std::get<std::string>(message->data).c_str());
+					_gui->Log("[RepentogonUpdater] Initialized cURL connection to %s", std::get<std::string>(message->data).c_str());
 					break;
 
 				case Github::GH_NOTIFICATION_CURL_PERFORM:
-					_gui->Log("[Updater] Performing cURL request to %s", std::get<std::string>(message->data).c_str());
+					_gui->Log("[RepentogonUpdater] Performing cURL request to %s", std::get<std::string>(message->data).c_str());
 					break;
 
 				case Github::GH_NOTIFICATION_CURL_PERFORM_DONE:
-					_gui->Log("[Updater] Performed cURL request to %s", std::get<std::string>(message->data).c_str());
+					_gui->Log("[RepentogonUpdater] Performed cURL request to %s", std::get<std::string>(message->data).c_str());
 					break;
 
 				case Github::GH_NOTIFICATION_DATA_RECEIVED:
@@ -500,24 +522,24 @@ namespace Launcher {
 					now = std::chrono::steady_clock::now();
 					if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReceived).count() > 100) {
 						lastReceived = now;
-						_gui->Log("[Updater] Downloaded %lu bytes", totalDownloadSize);
+						_gui->Log("[RepentogonUpdater] Downloaded %lu bytes", totalDownloadSize);
 					}
 					break;
 
 				case Github::GH_NOTIFICATION_PARSE_RESPONSE:
-					_gui->Log("[Updater] Parsing result of cURL request from %s", std::get<std::string>(message->data).c_str());
+					_gui->Log("[RepentogonUpdater] Parsing result of cURL request from %s", std::get<std::string>(message->data).c_str());
 					break;
 
 				case Github::GH_NOTIFICATION_PARSE_RESPONSE_DONE:
-					_gui->Log("[Updater] Parsed result of cURL request from %s", std::get<std::string>(message->data).c_str());
+					_gui->Log("[RepentogonUpdater] Parsed result of cURL request from %s", std::get<std::string>(message->data).c_str());
 					break;
 
 				case Github::GH_NOTIFICATION_DONE:
-					_gui->Log("[Updater] Successfully downloaded content from %s", std::get<std::string>(message->data).c_str());
+					_gui->Log("[RepentogonUpdater] Successfully downloaded content from %s", std::get<std::string>(message->data).c_str());
 					break;
 
 				default:
-					_gui->LogError("[Updater] Unexpected asynchronous notification (id = %d)", message->type);
+					_gui->LogError("[RepentogonUpdater] Unexpected asynchronous notification (id = %d)", message->type);
 					break;
 				}
 			}
@@ -563,7 +585,7 @@ namespace Launcher {
 			break;
 
 		default:
-			_gui->LogError("Unknown error code from Updater::UpdateRepentogon: %d\n", updateResult);
+			_gui->LogError("Unknown error code from RepentogonUpdater::UpdateRepentogon: %d\n", updateResult);
 		}
 
 		return updateResult == REPENTOGON_UPDATE_RESULT_OK;
@@ -592,24 +614,49 @@ namespace Launcher {
 	}
 
 	void InstallationManager::DoSelfUpdate(std::string const& version, std::string const& url) {
-		SelfUpdateErrorCode result = _selfUpdater.DoSelfUpdate(version, url);
-		if (HandleSelfUpdateResult(result) == SELF_UPDATE_PARTIAL) {
-			FinishSelfUpdate();
+		if (!_launcherUpdateManager.DoUpdate(Launcher::version, version.c_str(), url.c_str())) {
+			return;
 		}
+
+		FinishSelfUpdate();
 	}
 
 	void InstallationManager::ForceSelfUpdate(bool unstable) {
 		_gui->Log("Performing self-update (forcibly triggered)");
-		Launcher::SelfUpdateErrorCode result = _selfUpdater.DoSelfUpdate(unstable, true);
-		if (HandleSelfUpdateResult(result) == SELF_UPDATE_PARTIAL) {
-			FinishSelfUpdate();
+		Launcher::SelfUpdateErrorCode result = _selfUpdater.SelectReleaseTarget(unstable, true);
+		if (result.base != SELF_UPDATE_CANDIDATE) {
+			_gui->LogError("Error %d while selecting target release\n", result.base);
+			return;
 		}
+
+		CandidateVersion const& candidate = std::get<CandidateVersion>(result.detail);
+		if (!_launcherUpdateManager.DoUpdate(Launcher::version, candidate.version.c_str(), candidate.url.c_str())) {
+			return;
+		}
+
+		FinishSelfUpdate();
 	}
 
 	void InstallationManager::FinishSelfUpdate() {
-		while (_selfUpdater.ResumeSelfUpdate().base == SELF_UPDATE_SYNCHRONIZATION_IN_PROGRESS)
-			;
+		Updater::Finalizer finalizer;
+		Updater::FinalizationResult result = finalizer.Finalize();
 
-		_gui->LogError("Unrecoverable error while performing self-update.");
+		if (!std::holds_alternative<Updater::FinalizationCommunicationResult>(result)) {
+			HandleFinalizationResult(result);
+			return;
+		}
+
+		Updater::FinalizationCommunicationResult commResult = std::get<Updater::FinalizationCommunicationResult>(result);
+		if (commResult != Updater::FINALIZATION_COMM_INTERNAL_OK && 
+			commResult != Updater::FINALIZATION_COMM_INFO_TIMEOUT) {
+			HandleFinalizationResult(result);
+			return;
+		}
+
+		do {
+			commResult = finalizer.ResumeFinalize();
+		} while (commResult == Updater::FINALIZATION_COMM_INTERNAL_OK || commResult == Updater::FINALIZATION_COMM_INFO_TIMEOUT);
+
+		HandleFinalizationResult(commResult);
 	}
 }

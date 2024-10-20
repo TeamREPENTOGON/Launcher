@@ -28,8 +28,4 @@ struct IsaacOptions {
 	void WriteConfiguration(ILoggableGUI* gui, Launcher::fs::Installation const& installation);
 };
 
-namespace Launcher {
-	static constexpr const char* version = "alpha";
-}
-
 void Launch(const char* path, IsaacOptions const& options);
