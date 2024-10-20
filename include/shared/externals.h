@@ -1,5 +1,6 @@
 #pragma once
 
+#include <WinSock2.h>
 #include <Windows.h>
 
 /* Define pointers to functions that are part of the Win32 API but that may 
