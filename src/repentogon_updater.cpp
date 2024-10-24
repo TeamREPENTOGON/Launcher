@@ -340,7 +340,13 @@ namespace Launcher {
 					break;
 				}
 
-				fwrite(buffer, count, 1, output);
+				if (fwrite(buffer, count, 1, output) != 1) {
+					Logger::Error("RepentogonUpdater::ExtractRepentogon: error while writing %s\n", name);
+					ok = false;
+					fileOk = false;
+					break;
+				}
+
 				count = zip_fread(file, buffer, 4096);
 			}
 

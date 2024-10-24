@@ -17,7 +17,9 @@ namespace Zip {
 		char buffer[4096];
 		zip_int64_t read = 0;
 		while ((read = zip_fread(file, buffer, 4096)) > 0) {
-			fwrite(buffer, read, 1, output);
+			if (fwrite(buffer, read, 1, output) != 1) {
+				return EXTRACT_FILE_ERR_FWRITE;
+			}
 		}
 
 		if (read == -1) {

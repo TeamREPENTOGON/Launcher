@@ -146,7 +146,11 @@ namespace Updater {
 		bool foundExe = false;
 
 		int nFiles = zip_get_num_files(zip);
-		fwrite(&nFiles, sizeof(nFiles), 1, output);
+		if (fwrite(&nFiles, sizeof(nFiles), 1, output) != 1) {
+			result.errCode = EXTRACT_ARCHIVE_ERR_FWRITE;
+			return result;
+		}
+
 		for (int i = 0; i < nFiles; ++i) {
 			zip_file_t* file = zip_fopen_index(zip, i, 0);
 			if (!file) {
@@ -165,8 +169,15 @@ namespace Updater {
 			}
 
 			size_t nameLength = strlen(name);
-			fwrite(&nameLength, sizeof(nameLength), 1, output);
-			fwrite(name, nameLength, 1, output);
+			if (fwrite(&nameLength, sizeof(nameLength), 1, output) != 1) {
+				result.errCode = EXTRACT_ARCHIVE_ERR_FWRITE;
+				return result;
+			}
+
+			if (fwrite(name, nameLength, 1, output) != 1) {
+				result.errCode = EXTRACT_ARCHIVE_ERR_FWRITE;
+				return result;
+			}
 
 			zip_stat_t fileStat;
 			int statResult = zip_stat_index(zip, i, 0, &fileStat);
@@ -174,7 +185,11 @@ namespace Updater {
 				result.files.push_back(std::make_tuple(std::string(name), Zip::EXTRACT_FILE_ERR_ZIP_STAT));
 				extractError = true;
 			} else {
-				fwrite(&fileStat.size, sizeof(fileStat.size), 1, output);
+				if (fwrite(&fileStat.size, sizeof(fileStat.size), 1, output) != 1) {
+					result.errCode = EXTRACT_ARCHIVE_ERR_FWRITE;
+					return result;
+				}
+
 				Zip::ExtractFileResult extractFileResult = Zip::ExtractFile(zip, i, file, output);
 				result.files.push_back(std::make_tuple(std::string(name), extractFileResult));
 				if (!extractError) {

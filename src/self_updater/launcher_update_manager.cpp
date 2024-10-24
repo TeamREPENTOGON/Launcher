@@ -233,6 +233,10 @@ namespace Updater {
 			_gui->LogError("Errors encountered while extracting files\n");
 			break;
 
+		case EXTRACT_ARCHIVE_ERR_FWRITE:
+			_gui->LogError("Error while writing uncompressed files\n");
+			break;
+
 		case EXTRACT_ARCHIVE_ERR_ZIP_ERROR:
 			_gui->LogError("libzip error encountered: %s\n", result.zipError.c_str());
 			break;
@@ -256,6 +260,10 @@ namespace Updater {
 
 			case Zip::EXTRACT_FILE_ERR_FOPEN:
 				_gui->Log("", true, "unable to open file on disk to write content");
+				break;
+
+			case Zip::EXTRACT_FILE_ERR_FWRITE:
+				_gui->Log("", true, "unable to write extracted file");
 				break;
 
 			case Zip::EXTRACT_FILE_ERR_ZIP_STAT:
