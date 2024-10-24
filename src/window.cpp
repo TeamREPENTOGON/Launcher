@@ -352,7 +352,7 @@ namespace Launcher {
 				Log("Skipping self-update as per user choice");
 			}
 		} else {
-			
+			Log("Launcher is up-to-date");
 		}
 	}
 
