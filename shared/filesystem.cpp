@@ -76,8 +76,7 @@ namespace Filesystem {
 			if (result < 0) {
 				return SAVE_FOLDER_ERR_USERPROFILE;
 			}
-		}
-		else {
+		} else {
 			BOOL result = Externals::pGetUserProfileDirectoryA(token, homeDirectory, &homeLen);
 
 			if (!result) {

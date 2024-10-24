@@ -60,8 +60,7 @@ namespace Launcher {
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
 		if (!allowPreReleases) {
 			return Github::FetchReleaseInfo(RepentogonURL, response, monitor);
-		}
-		else {
+		} else {
 			std::string allReleases;
 			Github::DownloadAsStringResult allReleasesResult = Github::DownloadAsString(RepentogonReleasesURL, allReleases, nullptr);
 			if (allReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
@@ -170,8 +169,7 @@ namespace Launcher {
 				_repentogonUpdateState.hashOk = true;
 				_repentogonUpdateState.hashUrl = url;
 				hasHash = true;
-			}
-			else if (isRepentogon) {
+			} else if (isRepentogon) {
 				_repentogonUpdateState.zipOk = true;
 				_repentogonUpdateState.zipUrl = url;
 				hasZip = true;

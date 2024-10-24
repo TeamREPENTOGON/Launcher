@@ -8,8 +8,7 @@ size_t AbstractCurlResponseHandler::OnData(void* data, size_t size, size_t n) {
 	if (!_firstReceived) {
 		_firstReceived = true;
 		return OnFirstData(data, size, n);
-	}
-	else {
+	} else {
 		return OnNewData(data, size, n);
 	}
 }

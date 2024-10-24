@@ -160,16 +160,14 @@ namespace Updater {
 			}
 
 			return false;
-		}
-		else {
+		} else {
 			_gui->Log("Checking release integrity...\n");
 
 			data->TrimHash();
 			if (!_updater.CheckHashConsistency(data->_zipFileName.c_str(), data->_hash.c_str())) {
 				_gui->LogError("Hash mismatch: download was corrupted\n");
 				return false;
-			}
-			else {
+			} else {
 				_gui->Log("OK\n");
 			}
 

@@ -82,8 +82,7 @@ namespace Updater {
 			if (name == "hash.txt") {
 				foundHash = true;
 				_hashUrl = url;
-			}
-			else if (name == "REPENTOGONLauncher.zip") {
+			} else if (name == "REPENTOGONLauncher.zip") {
 				foundZip = true;
 				_zipUrl = url;
 			}
@@ -174,8 +173,7 @@ namespace Updater {
 			if (statResult) {
 				result.files.push_back(std::make_tuple(std::string(name), Zip::EXTRACT_FILE_ERR_ZIP_STAT));
 				extractError = true;
-			}
-			else {
+			} else {
 				fwrite(&fileStat.size, sizeof(fileStat.size), 1, output);
 				Zip::ExtractFileResult extractFileResult = Zip::ExtractFile(zip, i, file, output);
 				result.files.push_back(std::make_tuple(std::string(name), extractFileResult));
@@ -187,11 +185,9 @@ namespace Updater {
 
 		if (!foundExe) {
 			result.errCode = EXTRACT_ARCHIVE_ERR_NO_EXE;
-		}
-		else if (extractError) {
+		} else if (extractError) {
 			result.errCode = EXTRACT_ARCHIVE_ERR_FILE_EXTRACT;
-		}
-		else {
+		} else {
 			result.errCode = EXTRACT_ARCHIVE_OK;
 		}
 

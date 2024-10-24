@@ -119,8 +119,7 @@ namespace Synchronization {
 				if (IOResult ioResult = WaitOverlapped(pipe, &overlapped, timeout, &nWritten); ioResult != IO_RESULT_OK) {
 					return ioResult;
 				}
-			}
-			else {
+			} else {
 				return IO_RESULT_ERR;
 			}
 		}
@@ -145,8 +144,7 @@ namespace Synchronization {
 				if (IOResult ioResult = WaitOverlapped(pipe, &overlapped, timeout, &nRead); ioResult != IO_RESULT_OK) {
 					return ioResult;
 				}
-			}
-			else {
+			} else {
 				return IO_RESULT_ERR;
 			}
 		}
@@ -166,8 +164,7 @@ namespace Synchronization {
 			DWORD err = GetLastError();
 			if (err == ERROR_IO_INCOMPLETE || err == WAIT_IO_COMPLETION) {
 				return IO_RESULT_ERR_INVALID_CALL;
-			}
-			else if (err == WAIT_TIMEOUT) {
+			} else if (err == WAIT_TIMEOUT) {
 				return IO_RESULT_ERR_TIMEOUT;
 			}
 		}

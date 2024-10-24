@@ -142,8 +142,7 @@ namespace Updater {
 			Logger::Info("Finalizer::SynchronizeUnpacker: WaitUntilDeath\n");
 			WaitUntilDeath();
 			return FINALIZATION_COMM_ERR_STILL_ALIVE;
-		}
-		else {
+		} else {
 			Logger::Info("Finalizer::SynchronizeUnpacker: ProcessNextMessage\n");
 			FinalizationCommunicationResult result = ProcessNextMessage();
 
@@ -166,16 +165,14 @@ namespace Updater {
 					if (error == WAIT_TIMEOUT) {
 						Logger::Info("Finalizer::ConnectPipe: timeout while waiting for client\n");
 						return FINALIZATION_COMM_INFO_TIMEOUT;
-					}
-					else {
+					} else {
 						Logger::Error("Finalizer::ConnectPipe: unexpected error while waiting for client (%d)\n", error);
 						return FINALIZATION_COMM_ERR_CONNECT_ERR;
 					}
 				}
 
 				// Safe fallthrough
-			}
-			else if (error != ERROR_PIPE_CONNECTED) {
+			} else if (error != ERROR_PIPE_CONNECTED) {
 				Logger::Error("Finalizer::ConnectPipe: ConnectNamedPipe error (%d)\n", error);
 				return FINALIZATION_COMM_ERR_CONNECT_ERR;
 			}
@@ -197,13 +194,11 @@ namespace Updater {
 				Logger::Info("Finalizer::ProcessNextMessage: %s...\n", messageContext);
 				Sleep(100);
 				return FINALIZATION_COMM_INFO_TIMEOUT;
-			}
-			else {
+			} else {
 				Logger::Error("Finalizer::ProcessNextMessage: unexpected error %d in ReadFile\n", readError);
 				return FINALIZATION_COMM_ERR_READFILE_ERROR;
 			}
-		}
-		else {
+		} else {
 			DWORD nRead = 0;
 			GetOverlappedResult(pipe, &readOverlapped, &nRead, TRUE);
 
@@ -285,8 +280,7 @@ namespace Updater {
 		if (overlappedResult == FALSE) {
 			if (GetLastError() == ERROR_IO_PENDING) {
 				*result = MESSAGE_PROCESS_ERR_WRITE_OVERLAPPED_TIMEOUT;
-			}
-			else {
+			} else {
 				*result = MESSAGE_PROCESS_ERR_WRITE_OVERLAPPED;
 			}
 			return false;

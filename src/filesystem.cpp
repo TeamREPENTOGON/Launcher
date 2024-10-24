@@ -131,8 +131,7 @@ namespace Launcher::fs {
 		if (!result) {
 			Logger::Warn("Installation::RetrieveSymbol: %s does not export %s\n", libname, symbol);
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
-		}
-		else {
+		} else {
 			Logger::Info("Installation::RetrieveSymbol: found %s at %p\n", symbol, result);
 		}
 
@@ -157,8 +156,7 @@ namespace Launcher::fs {
 					MB_ICONEXCLAMATION);
 				_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 				return false;
-			}
-			else {
+			} else {
 				Logger::Info("Identified %s version %s\n", libname, target.c_str());
 			}
 		}
@@ -178,8 +176,7 @@ namespace Launcher::fs {
 
 			repentogonFolder = _isaacFolder;
 			Logger::Warn("Repentogon folder not specified in configuration file or configuration file absent: assuming legacy Repentogon installation\n");
-		}
-		else {
+		} else {
 			if (_isaacFolder.empty()) {
 				Logger::Fatal("Repentogon folder found (%s), but no Isaac folder specified, invalid state\n", _repentogonFolder.c_str());
 				throw std::runtime_error("Invalid launcher state: cannot have a Repentogon folder and no Isaac folder");
@@ -258,8 +255,7 @@ namespace Launcher::fs {
 
 		if (Filesystem::FileExists((_isaacFolder + "dsound.dll").c_str())) {
 			_installationState = REPENTOGON_INSTALLATION_STATE_LEGACY;
-		}
-		else {
+		} else {
 			_installationState = REPENTOGON_INSTALLATION_STATE_MODERN;
 		}
 
@@ -269,8 +265,7 @@ namespace Launcher::fs {
 	void Installation::SetLauncherConfigurationPath(ConfigurationFileLocation loc) {
 		if (loc == CONFIG_FILE_LOCATION_HERE) {
 			_configurationPath = Filesystem::GetCurrentDirectory_();
-		}
-		else {
+		} else {
 			if (_saveFolder.empty()) {
 				Logger::Error("Trying to set configuration file location to save folder when no save folder was found\n");
 				return;
@@ -472,8 +467,7 @@ namespace Launcher::fs {
 			if (Filesystem::FolderExists(defaultRepentogonFolder)) {
 				_repentogonFolder = (Filesystem::GetCurrentDirectory_() + "\\") + defaultRepentogonFolder;
 				Logger::Info("Found Repentogon installation folder in %s\n", _repentogonFolder.c_str());
-			}
-			else {
+			} else {
 				Logger::Info("No Repentogon installation folder in launcher configuration file\n");
 			}
 
@@ -512,8 +506,7 @@ namespace Launcher::fs {
 			Logger::Fatal("Installation::WriteLauncherConfigurationFile: error while rereading configuration file\n");
 			if (line == -1) {
 				Logger::Fatal("Unable to open configuration file %s\n", _configurationPath.c_str());
-			}
-			else {
+			} else {
 				Logger::Fatal("Parse error on line %d of configuration file %s\n", line, _configurationPath.c_str());
 			}
 			throw std::runtime_error("Error while writing configuration file");

@@ -101,8 +101,7 @@ namespace Github {
 		if (strcmp(remoteVersion, installed)) {
 			Logger::Info("CheckUpdates: %s: new version available: %s", tool, remoteVersion);
 			return VERSION_CHECK_NEW;
-		}
-		else {
+		} else {
 			Logger::Info("CheckUpdates: %s: up-to-date", tool);
 			return VERSION_CHECK_UTD;
 		}

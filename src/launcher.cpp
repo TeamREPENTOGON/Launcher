@@ -56,8 +56,7 @@ void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bo
 		gui->LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", mode, Keys::launchMode);
 		if (validRepentogon) {
 			mode = LAUNCH_MODE_REPENTOGON;
-		}
-		else {
+		} else {
 			mode = LAUNCH_MODE_VANILLA;
 		}
 	}

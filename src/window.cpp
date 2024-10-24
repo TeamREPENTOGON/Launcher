@@ -237,8 +237,7 @@ namespace Launcher {
 		const char* emptyText) {
 		if (!path.empty()) {
 			ctrl->SetValue(path);
-		}
-		else {
+		} else {
 			wxTextAttr textAttr = ctrl->GetDefaultStyle();
 			ctrl->Clear();
 			ctrl->SetDefaultStyle(wxTextAttr(emptyColor));
@@ -257,8 +256,7 @@ namespace Launcher {
 			int type = std::stoi(match[2].str(), NULL, 0);
 			_options.levelStage = stage;
 			_options.stageType = type;
-		}
-		else if (!strcmp(text, "--")) {
+		} else if (!strcmp(text, "--")) {
 			_options.levelStage = _options.stageType = 0;
 		}
 	}
@@ -267,8 +265,7 @@ namespace Launcher {
 		wxComboBox* box = dynamic_cast<wxComboBox*>(event.GetEventObject());
 		if (box->GetValue() == "Vanilla") {
 			_options.mode = LAUNCH_MODE_VANILLA;
-		}
-		else {
+		} else {
 			_options.mode = LAUNCH_MODE_REPENTOGON;
 		}
 
@@ -309,16 +306,14 @@ namespace Launcher {
 		Log("\tRepentogon:");
 		if (_options.mode == LAUNCH_MODE_VANILLA) {
 			Log("\t\tRepentogon is disabled");
-		}
-		else {
+		} else {
 			Log("\t\tRepentogon is enabled");
 			Log("\t\tEnable Repentogon console window: %s", _options.console ? "yes" : "no");
 		}
 		Log("\tVanilla:");
 		if (_options.levelStage) {
 			Log("\t\tStarting stage: %d.%d", _options.levelStage, _options.stageType);
-		}
-		else {
+		} else {
 			Log("\t\tStarting stage: not selected");
 		}
 		Log("\t\tLua debug: %s", _options.luaDebug ? "yes" : "no");
@@ -336,14 +331,12 @@ namespace Launcher {
 			if (!_installationManager._installation.SetIsaacInstallationFolder(p.string())) {
 				LogError("Unable to configure the Isaac installation folder");
 				return;
-			}
-			else {
+			} else {
 				Log("Set Isaac installation folder to %s", p.string().c_str());
 			}
 
 			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
-		}
-		else {
+		} else {
 			OnFileSelected(_installationManager._installation.GetIsaacInstallationFolder() + "isaac-ng.exe", 
 				NoIsaacColor, _isaacFileText, NoIsaacText);
 		}
@@ -355,13 +348,11 @@ namespace Launcher {
 			if (PromptLauncherUpdate(result.version, result.url)) {
 				Log("Initiating update");
 				_installationManager.DoSelfUpdate(result.version, result.url);
-			}
-			else {
+			} else {
 				Log("Skipping self-update as per user choice");
 			}
-		}
-		else {
-
+		} else {
+			
 		}
 	}
 
@@ -425,8 +416,7 @@ namespace Launcher {
 			rapidjson::Document release;
 			if (!_installationManager.CheckRepentogonUpdates(release, _options.unstableUpdates, false)) {
 				Log("Repentogon is up-to-date");
-			}
-			else {
+			} else {
 				Log("An update is available. Updating Repentogon...");
 				_installationManager.InstallRepentogon(release);
 				installationState = _installationManager.CheckRepentogonInstallation(false, false);
@@ -436,8 +426,7 @@ namespace Launcher {
 		if (installationState != InstallationManager::REPENTOGON_INSTALLATION_CHECK_OK) {
 			if (installationState == InstallationManager::REPENTOGON_INSTALLATION_CHECK_LEGACY) {
 				Log("Legacy installation of Repentogon found. Repentogon will work, but the launcher cannot configure it.");
-			}
-			else {
+			} else {
 				LogWarn("No valid installation of Repentogon found.");
 			}
 
@@ -628,8 +617,7 @@ namespace Launcher {
 		if (!invokeReader || reader->ParseError() == -1) {
 			if (!invokeReader) {
 				LogError("No configuration file found, using defaults");
-			}
-			else {
+			} else {
 				LogError("Malformed configuration file found (%s), using defaults", configurationFile.c_str());
 			}
 
@@ -642,8 +630,7 @@ namespace Launcher {
 			_options.InitializeDefaults(this, result == wxID_OK || result == wxID_YES,
 				result == wxID_OK || result == wxID_YES, 
 				_installationManager.IsValidRepentogonInstallation(true));
-		}
-		else {
+		} else {
 			Log("Found configuration file launcher.ini");
 			_options.InitializeFromConfig(this, *reader,
 				_installationManager.IsValidRepentogonInstallation(true));
@@ -666,8 +653,7 @@ namespace Launcher {
 		InitializeLevelSelectFromOptions();
 		if (_options.mode == LAUNCH_MODE_REPENTOGON) {
 			_launchMode->SetValue("Repentogon");
-		}
-		else {
+		} else {
 			_launchMode->SetValue("Vanilla");
 		}
 
@@ -679,24 +665,21 @@ namespace Launcher {
 		std::string value;
 		if (level == 0) {
 			value = "--";
-		}
-		else {
+		} else {
 			std::string levelName;
 			if (level <= IsaacInterface::STAGE4_2) {
 				/* To find the level name, divide level by two to get the chapter - 1, then add the stage type. */
 				levelName = IsaacInterface::levelNames[((level - 1) / 2) * 5 + type];
 				if (level % 2 == 0) {
 					levelName += " II";
-				}
-				else {
+				} else {
 					levelName += " I";
 				}
 
 				char buffer[10];
 				sprintf(buffer, " (%d.%d)", level, type);
 				levelName += std::string(buffer);
-			}
-			else {
+			} else {
 				levelName = IsaacInterface::uniqueLevelNames[level - IsaacInterface::STAGE4_3];
 			}
 			value = levelName;
@@ -709,8 +692,7 @@ namespace Launcher {
 		if (_launchMode->GetValue() == "Repentogon") {
 			_repentogonOptions->Enable(true);
 			// _console->Enable(true);
-		}
-		else {
+		} else {
 			_repentogonOptions->Enable(false);
 			// _console->Enable(false);
 		}
@@ -745,8 +727,7 @@ namespace Launcher {
 			wxMessageDialog dialog(this, message, "Information", wxOK);
 			dialog.ShowModal();
 			return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
-		}
-		else {
+		} else {
 			message += "The launcher will proceed to create its configuration file.\n\n"
 				"You can decide whether you want that file to be installed next to the launcher, or in the same folder as the Repentance save files\n"
 				"The launcher identified your Repentance save folder as: ";
@@ -760,8 +741,7 @@ namespace Launcher {
 
 			if (dialog.GetSelection() == 0) {
 				return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
-			}
-			else {
+			} else {
 				return Launcher::fs::CONFIG_FILE_LOCATION_SAVE;
 			}
 		}

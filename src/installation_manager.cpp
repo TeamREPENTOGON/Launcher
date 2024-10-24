@@ -110,11 +110,9 @@ namespace Launcher {
 
 		if (isInfo) {
 			_gui->LogInfo(info.str().c_str());
-		}
-		else if (isWarn) {
+		} else if (isWarn) {
 			_gui->LogWarn(warn.str().c_str());
-		}
-		else {
+		} else {
 			_gui->LogError(err.str().c_str());
 		}
 	}
@@ -128,8 +126,7 @@ namespace Launcher {
 
 		if (std::holds_alternative<Github::DownloadAsStringResult>(updateResult.detail)) {
 			downloadResult = std::get<Github::DownloadAsStringResult>(updateResult.detail);
-		}
-		else {
+		} else {
 			candidate = std::get<CandidateVersion>(updateResult.detail);
 		}
 
@@ -172,8 +169,7 @@ namespace Launcher {
 
 		if (isInfo) {
 			_gui->LogInfo(info.str().c_str());
-		}
-		else {
+		} else {
 			_gui->LogError(err.str().c_str());
 		}
 		return updateResult.base != SELF_UPDATE_UPDATE_CHECK_FAILED;
@@ -220,8 +216,7 @@ namespace Launcher {
 		if (foundConfiguration && couldOpenConfiguration && couldReadConfiguration) {
 			_gui->Log("[Configuration load] Found valid Repentogon configuration file %s", _installation.GetLauncherConfigurationPath().c_str());
 			_gui->Log("[Configuration load] Found Isaac installation folder from configuration file: %s", _installation.GetIsaacInstallationFolder());
-		}
-		else {
+		} else {
 			_gui->Log("[Configuration load] No valid Repentogon configuration file found, prompting user for Isaac installation folder...");
 		}
 	}
@@ -232,8 +227,7 @@ namespace Launcher {
 			_gui->Log("KO");
 			_gui->LogWarn("[Isaac installation check] Unable to find isaac-ng.exe");
 			return false;
-		}
-		else {
+		} else {
 			_gui->Log("OK");
 		}
 
@@ -249,8 +243,7 @@ namespace Launcher {
 			_gui->Log("OK");
 			_gui->Log("New version of the launcher available: %s (can be downloaded from %s)\n", result.version.c_str(), result.url.c_str());
 			result.code = SELF_UPDATE_CHECK_NEW;;
-		}
-		else {
+		} else {
 			_gui->Log("KO");
 			if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
 				_gui->LogError("Error encountered while checking for availability of launcher update");
@@ -277,8 +270,7 @@ namespace Launcher {
 				}
 
 				result.code = SELF_UPDATE_CHECK_ERR;
-			}
-			else {
+			} else {
 				result.code = SELF_UPDATE_CHECK_UTD;
 			}
 		}
@@ -300,8 +292,7 @@ namespace Launcher {
 		if (!version->valid) {
 			_gui->Log("\n");
 			_gui->LogError("[Isaac version check] This version of the game does not support REPENTOGON.");
-		}
-		else {
+		} else {
 			_gui->Log(": this version of the game is compatible with REPENTOGON.");
 		}
 
@@ -330,8 +321,7 @@ namespace Launcher {
 		bool ok = Filesystem::RemoveFile(filename);
 		if (ok) {
 			_gui->Log("OK");
-		}
-		else {
+		} else {
 			_gui->Log("KO");
 			_gui->LogError("Error while deleting file %s (GetLastError() = %d)\n", filename, GetLastError());
 		}
@@ -347,16 +337,14 @@ namespace Launcher {
 				_gui->LogError("%s/dsound.dll still exists: please remove it manually",
 					_installation.GetIsaacInstallationFolder().c_str());
 				return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_KO_LEGACY);
-			}
-			else {
+			} else {
 				_gui->LogWarn("Errors encountered while removing legacy Repentogon installation");
 				_gui->LogWarn("%s/dsound.dll was removed: you may safely launch Repentogon from the launcher",
 					_installation.GetIsaacInstallationFolder().c_str());
 				// Return KO to prompt the installation of newer Repentogon
 				return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_KO);
 			}
-		}
-		else {
+		} else {
 			_gui->Log("Successfully uninstalled legacy Repentogon installation");
 			// Return KO to prompt the installation of newer Repentogon
 			return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_KO);
@@ -378,19 +366,15 @@ namespace Launcher {
 					_gui->LogWarn("This may indicate a broken release process on Repentogon's side. Please check with the devs.\n");
 					DisplayRepentogonFilesVersion(1, isUpdate);
 					return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_LEGACY);
-				}
-				else {
+				} else {
 					return GetSetRepentogonInstallationState(ManageLegacyInstallation());
 				}
-			}
-			else {
+			} else {
 				if (isRetry) {
 					_gui->Log("Repentogon was successfully installed: ");
-				}
-				else if (isUpdate) {
+				} else if (isUpdate) {
 					_gui->Log("Repentogon was successfully updated: ");
-				}
-				else {
+				} else {
 					_gui->Log("Found a valid Repentogon installation: ");
 				}
 
@@ -398,8 +382,7 @@ namespace Launcher {
 			}
 
 			return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_OK);
-		}
-		else {
+		} else {
 			DebugDumpBrokenRepentogonInstallation();
 			return GetSetRepentogonInstallationState(REPENTOGON_INSTALLATION_CHECK_KO);
 		}
@@ -413,8 +396,7 @@ namespace Launcher {
 		_gui->LogNoNL("ZHL version: %s", _installation.GetZHLVersion().c_str());
 		if (isUpdate) {
 			_gui->Log(" (updated from %s)", _zhlVersion.c_str());
-		}
-		else {
+		} else {
 			_gui->Log("\n");
 		}
 
@@ -425,8 +407,7 @@ namespace Launcher {
 		_gui->LogNoNL("ZHL loader version: %s", _installation.GetZHLLoaderVersion().c_str());
 		if (isUpdate) {
 			_gui->Log(" (updated from %s)", _zhlVersion.c_str());
-		}
-		else {
+		} else {
 			_gui->Log("\n");
 		}
 
@@ -437,8 +418,7 @@ namespace Launcher {
 		_gui->LogNoNL("Repentogon version: %s", _installation.GetRepentogonVersion().c_str());
 		if (isUpdate) {
 			_gui->Log(" (updated from %s)", _repentogonVersion.c_str());
-		}
-		else {
+		} else {
 			_gui->Log("\n");
 		}
 	}
@@ -450,13 +430,11 @@ namespace Launcher {
 			std::string const& version = (_installation.*ptr)();
 			if (version.empty()) {
 				_gui->Log("unable to find version");
-			}
-			else {
+			} else {
 				*found = true;
 				_gui->Log("found version %s", version.c_str());
 			}
-		}
-		else {
+		} else {
 			_gui->Log("unable to load");
 		}
 	}
@@ -468,8 +446,7 @@ namespace Launcher {
 		for (fs::FoundFile const& file : files) {
 			if (file.found) {
 				_gui->Log("\t\t%s: found", file.filename.c_str());
-			}
-			else {
+			} else {
 				_gui->Log("\t\t%s: not found", file.filename.c_str());
 			}
 		}
@@ -482,8 +459,7 @@ namespace Launcher {
 		if (zhlVersionAvailable && repentogonVersionAvailable && zhlLoaderVersionAvailable) {
 			if (_installation.RepentogonZHLVersionMatch()) {
 				_gui->Log("\tZHL / Repentogon version match");
-			}
-			else {
+			} else {
 				_gui->Log("\tZHL / Repentogon version mismatch");
 			}
 		}
@@ -572,8 +548,7 @@ namespace Launcher {
 			for (auto const& [filename, success] : state.unzipedFiles) {
 				if (filename.empty()) {
 					_gui->LogError("Could not extract file %d from the archive\n", i);
-				}
-				else {
+				} else {
 					_gui->LogError("Extracted %s: %s\n", filename.c_str(), success ? "yes" : "no");
 				}
 			}

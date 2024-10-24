@@ -78,8 +78,7 @@ DWORD CreateIsaac(const char* path, struct IsaacOptions const* options, PROCESS_
 	if (result == 0) {
 		Logger::Error("Failed to create process: %d\n", GetLastError());
 		return -1;
-	}
-	else {
+	} else {
 		Logger::Info("Started isaac-ng.exe in suspended state, processID = %d\n", processInfo->dwProcessId);
 	}
 
@@ -130,8 +129,7 @@ int UpdateMemory(struct IsaacOptions const* options, HANDLE process, PROCESS_INF
 	if (!remotePage) {
 		Logger::Error("Failed to allocate memory in isaac-ng.exe to load the dsound DLL: %d\n", GetLastError());
 		return -1;
-	}
-	else {
+	} else {
 		Logger::Info("Allocated memory for remote thread at %p\n", remotePage);
 	}
 
@@ -149,8 +147,7 @@ int UpdateMemory(struct IsaacOptions const* options, HANDLE process, PROCESS_INF
 	ok = VirtualQueryEx(process, remotePage, &info, sizeof(info));
 	if (!ok) {
 		Logger::Warn("Unable to get information about the allocated pages: %d\n", GetLastError());
-	}
-	else {
+	} else {
 		baseAddr = info.BaseAddress;
 	}
 
@@ -183,8 +180,7 @@ int FirstStageInit(const char* path, struct IsaacOptions const* options, HANDLE*
 	if (!process) {
 		Logger::Error("Failed to open process: %d\n", GetLastError());
 		return -1;
-	}
-	else {
+	} else {
 		Logger::Info("Acquired handle to isaac-ng.exe, process ID = %d\n", processInfo->dwProcessId);
 	}
 
@@ -204,8 +200,7 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	if (!remoteThread) {
 		Logger::Error("Error while creating remote thread: %d\n", GetLastError());
 		return -1;
-	}
-	else {
+	} else {
 		Logger::Info("Created remote thread in isaac-ng.exe\n");
 	}
 
@@ -257,8 +252,7 @@ int InjectIsaac(const char* path, int updates, int console, int lua_debug, int l
 	if (result == -1) {
 		Logger::Error("Failed to resume isaac-ng.exe main thread: %d\n", GetLastError());
 		return -1;
-	}
-	else {
+	} else {
 		Logger::Info("Resumed main thread of isaac-ng.exe, previous supend count was %d\n", result);
 	}
 
