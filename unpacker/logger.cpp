@@ -1,4 +1,5 @@
 #include <cstdarg>
+#include <cstdlib>
 #include <ctime>
 
 #include "unpacker/logger.h"
@@ -32,10 +33,25 @@ namespace Logger {
 		va_end(va);
 	}
 
+	void Warn(const char* fmt, ...) {
+		va_list va;
+		va_start(va, fmt);
+		Log("[WARN] ", fmt, va);
+		va_end(va);
+	}
+
 	void Error(const char* fmt, ...) {
 		va_list va;
 		va_start(va, fmt);
 		Log("[ERROR] ", fmt, va);
 		va_end(va);
+	}
+
+	void Fatal(const char* fmt, ...) {
+		va_list va;
+		va_start(va, fmt);
+		Log("[FATAL] ", fmt, va);
+		va_end(va);
+		abort();
 	}
 }
