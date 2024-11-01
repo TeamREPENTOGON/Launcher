@@ -1,6 +1,7 @@
 #include <WinSock2.h>
 #include <Windows.h>
 #include <bcrypt.h>
+#include <io.h>
 #include <Psapi.h>
 #include <UserEnv.h>
 
@@ -16,6 +17,7 @@
 #include "shared/externals.h"
 #include "shared/logger.h"
 #include "shared/filesystem.h"
+#include "shared/scoped_file.h"
 #include "shared/sha256.h"
 
 namespace Launcher::fs {
@@ -29,6 +31,35 @@ namespace Launcher::fs {
 		"freetype.dll",
 		NULL
 	};
+
+	#pragma pack(1)
+	struct COFFHeader {
+		uint16_t Machine;
+		uint16_t NumberOfSections;
+		uint32_t TimeDateStamp;
+		void* PointerToSymbolTable;
+		uint32_t NumberOfSymbols;
+		uint16_t SizeOfOptionalHeader;
+		uint16_t Characteristics;
+	};
+
+	static_assert(sizeof(COFFHeader) == 20);
+
+	#pragma pack(1)
+	struct SectionHeader {
+		char Name[8];
+		uint32_t VirtualSize;
+		uint32_t VirtualAddress;
+		uint32_t SizeOfRawData;
+		uint32_t PointerToRawData;
+		uint32_t PointerToRelocations;
+		uint32_t PointerToLineNumbers;
+		uint16_t NumberOfRelocations;
+		uint16_t NumberOfLineNumbers;
+		uint32_t Characteristics;
+	};
+
+	static_assert(sizeof(SectionHeader) == 40);
 
 	Version const knownVersions[] = {
 		{ "04469d0c3d3581936fcf85bea5f9f4f3a65b2ccf96b36310456c9626bac36dc6", "v1.7.9b.J835 (Steam)", true },
@@ -98,6 +129,7 @@ namespace Launcher::fs {
 			Logger::Error("Updater::CheckIsaacInstallation: exception: %s\n", e.what());
 		}
 
+		_isaacExecutable = std::move(fullPath);
 		return true;
 	}
 
@@ -366,6 +398,10 @@ namespace Launcher::fs {
 		return _isaacFolder;
 	}
 
+	std::string const& Installation::GetIsaacExecutablePath() const {
+		return _isaacExecutable;
+	}
+
 	std::string const& Installation::GetRepentogonInstallationFolder() const {
 		return _repentogonFolder;
 	}
@@ -511,5 +547,131 @@ namespace Launcher::fs {
 			}
 			throw std::runtime_error("Error while writing configuration file");
 		}
+	}
+
+	ReadVersionStringResult Installation::GetVersionString(std::string& result) const {
+		if (_isaacExecutable.empty()) {
+			Logger::Error("Installation::GetVersionString: no executable\n");
+			return READ_VERSION_STRING_ERR_NO_FILE;
+		}
+
+		FILE* exe = fopen(_isaacExecutable.c_str(), "rb");
+		if (!exe) {
+			Logger::Error("Installation::GetVersionString: could not open %s\n", _isaacExecutable.c_str());
+			return READ_VERSION_STRING_ERR_OPEN;
+		}
+
+		ScopedFile scopedFile(exe);
+		
+		DWORD highOrder = 0;
+		HANDLE exeHandle = (HANDLE)_get_osfhandle(_fileno(exe));
+		DWORD size = GetFileSize(exeHandle, &highOrder);
+		DWORD minSize = 0x40; // DOS header
+
+		if (highOrder != 0) {
+			Logger::Error("Installation::GetVersionString: isaac-ng.exe size > 4GB\n");
+			return READ_VERSION_STRING_ERR_TOO_BIG;
+		}
+
+		if (size < minSize) {
+			Logger::Error("Installation::GetVersionString: executable too short (< 0x40 bytes)\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+
+		char* content = (char*)malloc(size);
+		if (!content) {
+			Logger::Error("Installation::GetVersionString: unable to allocate memory to store isaac-ng.exe\n");
+			return READ_VERSION_STRING_ERR_NO_MEM;
+		}
+
+		uint32_t* peOffset = (uint32_t*)(content + 0x3c);
+		minSize = *peOffset + 0x4; // DOS header + PE signature
+		if (size <= minSize) {
+			Logger::Error("Installation::GetVersionString: executable too short (no PE header)\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+
+		uint32_t* peSignaturePtr = (uint32_t*)(content + *peOffset);
+		if (*peSignaturePtr != 0x50450000) {
+			Logger::Error("Installation::GetVersionString: executable is not a PE executable\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+
+		minSize += 20; // DOS header + PE signature + COFF Header
+		if (size < minSize) {
+			Logger::Error("Installation::GetVersionString: executable too short (no COFF header)\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+ 
+		COFFHeader* coffHeader = (COFFHeader*)(content + *peOffset + 0x4);
+		
+		minSize += coffHeader->SizeOfOptionalHeader;
+		if (size < minSize) {
+			Logger::Error("Installation::GetVersionString: executable too short (malformed optional header)\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+
+		SectionHeader* sections = (SectionHeader*)(content + minSize);
+		minSize += coffHeader->NumberOfSections * sizeof(*coffHeader);
+
+		if (size < minSize) {
+			Logger::Error("Installation::GetVersionString: executable too short (malformed section headers)\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+
+		SectionHeader* rdataSectionHeader = NULL;
+		for (uint16_t i = 0; i < coffHeader->NumberOfSections; ++i) {
+			SectionHeader* currentSection = sections + i;
+			if (!strncmp(".rdata", currentSection->Name, 8)) {
+				rdataSectionHeader = currentSection;
+				break;
+			}
+		}
+
+		if (!rdataSectionHeader) {
+			Logger::Error("Installation::GetVersionString: no .rdata section found\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+
+		char* sectionStart = content + rdataSectionHeader->PointerToRawData;
+		if (size < rdataSectionHeader->PointerToRawData + rdataSectionHeader->SizeOfRawData) {
+			Logger::Error("Installation::GetVersionString: executable too short (malformed rdata section header)\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+
+		const char* needle = "Binding of Isaac: Repentance v";
+		size_t needleLen = strlen(needle);
+		if (rdataSectionHeader->SizeOfRawData < needleLen) {
+			Logger::Error("Installation::GetVersionString: executable too short (version string does not fit)\n");
+		}
+
+		size_t limit = rdataSectionHeader->SizeOfRawData - needleLen;
+		uint32_t offset = -1;
+		for (uint32_t i = 0; i < limit; ++i) {
+			if (memcmp(sectionStart + i, needle, needleLen))
+				continue;
+			offset = i;
+			break;
+		}
+		
+		if (offset != -1) {
+			Logger::Error("Installation::GetVersionString: invalid executable (no version string found)\n");
+			return READ_VERSION_STRING_ERR_NO_VERSION;
+		}
+
+		char* startVersion = sectionStart + offset;
+		char* endVersion = startVersion;
+
+		while (*endVersion && endVersion < sectionStart + limit)
+			++endVersion;
+
+		if (*endVersion) {
+			Logger::Error("Installation::GetVersionString: invalid executable (version string goes out of rdata section)\n");
+			return READ_VERSION_STRING_ERR_INVALID_PE;
+		}
+
+		free(content);
+		result = std::string(startVersion, endVersion);
+		return READ_VERSION_STRING_OK;
 	}
 }

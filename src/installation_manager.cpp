@@ -282,21 +282,23 @@ namespace Launcher {
 		_gui->LogNoNL("Checking Isaac version... ");
 		fs::Version const* version = _installation.GetIsaacVersion();
 		if (!version) {
+			
+
 			_gui->Log("KO");
 			_gui->LogError("[Isaac version check] Unknown Isaac version. REPENTOGON will not launch.");
 			return false;
-		}
-
-		_gui->Log("\n");
-		_gui->LogNoNL("[Isaac version check] Identified Isaac version %s", version->version);
-		if (!version->valid) {
-			_gui->Log("\n");
-			_gui->LogError("[Isaac version check] This version of the game does not support REPENTOGON.");
 		} else {
-			_gui->Log(": this version of the game is compatible with REPENTOGON.");
-		}
+			_gui->Log("\n");
+			_gui->LogNoNL("[Isaac version check] Identified Isaac version %s", version->version);
+			if (!version->valid) {
+				_gui->Log("\n");
+				_gui->LogError("[Isaac version check] This version of the game does not support REPENTOGON.");
+			} else {
+				_gui->Log(": this version of the game is compatible with REPENTOGON.");
+			}
 
-		return version->valid;
+			return version->valid;
+		}
 	}
 
 	bool InstallationManager::UninstallLegacyRepentogon() {

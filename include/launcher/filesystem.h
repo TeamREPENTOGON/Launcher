@@ -108,6 +108,16 @@ namespace Launcher {
 			CONFIG_FILE_LOCATION_SAVE,
 		};
 
+		enum ReadVersionStringResult {
+			READ_VERSION_STRING_OK,
+			READ_VERSION_STRING_ERR_NO_FILE,
+			READ_VERSION_STRING_ERR_OPEN,
+			READ_VERSION_STRING_ERR_NO_MEM,
+			READ_VERSION_STRING_ERR_TOO_BIG,
+			READ_VERSION_STRING_ERR_INVALID_PE,
+			READ_VERSION_STRING_ERR_NO_VERSION
+		};
+
 		/* Global array of all known versions of the game. */
 		extern Version const knownVersions[];
 
@@ -173,9 +183,12 @@ namespace Launcher {
 			std::string const& GetSaveFolder() const;
 			std::string const& GetLauncherConfigurationPath() const;
 			std::string const& GetIsaacInstallationFolder() const;
+			std::string const& GetIsaacExecutablePath() const;
 			std::string const& GetRepentogonInstallationFolder() const;
 
 			int GetConfigurationFileSyntaxErrorLine() const;
+
+			ReadVersionStringResult GetVersionString(std::string& version) const;
 
 		private:
 			/* State of the Repentogon installation. */
@@ -212,8 +225,10 @@ namespace Launcher {
 			std::string _saveFolder;
 			/* Path to the folder containing the configuration of the launcher. */
 			std::string _configurationPath;
-			/* Path to the Isaac installation. */
+			/* Path to the Isaac installation folder, or empty if not found. */
 			std::string _isaacFolder;
+			/* Path to the Isaac executable, or empty if not found. */
+			std::string _isaacExecutable;
 			/* Path to the folder containing the current installation of 
 			 * Repentogon, if any. 
 			 */
