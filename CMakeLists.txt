@@ -61,6 +61,7 @@ add_custom_command (TARGET REPENTOGONLauncher POST_BUILD COMMAND ${CMAKE_COMMAND
 
 file (GLOB_RECURSE UNPACKER_FILES "include/unpacker/*.h" unpacker/*.cpp)
 add_executable (unpacker WIN32 ${UNPACKER_FILES})
+target_link_libraries (unpacker userenv ktmw32)
 target_include_directories (unpacker PRIVATE
   "${CMAKE_SOURCE_DIR}/include"
 )
