@@ -71,7 +71,7 @@ namespace Launcher {
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 	
 	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
-		_installationManager(this) {
+		_installationManager(this), _launcherUpdaterMgr(this), _installation(this) {
 		memset(&_options, 0, sizeof(_options));
 		// _optionsGrid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
@@ -342,15 +342,22 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::HandleLauncherUpdates(bool allowDrafts) {
-		InstallationManager::CheckSelfUpdateResult result = _installationManager.CheckSelfUpdates(allowDrafts);
-		if (result.code == InstallationManager::SELF_UPDATE_CHECK_NEW) {
-			if (PromptLauncherUpdate(result.version, result.url)) {
+	void MainFrame::HandleLauncherUpdates(bool allowPreReleases) {
+		using lu = Updater::LauncherUpdateManager;
+		std::string version, url;
+		lu::SelfUpdateCheckResult result = 
+			this->_launcherUpdaterMgr.CheckSelfUpdateAvailability(allowPreReleases, version, url);
+		if (result == lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE) {
+			if (PromptLauncherUpdate(version, url)) {
 				Log("Initiating update");
-				_installationManager.DoSelfUpdate(result.version, result.url);
+				if (!_launcherUpdaterMgr.DoUpdate(Launcher::version, version.c_str(), url.c_str())) {
+					LogError("Error while updating the launcher\n");
+				}
 			} else {
 				Log("Skipping self-update as per user choice");
 			}
+		} else if (result == lu::SELF_UPDATE_CHECK_ERR_GENERIC) {
+			LogError("Error while checking for the availability of launcher updates");
 		} else {
 			Log("Launcher is up-to-date");
 		}
@@ -358,6 +365,12 @@ namespace Launcher {
 
 	bool MainFrame::SanityCheckLauncherUpdate() {
 		return Filesystem::FileExists(Comm::UnpackedArchiveName);
+	}
+
+	void MainFrame::SanitizeLauncherUpdate() {
+		LogWarn("Found launcher update file %s in the current folder."
+			"This may indicate a broken update. Deleting it.\n", Comm::UnpackedArchiveName);
+		Filesystem::RemoveFile(Comm::UnpackedArchiveName);
 	}
 
 	void MainFrame::PostInit() {
@@ -372,9 +385,7 @@ namespace Launcher {
 		Log("Current directory is: %s", currentDir.c_str());
 
 		if (!SanityCheckLauncherUpdate()) {
-			LogWarn("Found launcher update file %s in the current folder."
-				"This may indicate a broken update. Deleting it.\n", Comm::UnpackedArchiveName);
-			Filesystem::RemoveFile(Comm::UnpackedArchiveName);
+			SanitizeLauncherUpdate();
 		}
 		
 		HandleLauncherUpdates(true);
@@ -382,8 +393,7 @@ namespace Launcher {
 		LPSTR cli = GetCommandLineA();
 		Log("Command line: %s", cli);
 		Log("Loading Repentogon configuration...");
-
-		
+				
 		bool needIsaacFolder = true;
 		bool canWriteConfiguration = false;
 
@@ -719,14 +729,14 @@ namespace Launcher {
 		_installationManager.CheckRepentogonInstallation(false, true);
 	}
 
-	Launcher::fs::ConfigurationFileLocation MainFrame::PromptConfigurationFileLocation() {
+	Launcher::ConfigurationFileLocation MainFrame::PromptConfigurationFileLocation() {
 		wxString message("The launcher was not able to find a configuration file. If this is your first run, it is normal.\n");
 		std::string saveFolder = _installationManager._installation.GetSaveFolder();
 		if (saveFolder.empty()) {
 			message += "The launcher was not able to find your user profile directory. As such, the configuration fille will be created next to the launcher.";
 			wxMessageDialog dialog(this, message, "Information", wxOK);
 			dialog.ShowModal();
-			return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
+			return Launcher::CONFIG_FILE_LOCATION_HERE;
 		} else {
 			message += "The launcher will proceed to create its configuration file.\n\n"
 				"You can decide whether you want that file to be installed next to the launcher, or in the same folder as the Repentance save files\n"
@@ -740,13 +750,13 @@ namespace Launcher {
 			dialog.ShowModal();
 
 			if (dialog.GetSelection() == 0) {
-				return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
+				return Launcher::CONFIG_FILE_LOCATION_HERE;
 			} else {
-				return Launcher::fs::CONFIG_FILE_LOCATION_SAVE;
+				return Launcher::CONFIG_FILE_LOCATION_SAVE;
 			}
 		}
 
-		return Launcher::fs::CONFIG_FILE_LOCATION_HERE;
+		return Launcher::CONFIG_FILE_LOCATION_HERE;
 	}
 
 	std::string MainFrame::PromptIsaacInstallation() {
@@ -810,11 +820,11 @@ namespace Launcher {
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE:
-			_installationManager.ForceSelfUpdate(true);
+			_launcherUpdaterMgr.ForceSelfUpdate(true);
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE:
-			_installationManager.ForceSelfUpdate(false);
+			_launcherUpdaterMgr.ForceSelfUpdate(false);
 			break;
 
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE:

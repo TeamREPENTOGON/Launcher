@@ -20,7 +20,7 @@
 #include "shared/scoped_file.h"
 #include "shared/sha256.h"
 
-namespace Launcher::fs {
+namespace Launcher {
 	/* Array of all the names of files that must be found for the installation
 	 * to be considered a valid Repentogon installation.
 	 */
@@ -81,6 +81,10 @@ namespace Launcher::fs {
 		}
 
 		return NULL;
+	}
+
+	Installation::Installation(ILoggableGUI* gui) : _gui(gui) {
+
 	}
 
 	IsaacInstallationPathInitResult Installation::InitFolders() {
@@ -533,8 +537,8 @@ namespace Launcher::fs {
 		}
 
 		std::ofstream configuration(_configurationPath, std::ios::out);
-		configuration << "[" << fs::Configuration::GeneralSection << "]" << std::endl;
-		configuration << fs::Configuration::IsaacFolderKey << " = " << _isaacFolder << std::endl;
+		configuration << "[" << Configuration::GeneralSection << "]" << std::endl;
+		configuration << Configuration::IsaacFolderKey << " = " << _isaacFolder << std::endl;
 		configuration.close();
 
 		_configurationFile.reset(new INIReader(_configurationPath));

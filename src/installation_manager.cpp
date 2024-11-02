@@ -7,200 +7,36 @@
 #include "shared/logger.h"
 
 namespace Launcher {
-	InstallationManager::InstallationManager(ILoggableGUI* gui) : _gui(gui), _launcherUpdateManager(gui) {
+	InstallationManager::InstallationManager(ILoggableGUI* gui) : _gui(gui), _installation(gui) {
 
-	}
-
-	void InstallationManager::HandleFinalizationResult(Updater::FinalizationResult const& finalizationResult) {
-		struct ResultVisitor {
-			ResultVisitor(std::ostringstream* info, std::ostringstream* err, std::ostringstream* warn,
-				bool* isInfo, bool* isWarn) : info(info), err(err), warn(warn), 
-				isInfo(isInfo), isWarn(isWarn) {
-
-			}
-
-			std::ostringstream *info, *err, *warn;
-			bool *isWarn, *isInfo;
-
-			void operator()(Updater::FinalizationExtractionResult code) {
-				*err << "Error while extracting the unpacker: ";
-				switch (code) {
-				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_NOT_FOUND:
-					*err << "unable to locate unpacker inside the launcher";
-					break;
-
-				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_LOAD_FAILED:
-					*err << "unable to load unpacker from the launcher";
-					break;
-
-				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_LOCK_FAILED:
-					*err << "unable to acquire resource lock on unpacker";
-					break;
-
-				case Updater::FINALIZATION_EXTRACTION_ERR_BAD_RESOURCE_SIZE:
-					*err << "embedded unpacker has the wrong size";
-					break;
-
-				case Updater::FINALIZATION_EXTRACTION_ERR_OPEN_TEMPORARY_FILE:
-					*err << "unable to open temporary file to extract unpacker";
-					break;
-
-				case Updater::FINALIZATION_EXTRACTION_ERR_WRITTEN_SIZE:
-					*err << "unable to write self-updater on the disk";
-					break;
-				}
-			}
-
-			void operator()(Updater::FinalizationStartUnpackerResult code) {
-				*err << "Error while launching unpacker: ";
-				switch (code) {
-				case Updater::FINALIZATION_START_UNPACKER_ERR_NO_PIPE:
-					*err << "unable to create pipe to communicate with unpacker";
-					break;
-
-				case Updater::FINALIZATION_START_UNPACKER_ERR_CREATE_PROCESS:
-					*err << "error while creating unpacker process";
-					break;
-
-				case Updater::FINALIZATION_START_UNPACKER_ERR_OPEN_PROCESS:
-					*err << "error while opening unpacker process handle";
-					break;
-
-				default:
-					*err << "Unknown error " << code << " while launching unpacker";
-					break;
-				}
-			}
-
-			void operator()(Updater::FinalizationCommunicationResult code) {
-				switch (code) {
-				case Updater::FINALIZATION_COMM_ERR_READFILE_ERROR:
-					*err << "unknown error while checking for availability of self-updater";
-					break;
-
-				case Updater::FINALIZATION_COMM_ERR_INVALID_PING:
-					*err << "invalid message sent by self-updater";
-					break;
-
-				case Updater::FINALIZATION_COMM_ERR_INVALID_RESUME:
-					*err << "attempted to resume an update that was not started";
-					break;
-
-				case Updater::FINALIZATION_COMM_ERR_STILL_ALIVE:
-					*err << "launcher was not properly terminated by updater";
-					break;
-
-				case Updater::FINALIZATION_COMM_INFO_TIMEOUT:
-					*isWarn = true;
-					*warn << "Timed out while waiting for availability of the self-updater";
-					break;
-
-				case Updater::FINALIZATION_COMM_INTERNAL_OK:
-					*isInfo = true;
-					*info << "Synchronizing the launcher and the updater...";
-					break;
-				}
-			}
-		};
-
-		std::ostringstream info, err, warn;
-		bool isInfo = false, isWarn = false;
-
-		std::visit(ResultVisitor(&info, &err, &warn, &isInfo, &isWarn), finalizationResult);
-
-		if (isInfo) {
-			_gui->LogInfo(info.str().c_str());
-		} else if (isWarn) {
-			_gui->LogWarn(warn.str().c_str());
-		} else {
-			_gui->LogError(err.str().c_str());
-		}
-	}
-
-	bool InstallationManager::HandleSelfUpdateResult(SelfUpdateErrorCode const& updateResult) {
-		std::ostringstream err, info;
-		bool isInfo = false;
-
-		std::optional<Github::DownloadAsStringResult> downloadResult;
-		std::optional<CandidateVersion> candidate;
-
-		if (std::holds_alternative<Github::DownloadAsStringResult>(updateResult.detail)) {
-			downloadResult = std::get<Github::DownloadAsStringResult>(updateResult.detail);
-		} else {
-			candidate = std::get<CandidateVersion>(updateResult.detail);
-		}
-
-		switch (updateResult.base) {
-		case SELF_UPDATE_UPDATE_CHECK_FAILED:
-			err << "Error while checking for available launcher updates: ";
-			switch (*downloadResult) {
-			case Github::DOWNLOAD_AS_STRING_BAD_CURL:
-				err << "error while initializing cURL";
-				break;
-
-			case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
-				err << "error while performing cURL request";
-				break;
-
-			case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
-				err << "malformed HTTP answer";
-				break;
-
-			case Github::DOWNLOAD_AS_STRING_NO_NAME:
-				err << "HTTP answer lacks a \"name\" field";
-				break;
-			}
-			break;
-
-		case SELF_UPDATE_UP_TO_DATE:
-			isInfo = true;
-			info << "Everything up-to-date";
-			break;
-
-		case SELF_UPDATE_CANDIDATE:
-			isInfo = true;
-			info << "A candidate release has been found: " << candidate->version << ", available at " << candidate->url;
-			break;
-
-		default:
-			_gui->LogError("Unknown error category %d while attempting self update", updateResult.base);
-			break;
-		}
-
-		if (isInfo) {
-			_gui->LogInfo(info.str().c_str());
-		} else {
-			_gui->LogError(err.str().c_str());
-		}
-		return updateResult.base != SELF_UPDATE_UPDATE_CHECK_FAILED;
 	}
 
 	void InstallationManager::InitFolders(bool* needIsaacFolder, bool* canWriteConfiguration) {
-		Launcher::fs::IsaacInstallationPathInitResult initState = _installation.InitFolders();
+		Launcher::IsaacInstallationPathInitResult initState = _installation.InitFolders();
 		*needIsaacFolder = true;
 		*canWriteConfiguration = false;
 		bool foundConfiguration = false, couldOpenConfiguration = false, couldReadConfiguration = false;
 		switch (initState) {
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_PROFILE_DIR:
+		case Launcher::INSTALLATION_PATH_INIT_ERR_PROFILE_DIR:
 			_gui->LogError("[Configuration load] Unable to access the Repentance save folder");
 			break;
 
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR:
+		case Launcher::INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR:
 			_gui->LogError("[Configuration load] No Repentance save folder found, please launch the vanilla game at least once");
 			break;
 
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_NO_CONFIG:
+		case Launcher::INSTALLATION_PATH_INIT_ERR_NO_CONFIG:
 			_gui->Log("[Configuration load] Found Isaac save folder %s", _installation.GetSaveFolder().c_str());
 			_gui->LogWarn("[Configuration load] No Repentogon configuration file found in the Repentance save folder");
 			*canWriteConfiguration = true;
 			break;
 
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_OPEN_CONFIG:
+		case Launcher::INSTALLATION_PATH_INIT_ERR_OPEN_CONFIG:
 			_gui->LogError("[Configuration load] Error while opening Repentogon configuration file %s", _installation.GetLauncherConfigurationPath().c_str());
 			*canWriteConfiguration = foundConfiguration = true;
 			break;
 
-		case Launcher::fs::INSTALLATION_PATH_INIT_ERR_PARSE_CONFIG:
+		case Launcher::INSTALLATION_PATH_INIT_ERR_PARSE_CONFIG:
 			_gui->LogError("[Configuration load] Error while processing Repentogon configuration file %s, syntax error on line %d\n",
 				_installation.GetLauncherConfigurationPath().c_str(),
 				_installation.GetConfigurationFileSyntaxErrorLine());
@@ -234,53 +70,9 @@ namespace Launcher {
 		return true;
 	}
 
-	InstallationManager::CheckSelfUpdateResult InstallationManager::CheckSelfUpdates(bool allowPreReleases) {
-		_gui->LogNoNL("Checking for availability of launcher updates... ");
-		rapidjson::Document launcherResponse;
-		CheckSelfUpdateResult result;
-		Github::DownloadAsStringResult downloadReleasesResult;
-		if (_selfUpdater.IsSelfUpdateAvailable(allowPreReleases, false, result.version, result.url, &downloadReleasesResult)) {
-			_gui->Log("OK");
-			_gui->Log("New version of the launcher available: %s (can be downloaded from %s)\n", result.version.c_str(), result.url.c_str());
-			result.code = SELF_UPDATE_CHECK_NEW;;
-		} else {
-			_gui->Log("KO");
-			if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
-				_gui->LogError("Error encountered while checking for availability of launcher update");
-				switch (downloadReleasesResult) {
-				case Github::DOWNLOAD_AS_STRING_BAD_CURL:
-					_gui->LogError("Unable to initialize cURL connection");
-					break;
-
-				case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
-					_gui->LogError("Unable to perform cURL request");
-					break;
-
-				case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
-					_gui->LogError("Invalid response");
-					break;
-
-				case Github::DOWNLOAD_AS_STRING_NO_NAME:
-					_gui->LogError("Release has no \"name\" field (although you should not be seeing this error, report it as a bug");
-					break;
-
-				default:
-					_gui->LogError("Unexpected error %d: report it as a bug", downloadReleasesResult);
-					break;
-				}
-
-				result.code = SELF_UPDATE_CHECK_ERR;
-			} else {
-				result.code = SELF_UPDATE_CHECK_UTD;
-			}
-		}
-
-		return result;
-	}
-
 	bool InstallationManager::CheckIsaacVersion() {
 		_gui->LogNoNL("Checking Isaac version... ");
-		fs::Version const* version = _installation.GetIsaacVersion();
+		Version const* version = _installation.GetIsaacVersion();
 		if (!version) {
 			
 
@@ -305,8 +97,8 @@ namespace Launcher {
 		_gui->Log("Uninstalling legacy Repentogon installation...");
 
 		std::string dsound = _installation.GetIsaacInstallationFolder() + "/" + "dsound.dll";
-		std::string zhl = _installation.GetIsaacInstallationFolder() + "/" + fs::Libraries::zhl;
-		std::string repentogon = _installation.GetIsaacInstallationFolder() + "/" + fs::Libraries::repentogon;
+		std::string zhl = _installation.GetIsaacInstallationFolder() + "/" + Libraries::zhl;
+		std::string repentogon = _installation.GetIsaacInstallationFolder() + "/" + Libraries::repentogon;
 
 		bool dsoundOk = RemoveFile(dsound.c_str()),
 			zhlOk = RemoveFile(zhl.c_str()),
@@ -362,7 +154,7 @@ namespace Launcher {
 				_zhlLoaderVersion = _installation.GetZHLLoaderVersion();
 			}
 
-			if (_installation.GetRepentogonInstallationState() == fs::REPENTOGON_INSTALLATION_STATE_LEGACY) {
+			if (_installation.GetRepentogonInstallationState() == REPENTOGON_INSTALLATION_STATE_LEGACY) {
 				if (isRetry || isUpdate) {
 					_gui->LogWarn("Newly installed version of Repentogon is a legacy (dsound.dll based) installation.\n");
 					_gui->LogWarn("This may indicate a broken release process on Repentogon's side. Please check with the devs.\n");
@@ -425,8 +217,8 @@ namespace Launcher {
 		}
 	}
 
-	void InstallationManager::DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, fs::LoadableDlls dll,
-		std::string const& (fs::Installation::* ptr)() const, bool* found) {
+	void InstallationManager::DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, LoadableDlls dll,
+		std::string const& (Installation::* ptr)() const, bool* found) {
 		_gui->LogNoNL("\tLoad status of %s (%s): ", context, libname);
 		if (_installation.WasLibraryLoaded(dll)) {
 			std::string const& version = (_installation.*ptr)();
@@ -444,8 +236,8 @@ namespace Launcher {
 	void InstallationManager::DebugDumpBrokenRepentogonInstallation() {
 		_gui->Log("Found no valid installation of Repentogon");
 		_gui->Log("\tRequired files found / not found:");
-		std::vector<fs::FoundFile> const& files = _installation.GetRepentogonInstallationFilesState();
-		for (fs::FoundFile const& file : files) {
+		std::vector<FoundFile> const& files = _installation.GetRepentogonInstallationFilesState();
+		for (FoundFile const& file : files) {
 			if (file.found) {
 				_gui->Log("\t\t%s: found", file.filename.c_str());
 			} else {
@@ -454,9 +246,9 @@ namespace Launcher {
 		}
 
 		bool zhlVersionAvailable = false, repentogonVersionAvailable = false, zhlLoaderVersionAvailable = false;
-		DebugDumpBrokenRepentogonInstallationDLL("the ZHL DLL",			fs::Libraries::zhl,			fs::LOADABLE_DLL_LIBZHL,		&fs::Installation::GetZHLVersion,			&zhlVersionAvailable);
-		DebugDumpBrokenRepentogonInstallationDLL("the ZHL loader DLL",	fs::Libraries::loader,		fs::LOADABLE_DLL_ZHL_LOADER,	&fs::Installation::GetZHLLoaderVersion,		&zhlLoaderVersionAvailable);
-		DebugDumpBrokenRepentogonInstallationDLL("the Repentogon DLL",	fs::Libraries::repentogon,	fs::LOADABLE_DLL_REPENTOGON,	&fs::Installation::GetRepentogonVersion,	&repentogonVersionAvailable);
+		DebugDumpBrokenRepentogonInstallationDLL("the ZHL DLL",			Libraries::zhl,			LOADABLE_DLL_LIBZHL,		&Installation::GetZHLVersion,			&zhlVersionAvailable);
+		DebugDumpBrokenRepentogonInstallationDLL("the ZHL loader DLL",	Libraries::loader,		LOADABLE_DLL_ZHL_LOADER,	&Installation::GetZHLLoaderVersion,		&zhlLoaderVersionAvailable);
+		DebugDumpBrokenRepentogonInstallationDLL("the Repentogon DLL",	Libraries::repentogon,	LOADABLE_DLL_REPENTOGON,	&Installation::GetRepentogonVersion,	&repentogonVersionAvailable);
 
 		if (zhlVersionAvailable && repentogonVersionAvailable && zhlLoaderVersionAvailable) {
 			if (_installation.RepentogonZHLVersionMatch()) {
@@ -588,52 +380,5 @@ namespace Launcher {
 			return force;
 
 		return false;
-	}
-
-	void InstallationManager::DoSelfUpdate(std::string const& version, std::string const& url) {
-		if (!_launcherUpdateManager.DoUpdate(Launcher::version, version.c_str(), url.c_str())) {
-			return;
-		}
-
-		FinishSelfUpdate();
-	}
-
-	void InstallationManager::ForceSelfUpdate(bool unstable) {
-		_gui->Log("Performing self-update (forcibly triggered)");
-		Launcher::SelfUpdateErrorCode result = _selfUpdater.SelectReleaseTarget(unstable, true);
-		if (result.base != SELF_UPDATE_CANDIDATE) {
-			_gui->LogError("Error %d while selecting target release\n", result.base);
-			return;
-		}
-
-		CandidateVersion const& candidate = std::get<CandidateVersion>(result.detail);
-		if (!_launcherUpdateManager.DoUpdate(Launcher::version, candidate.version.c_str(), candidate.url.c_str())) {
-			return;
-		}
-
-		FinishSelfUpdate();
-	}
-
-	void InstallationManager::FinishSelfUpdate() {
-		Updater::Finalizer finalizer;
-		Updater::FinalizationResult result = finalizer.Finalize();
-
-		if (!std::holds_alternative<Updater::FinalizationCommunicationResult>(result)) {
-			HandleFinalizationResult(result);
-			return;
-		}
-
-		Updater::FinalizationCommunicationResult commResult = std::get<Updater::FinalizationCommunicationResult>(result);
-		if (commResult != Updater::FINALIZATION_COMM_INTERNAL_OK && 
-			commResult != Updater::FINALIZATION_COMM_INFO_TIMEOUT) {
-			HandleFinalizationResult(result);
-			return;
-		}
-
-		do {
-			commResult = finalizer.ResumeFinalize();
-		} while (commResult == Updater::FINALIZATION_COMM_INTERNAL_OK || commResult == Updater::FINALIZATION_COMM_INFO_TIMEOUT);
-
-		HandleFinalizationResult(commResult);
 	}
 }

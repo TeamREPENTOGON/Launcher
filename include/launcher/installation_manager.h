@@ -14,21 +14,7 @@
 namespace Launcher {
 	class InstallationManager {
 	public:
-		enum CheckSelfUpdateResultCode {
-			SELF_UPDATE_CHECK_UTD,
-			SELF_UPDATE_CHECK_NEW,
-			SELF_UPDATE_CHECK_ERR
-		};
-
-		struct CheckSelfUpdateResult {
-			CheckSelfUpdateResultCode code = SELF_UPDATE_CHECK_UTD;
-			std::string url;
-			std::string version;
-		};
-
 		InstallationManager(ILoggableGUI* gui);
-		bool HandleSelfUpdateResult(SelfUpdateErrorCode const& result);
-		void HandleFinalizationResult(Updater::FinalizationResult const& result);
 
 		/* Initialize the folder in the filesystem structure.
 		 * 
@@ -41,13 +27,9 @@ namespace Launcher {
 		 */
 		void InitFolders(bool* needIsaacFolder, bool* canWriteConfiguration);
 		bool CheckIsaacInstallation();
-		CheckSelfUpdateResult CheckSelfUpdates(bool allowPreReleases);
 		bool CheckIsaacVersion();
 		bool UninstallLegacyRepentogon();
 		bool RemoveFile(const char* file);
-
-		void DoSelfUpdate(std::string const& version, std::string const& url);
-		void ForceSelfUpdate(bool unstable);
 
 		enum RepentogonInstallationCheckResult {
 			REPENTOGON_INSTALLATION_CHECK_OK,
@@ -75,8 +57,8 @@ namespace Launcher {
 		 * broken.
 		 */
 		void DebugDumpBrokenRepentogonInstallation();
-		void DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, fs::LoadableDlls dll,
-			std::string const& (fs::Installation::* ptr)() const, bool* found);
+		void DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, LoadableDlls dll,
+			std::string const& (Installation::* ptr)() const, bool* found);
 		void DisplayRepentogonFilesVersion(int tabs, bool isUpdate);
 
 		bool InstallRepentogon(rapidjson::Document& document);
@@ -127,12 +109,10 @@ namespace Launcher {
 
 
 	public:
-		fs::Installation _installation;
+		Installation _installation;
 		RepentogonUpdater _updater;
-		SelfUpdater _selfUpdater;
 
 	private:
-		Updater::LauncherUpdateManager _launcherUpdateManager;
 		ILoggableGUI* _gui;
 		std::string _zhlVersion;
 		std::string _zhlLoaderVersion;
@@ -143,8 +123,6 @@ namespace Launcher {
 			_repentogonInstallationState = state;
 			return _repentogonInstallationState;
 		}
-
-		void FinishSelfUpdate();
 	};
 
 }

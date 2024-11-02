@@ -65,10 +65,12 @@ namespace Launcher {
 		void LogError(const char* fmt, ...);
 		void PostInit();
 
-		static fs::Version const* GetVersion(const char* hash);
+		static Version const* GetVersion(const char* hash);
 
 	private:
+		Installation _installation;
 		InstallationManager _installationManager;
+		Updater::LauncherUpdateManager _launcherUpdaterMgr;
 
 		/* Window building. */
 		void AddLauncherConfigurationOptions();
@@ -119,7 +121,7 @@ namespace Launcher {
 		void Inject();
 
 		/* Prompt the user for a place to store the configuration file.	*/
-		Launcher::fs::ConfigurationFileLocation PromptConfigurationFileLocation();
+		Launcher::ConfigurationFileLocation PromptConfigurationFileLocation();
 
 		/* Prompt the user for the folder containing an Isaac installation. */
 		std::string PromptIsaacInstallation();
@@ -144,6 +146,7 @@ namespace Launcher {
 		 * folder.
 		 */
 		bool SanityCheckLauncherUpdate();
+		void SanitizeLauncherUpdate();
 
 		void InitializeIsaacFolderPath(bool needIsaacFolder, bool canWriteConfiguration);
 		void HandleLauncherUpdates(bool allowDrafts);

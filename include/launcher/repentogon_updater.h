@@ -91,7 +91,7 @@ namespace Launcher {
 		 * the request.
 		 */
 		Github::VersionCheckResult CheckRepentogonUpdates(rapidjson::Document& response, 
-			fs::Installation const& installation,
+			Installation const& installation,
 			bool allowPreReleases,
 			Threading::Monitor<Github::GithubDownloadNotification>* monitor);
 

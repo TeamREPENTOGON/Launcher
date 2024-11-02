@@ -25,7 +25,7 @@ struct IsaacOptions {
 
 	void InitializeDefaults(ILoggableGUI* gui, bool allowUpdates, bool allowUnstableUpdates, bool validRepentogon);
 	void InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bool validRepentogon);
-	void WriteConfiguration(ILoggableGUI* gui, Launcher::fs::Installation const& installation);
+	void WriteConfiguration(ILoggableGUI* gui, Launcher::Installation const& installation);
 };
 
 void Launch(const char* path, IsaacOptions const& options);

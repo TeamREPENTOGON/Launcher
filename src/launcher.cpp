@@ -104,7 +104,7 @@ void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bo
 	}
 }
 
-void IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::fs::Installation const& installation) {
+void IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::Installation const& installation) {
 	std::string filename = installation.GetLauncherConfigurationPath();
 	if (filename.empty()) {
 		gui->LogError("No launcher configuration file found previously, cannot save settings\n");
@@ -118,9 +118,9 @@ void IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::fs::Installat
 	}
 
 	std::string isaacFolder = installation.GetIsaacInstallationFolder();
-	fprintf(f, "[%s]\n", Launcher::fs::Configuration::GeneralSection);
-	fprintf(f, "%s = %s\n", Launcher::fs::Configuration::IsaacFolderKey, isaacFolder.empty() ? 
-		Launcher::fs::Configuration::EmptyPath : isaacFolder.c_str());
+	fprintf(f, "[%s]\n", Launcher::Configuration::GeneralSection);
+	fprintf(f, "%s = %s\n", Launcher::Configuration::IsaacFolderKey, isaacFolder.empty() ? 
+		Launcher::Configuration::EmptyPath : isaacFolder.c_str());
 
 	fprintf(f, "[%s]\n", Sections::repentogon.c_str());
 	fprintf(f, "%s = %d\n", Keys::console.c_str(), console);

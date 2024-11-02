@@ -40,7 +40,7 @@ namespace Launcher {
 	}
 
 	Github::VersionCheckResult RepentogonUpdater::CheckRepentogonUpdates(rapidjson::Document& doc,
-		fs::Installation const& installation,
+		Installation const& installation,
 		bool allowPreReleases,
 		Threading::Monitor<Github::GithubDownloadNotification>* monitor) {
 		Github::DownloadAsStringResult fetchResult = FetchRepentogonUpdates(doc, allowPreReleases, monitor);
@@ -48,7 +48,7 @@ namespace Launcher {
 			return Github::VERSION_CHECK_ERROR;
 		}
 
-		if (installation.GetRepentogonInstallationState() == fs::REPENTOGON_INSTALLATION_STATE_NONE) {
+		if (installation.GetRepentogonInstallationState() == REPENTOGON_INSTALLATION_STATE_NONE) {
 			return Github::VERSION_CHECK_NEW;
 		}
 

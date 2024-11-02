@@ -10,6 +10,8 @@
 #include "shared/logger.h"
 #include "unpacker/synchronization.h"
 #include "launcher/self_updater/launcher_update_manager.h"
+#include "launcher/self_updater/finalizer.h"
+#include "launcher/version.h"
 
 namespace Externals {
 	void Init();
@@ -192,17 +194,19 @@ namespace Updater {
 		bool downloadResult = DownloadUpdate(&updateData);
 		
 		if (!PostDownloadChecks(downloadResult, &updateData)) {
-			_gui->LogError("Error during release download\n");
+			_gui->LogError("Error while downloading release\n");
 			return false;
 		}
 
 		if (!ExtractArchive(&updateData)) {
-			_gui->LogError("Error while extracting archive\n");
+			_gui->LogError("Error while extracting the releases's archive\n");
 			return false;
 		}
 
-		_gui->Log("Successfully downloaded and extracted new release\n");
-		return true;
+		_gui->Log("Successfully downloaded and extracted the new release\n");
+		FinalizeUpdate();
+		_gui->LogError("Error while finalizing the update of the launcher\n");
+		return false;
 	}
 
 	bool LauncherUpdateManager::ExtractArchive(LauncherUpdateData* data) {
@@ -367,6 +371,196 @@ namespace Updater {
 		default:
 			_gui->LogError("%s: Sylmir forgot a case somewhere\n", prefix);
 			break;
+		}
+	}
+
+	LauncherUpdateManager::SelfUpdateCheckResult LauncherUpdateManager::CheckSelfUpdateAvailability(bool allowPreReleases,
+		std::string& version, std::string& url) {
+		_gui->LogNoNL("Checking for availability of launcher updates... ");
+		rapidjson::Document launcherResponse;
+		Github::DownloadAsStringResult downloadReleasesResult;
+		if (_selfUpdater.IsSelfUpdateAvailable(allowPreReleases, false, version, url, &downloadReleasesResult)) {
+			_gui->Log("OK");
+			_gui->Log("New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
+			return SELF_UPDATE_CHECK_UPDATE_AVAILABLE;
+		} else {
+			_gui->Log("KO");
+			if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
+				_gui->LogError("Error encountered while checking for availability of launcher update");
+				switch (downloadReleasesResult) {
+				case Github::DOWNLOAD_AS_STRING_BAD_CURL:
+					_gui->LogError("Unable to initialize cURL connection");
+					break;
+
+				case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
+					_gui->LogError("Unable to perform cURL request");
+					break;
+
+				case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
+					_gui->LogError("Invalid response");
+					break;
+
+				case Github::DOWNLOAD_AS_STRING_NO_NAME:
+					_gui->LogError("Release has no \"name\" field (although you should not be seeing this error, report it as a bug");
+					break;
+
+				default:
+					_gui->LogError("Unexpected error %d: report it as a bug", downloadReleasesResult);
+					break;
+				}
+
+				return SELF_UPDATE_CHECK_ERR_GENERIC;
+			} else {
+				return SELF_UPDATE_CHECK_UP_TO_DATE;
+			}
+		}
+
+		_gui->LogWarn("You should not be seeing this, Sylmir probably forgot a return path somewhere, report it as a bug");
+		return SELF_UPDATE_CHECK_UP_TO_DATE;
+	}
+
+	void LauncherUpdateManager::FinalizeUpdate() {
+		Updater::Finalizer finalizer;
+		Updater::FinalizationResult result = finalizer.Finalize();
+
+		if (!std::holds_alternative<Updater::FinalizationCommunicationResult>(result)) {
+			HandleFinalizationResult(result);
+			return;
+		}
+
+		Updater::FinalizationCommunicationResult commResult = std::get<Updater::FinalizationCommunicationResult>(result);
+		if (commResult != Updater::FINALIZATION_COMM_INTERNAL_OK &&
+			commResult != Updater::FINALIZATION_COMM_INFO_TIMEOUT) {
+			HandleFinalizationResult(result);
+			return;
+		}
+
+		do {
+			commResult = finalizer.ResumeFinalize();
+		} while (commResult == Updater::FINALIZATION_COMM_INTERNAL_OK || commResult == Updater::FINALIZATION_COMM_INFO_TIMEOUT);
+
+		HandleFinalizationResult(commResult);
+	}
+
+	void LauncherUpdateManager::ForceSelfUpdate(bool allowPreReleases) {
+		_gui->Log("Performing self-update (forcibly triggered)");
+		Launcher::SelfUpdateErrorCode result = _selfUpdater.SelectReleaseTarget(allowPreReleases, true);
+		if (result.base != Launcher::SELF_UPDATE_CANDIDATE) {
+			_gui->LogError("Error %d while selecting target release\n", result.base);
+			return;
+		}
+
+		Launcher::CandidateVersion const& candidate = std::get<Launcher::CandidateVersion>(result.detail);
+		if (!DoUpdate(Launcher::version, candidate.version.c_str(), candidate.url.c_str())) {
+			return;
+		}
+
+		FinalizeUpdate();
+	}
+
+	void LauncherUpdateManager::HandleFinalizationResult(Updater::FinalizationResult const& finalizationResult) {
+		struct ResultVisitor {
+			ResultVisitor(std::ostringstream* info, std::ostringstream* err, std::ostringstream* warn,
+				bool* isInfo, bool* isWarn) : info(info), err(err), warn(warn),
+				isInfo(isInfo), isWarn(isWarn) {
+
+			}
+
+			std::ostringstream* info, * err, * warn;
+			bool* isWarn, * isInfo;
+
+			void operator()(Updater::FinalizationExtractionResult code) {
+				*err << "Error while extracting the unpacker: ";
+				switch (code) {
+				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_NOT_FOUND:
+					*err << "unable to locate unpacker inside the launcher";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_LOAD_FAILED:
+					*err << "unable to load unpacker from the launcher";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_RESOURCE_LOCK_FAILED:
+					*err << "unable to acquire resource lock on unpacker";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_BAD_RESOURCE_SIZE:
+					*err << "embedded unpacker has the wrong size";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_OPEN_TEMPORARY_FILE:
+					*err << "unable to open temporary file to extract unpacker";
+					break;
+
+				case Updater::FINALIZATION_EXTRACTION_ERR_WRITTEN_SIZE:
+					*err << "unable to write self-updater on the disk";
+					break;
+				}
+			}
+
+			void operator()(Updater::FinalizationStartUnpackerResult code) {
+				*err << "Error while launching unpacker: ";
+				switch (code) {
+				case Updater::FINALIZATION_START_UNPACKER_ERR_NO_PIPE:
+					*err << "unable to create pipe to communicate with unpacker";
+					break;
+
+				case Updater::FINALIZATION_START_UNPACKER_ERR_CREATE_PROCESS:
+					*err << "error while creating unpacker process";
+					break;
+
+				case Updater::FINALIZATION_START_UNPACKER_ERR_OPEN_PROCESS:
+					*err << "error while opening unpacker process handle";
+					break;
+
+				default:
+					*err << "Unknown error " << code << " while launching unpacker";
+					break;
+				}
+			}
+
+			void operator()(Updater::FinalizationCommunicationResult code) {
+				switch (code) {
+				case Updater::FINALIZATION_COMM_ERR_READFILE_ERROR:
+					*err << "unknown error while checking for availability of self-updater";
+					break;
+
+				case Updater::FINALIZATION_COMM_ERR_INVALID_PING:
+					*err << "invalid message sent by self-updater";
+					break;
+
+				case Updater::FINALIZATION_COMM_ERR_INVALID_RESUME:
+					*err << "attempted to resume an update that was not started";
+					break;
+
+				case Updater::FINALIZATION_COMM_ERR_STILL_ALIVE:
+					*err << "launcher was not properly terminated by updater";
+					break;
+
+				case Updater::FINALIZATION_COMM_INFO_TIMEOUT:
+					*isWarn = true;
+					*warn << "Timed out while waiting for availability of the self-updater";
+					break;
+
+				case Updater::FINALIZATION_COMM_INTERNAL_OK:
+					*isInfo = true;
+					*info << "Synchronizing the launcher and the updater...";
+					break;
+				}
+			}
+		};
+
+		std::ostringstream info, err, warn;
+		bool isInfo = false, isWarn = false;
+
+		std::visit(ResultVisitor(&info, &err, &warn, &isInfo, &isWarn), finalizationResult);
+
+		if (isInfo) {
+			_gui->LogInfo(info.str().c_str());
+		} else if (isWarn) {
+			_gui->LogWarn(warn.str().c_str());
+		} else {
+			_gui->LogError(err.str().c_str());
 		}
 	}
 }
