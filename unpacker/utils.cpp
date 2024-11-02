@@ -232,40 +232,29 @@ namespace Unpacker::Utils {
 	char* GetUserProfileDir() {
 		char buffer[4096];
 		DWORD len = 4096;
-		HANDLE token = NULL;
+		HANDLE token = GetCurrentProcessToken();
 		char* path = NULL;
-
-		if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
-			Logger::Error("GetUserProfileDir: OpenProcessToken failed (%d)\n", GetLastError());
-			return NULL;
-		}
 
 		if (!GetUserProfileDirectoryA(token, buffer, &len)) {
 			if (len != 4096) {
 				path = (char*)malloc(len);
 				if (!path) {
 					Logger::Error("GetUserProfileDir: unable to allocate memory for path\n");
-					CloseHandle(token);
 					return NULL;
 				}
 
 				if (!GetUserProfileDirectoryA(token, path, &len)) {
 					Logger::Error("GetUserProfileDir: GetUserProfileDirectoryA on malloced buffer failed (%d)\n", GetLastError());
 					free(path);
-					CloseHandle(token);
 					return NULL;
 				}
 
-				CloseHandle(token);
 				return path;
 			} else {
 				Logger::Error("GetUserProfileDir: GetUserProfileDirectoryA failed (%d)\n", GetLastError());
-				CloseHandle(token);
 				return NULL;
 			}
 		}
-
-		CloseHandle(token);
 
 		path = (char*)malloc(strlen(buffer) + 1);
 		if (!path) {
