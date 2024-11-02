@@ -39,11 +39,19 @@ void Logger::Error(const char* fmt, ...) {
 	va_end(va);
 }
 
+void Logger::Critical(const char* fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	Log("[CRITICAL] ", fmt, va);
+	va_end(va);
+}
+
 void Logger::Fatal(const char* fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	Log("[FATAL] ", fmt, va);
 	va_end(va);
+	abort();
 }
 
 void Logger::Log(const char* prefix, const char* fmt, va_list va) {
