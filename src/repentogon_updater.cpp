@@ -19,7 +19,7 @@
 #include "shared/scoped_curl.h"
 #include "shared/sha256.h"
 
-#include "launcher/filesystem.h"
+#include "launcher/installation.h"
 #include "launcher/repentogon_updater.h"
 
 #include "zip.h"

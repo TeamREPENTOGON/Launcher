@@ -19,7 +19,7 @@
 #include "comm/messages.h"
 #include "curl/curl.h"
 #include "launcher/advanced_options_window.h"
-#include "launcher/filesystem.h"
+#include "launcher/installation.h"
 #include "launcher/isaac.h"
 #include "launcher/self_update.h"
 #include "launcher/version.h"

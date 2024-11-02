@@ -1,7 +1,7 @@
 #pragma once
 
 #include "inih/cpp/INIReader.h"
-#include "launcher/filesystem.h"
+#include "launcher/installation.h"
 #include "shared/loggable_gui.h"
 
 enum LaunchMode {

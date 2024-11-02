@@ -10,7 +10,7 @@
 #endif
 
 #include "curl/curl.h"
-#include "launcher/filesystem.h"
+#include "launcher/installation.h"
 #include "launcher/installation_manager.h"
 #include "launcher/launcher.h"
 #include "launcher/self_update.h"

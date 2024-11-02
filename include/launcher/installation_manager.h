@@ -4,7 +4,7 @@
 #include <string>
 #include <tuple>
 
-#include "launcher/filesystem.h"
+#include "launcher/installation.h"
 #include "launcher/repentogon_updater.h"
 #include "launcher/self_update.h"
 #include "launcher/self_updater/launcher_update_manager.h"

@@ -13,7 +13,7 @@
 #include <cwchar>
 
 #include "inih/cpp/INIReader.h"
-#include "launcher/filesystem.h"
+#include "launcher/installation.h"
 #include "shared/externals.h"
 #include "shared/logger.h"
 #include "shared/filesystem.h"
