@@ -14,59 +14,22 @@
 namespace Launcher {
 	class InstallationManager {
 	public:
-		InstallationManager(ILoggableGUI* gui);
+		InstallationManager(ILoggableGUI* gui, Installation* installation);
 
-		/* Initialize the folder in the filesystem structure.
-		 * 
-		 * *needIsaacFolder is set to false if the launcher is able to open and
-		 * read the general configuration file, and finds the path to isaac-ng.exe
-		 * in it.
-		 * 
-		 * *canWriteConfiguration is set to true as soon as the launcher is able
-		 * to open the configuration file.
-		 */
-		void InitFolders(bool* needIsaacFolder, bool* canWriteConfiguration);
-		bool CheckIsaacInstallation();
-		bool CheckIsaacVersion();
-		bool UninstallLegacyRepentogon();
-		bool RemoveFile(const char* file);
-
-		enum RepentogonInstallationCheckResult {
-			REPENTOGON_INSTALLATION_CHECK_OK,
-			REPENTOGON_INSTALLATION_CHECK_LEGACY,
-			REPENTOGON_INSTALLATION_CHECK_KO,
-			// Installation is legacy, and launcher could not uninstall it
-			REPENTOGON_INSTALLATION_CHECK_KO_LEGACY,
-			REPENTOGON_INSTALLATION_CHECK_NONE
-		};
-
-		RepentogonInstallationCheckResult CheckRepentogonInstallation(bool isRetry, bool isUpdate);
-
-		/* Manage a legacy installation of Repentogon.
-		 *
-		 * If a legacy installation of Repentogon is found, prompt the user for
-		 * its removal. If the user agrees, uninstall the old version.
-		 *
-		 * This function indicates whether the user chose to keep the old
-		 * installation, or if they chose to remove it, and if so what was the
-		 * result of the removal.
-		 */
-		RepentogonInstallationCheckResult ManageLegacyInstallation();
-
-		/* Display information about why the current Repentogon installation is
-		 * broken.
-		 */
-		void DebugDumpBrokenRepentogonInstallation();
-		void DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, LoadableDlls dll,
-			std::string const& (Installation::* ptr)() const, bool* found);
-		void DisplayRepentogonFilesVersion(int tabs, bool isUpdate);
-
+		/* Install a specific release of Repentogon. */
 		bool InstallRepentogon(rapidjson::Document& document);
 
 		enum DownloadInstallRepentogonResult {
 			DOWNLOAD_INSTALL_REPENTOGON_OK,
 			DOWNLOAD_INSTALL_REPENTOGON_UTD,
-			DOWNLOAD_INSTALL_REPENTOGON_ERR
+			DOWNLOAD_INSTALL_REPENTOGON_ERR,
+			DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES
+		};
+
+		enum CheckRepentogonUpdatesResult {
+			CHECK_REPENTOGON_UPDATES_UTD,
+			CHECK_REPENTOGON_UPDATES_NEW,
+			CHECK_REPENTOGON_UPDATES_ERR
 		};
 
 		/* Download and install the latest release of Repentogon.
@@ -84,45 +47,28 @@ namespace Launcher {
 		 *
 		 * Parameter force will cause the function to consider that an update is
 		 * available even if the installation is up-to-date.
-		 *
-		 * Return false if the request for up-to-dateness fails in any way.
-		 * Return true if there is an update available.
-		 * Return false if the request succeeds, and the installation is up-to-date
-		 * and force is false.
-		 * Return true if the request succeeds, and the installation is up-to-date
-		 * and force is true.
 		 */
-		bool CheckRepentogonUpdates(rapidjson::Document& document, bool allowPreReleases, bool force);
+		CheckRepentogonUpdatesResult CheckRepentogonUpdates(rapidjson::Document& document, bool allowPreReleases, bool force);
 
-		inline RepentogonInstallationCheckResult GetRepentogonInstallationCheck() const {
-			return _repentogonInstallationState;
-		}
-
-		inline bool IsValidRepentogonInstallation(bool allowLegacy) const {
-			return _repentogonInstallationState == REPENTOGON_INSTALLATION_CHECK_OK ||
-				(allowLegacy && IsLegacyRepentogonInstallation());
-		}
-
-		inline bool IsLegacyRepentogonInstallation() const {
-			return _repentogonInstallationState == REPENTOGON_INSTALLATION_CHECK_LEGACY;
-		}
-
-
-	public:
-		Installation _installation;
-		RepentogonUpdater _updater;
+		/* Display information about why the current Repentogon installation is
+		 * broken.
+		 */
+		void DebugDumpBrokenRepentogonInstallation();
+		void DisplayRepentogonFilesVersion(int tabs, bool isUpdate);
 
 	private:
-		ILoggableGUI* _gui;
-		std::string _zhlVersion;
-		std::string _zhlLoaderVersion;
-		std::string _repentogonVersion;
-		RepentogonInstallationCheckResult _repentogonInstallationState = REPENTOGON_INSTALLATION_CHECK_NONE;
+		void DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, LoadableDlls dll,
+			std::string const& (Installation::* ptr)() const, bool* found);
+		bool RemoveFile(const char* file);
+		bool HandleLegacyInstallation();
 
-		inline RepentogonInstallationCheckResult GetSetRepentogonInstallationState(RepentogonInstallationCheckResult state) {
-			_repentogonInstallationState = state;
-			return _repentogonInstallationState;
-		}
+		Installation* _installation;
+		ILoggableGUI* _gui;
+
+		/* Prior to update, for logging purpose. */
+		std::string _zhlVersion;
+		std::string _repentogonVersion;
+		std::string _loaderVersion;
 	};
 
 }

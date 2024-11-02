@@ -87,64 +87,57 @@ namespace Launcher {
 
 	}
 
-	IsaacInstallationPathInitResult Installation::InitFolders() {
-		IsaacInstallationPathInitResult result = SearchSaveFolder();
-		IsaacInstallationPathInitResult saveResult = result;
-		if (result != INSTALLATION_PATH_INIT_OK) {
-			Logger::Warn("Error while lokking for save folder: %d\n", result);
+	bool Installation::InitFolders() {
+		if (!SearchIsaacSaveFolder()) {
+			return false;
 		}
 			
-		result = SearchConfigurationFile();
-		if (result != INSTALLATION_PATH_INIT_OK) {
-			if (result == INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR) {
-				return saveResult;
-			}
-			return result;
+		if (!SearchConfigurationFile()) {
+			return false;
 		}
 
-		result = SearchIsaacInstallationPath();
-		if (result != INSTALLATION_PATH_INIT_OK) {
-			return result;
-		}
-
-		result = SearchRepentogonInstallationPath();
-		return result;
+		return SearchIsaacInstallationPath();
 	}
 
-	bool Installation::CheckIsaacInstallation() {
-		Logger::Info("Checking Isaac installation...\n");
-		if (_isaacFolder.empty()) {
-			Logger::Info("No Isaac folder found\n");
+	bool Installation::CheckIsaacInstallationFolder(std::string const& path) {
+		if (path.empty()) {
+			Logger::Info("Installation::CheckIsaacInstallationFolder: empty path given\n");
 			return false;
 		}
 
-		std::string fullPath = (_isaacFolder + "\\") + isaacExecutable;
+		std::string fullPath = (path + "\\") + isaacExecutable;
 		if (!Filesystem::FileExists(fullPath.c_str())) {
-			Logger::Error("No isaac-ng.exe file in %s\n", fullPath.c_str());
+			Logger::Info("Installation::CheckIsaacInstallationFolder:: no isaac-ng.exe file in %s\n", fullPath.c_str());
 			return false;
 		}
+
+		return true;
+	}
+
+	bool Installation::ConfigureIsaacInstallationFolder(std::string const& path) {
+		if (!CheckIsaacInstallationFolder(path)) {
+			_gui->LogError("%s is not a valid Isaac installation folder (no isaac-ng.exe found)\n", path.c_str());
+			Logger::Error("Installation::ConfigurationIsaacInstallationFolder: invalid folder given\n");
+			return false;
+		}
+
+		std::string fullPath = (path + "\\") + isaacExecutable;
 
 		try {
 			std::string hash = Sha256::Sha256F(fullPath.c_str());
 			_isaacVersion = GetIsaacVersionFromHash(hash.c_str());
 			Logger::Info("Computed hash of isaac-ng.exe: %s\n", hash.c_str());
-		}
-		catch (std::runtime_error& e) {
+		} catch (std::runtime_error& e) {
 			Logger::Error("Updater::CheckIsaacInstallation: exception: %s\n", e.what());
 		}
 
-		_isaacExecutable = std::move(fullPath);
-		return true;
-	}
-
-	bool Installation::SetIsaacInstallationFolder(std::string const& path) {
-		std::string backup = _isaacFolder;
+		/* Not an error to not have _isaacVersion here : second attempt will be 
+		 * performed later, state remains consistent.
+		 */
 		_isaacFolder = path;
+		_isaacExecutable = std::move(fullPath);
 
-		if (!CheckIsaacInstallation()) {
-			_isaacFolder = backup;
-			return false;
-		}
+		CheckRepentogonInstallation();
 
 		return true;
 	}
@@ -154,7 +147,6 @@ namespace Launcher {
 		ScopedModule module(lib);
 		if (!module) {
 			Logger::Error("Installation::LoadModule: Failed to load %s (%d)\n", shortName, GetLastError());
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 		} else {
 			Logger::Info("Installation::LoadModule: Loaded %s\n", shortName);
 		}
@@ -166,7 +158,6 @@ namespace Launcher {
 		FARPROC result = GetProcAddress(module, symbol);
 		if (!result) {
 			Logger::Warn("Installation::RetrieveSymbol: %s does not export %s\n", libname, symbol);
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 		} else {
 			Logger::Info("Installation::RetrieveSymbol: found %s at %p\n", symbol, result);
 		}
@@ -190,7 +181,6 @@ namespace Launcher {
 				MessageBoxA(NULL, "Alert",
 					buffer,
 					MB_ICONEXCLAMATION);
-				_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 				return false;
 			} else {
 				Logger::Info("Identified %s version %s\n", libname, target.c_str());
@@ -201,23 +191,15 @@ namespace Launcher {
 	}
 
 	bool Installation::CheckRepentogonInstallation() {
-		std::string repentogonFolder = _repentogonFolder;
+		std::string repentogonFolder = _isaacFolder;
+		_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 
-		if (_repentogonFolder.empty()) {
-			// Assume legacy installation.
-			if (_isaacFolder.empty()) {
-				Logger::Error("Repentogon folder not specified in configuration file or configuration file absent, and no Isaac folder specified: assuming no Repentogon installation\n");
-				return false;
-			}
+		_gui->Log("Checking for a Repentogon installation...\n");
 
-			repentogonFolder = _isaacFolder;
-			Logger::Warn("Repentogon folder not specified in configuration file or configuration file absent: assuming legacy Repentogon installation\n");
-		} else {
-			if (_isaacFolder.empty()) {
-				Logger::Fatal("Repentogon folder found (%s), but no Isaac folder specified, invalid state\n", _repentogonFolder.c_str());
-				throw std::runtime_error("Invalid launcher state: cannot have a Repentogon folder and no Isaac folder");
-				return false;
-			}
+		if (repentogonFolder.empty()) {
+			_gui->LogError("Cannot check for a Repentogon installation without being given an Isaac installation folder\n");
+			Logger::Critical("Installation::CheckRepentogonInstallation: function called without an Isaac folder, abnormal internal state\n");
+			return false;
 		}
 
 		_repentogonFiles.clear();
@@ -239,22 +221,25 @@ namespace Launcher {
 		}
 
 		if (!ok) {
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+			_gui->LogError("No valid Repentogon installation found in %s: missing files detected\n", _isaacFolder.c_str());
 			return false;
 		}
 
 		ScopedModule loader = LoadModule(Libraries::loader, (repentogonFolder + Libraries::loader).c_str(), LOADABLE_DLL_ZHL_LOADER);
 		if (!loader) {
+			_gui->LogError("No valid Repentogon installation found: ZHL loader missing\n");
 			return false;
 		}
 
 		ScopedModule zhl = LoadModule(Libraries::zhl, (repentogonFolder + Libraries::zhl).c_str(), LOADABLE_DLL_LIBZHL);
 		if (!zhl) {
+			_gui->LogError("No valid Repentogon installation found: ZHL DLL missing\n");
 			return false;
 		}
 
 		ScopedModule repentogon = LoadModule(Libraries::repentogon, (repentogonFolder + Libraries::repentogon).c_str(), LOADABLE_DLL_REPENTOGON);
 		if (!repentogon) {
+			_gui->LogError("No valid Repentogon installation found: Repentogon DLL missing\n");
 			return false;
 		}
 
@@ -263,23 +248,27 @@ namespace Launcher {
 		FARPROC loaderVersion		= RetrieveSymbol(loader,		Libraries::loader,		Symbols::loaderVersion);
 
 		if (!zhlVersion || !repentogonVersion || !loaderVersion) {
-			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+			_gui->LogError("No valid Repentogon installation found: some DLLs do not indicate a version\n");
 			return false;
 		}
 
 		if (!ValidateVersionSymbol(loader, Libraries::loader, Symbols::loaderVersion, loaderVersion, _zhlLoaderVersion)) {
+			_gui->LogError("[DANGER] No valid Repentogon installation found: the ZHL loader DLL is malformed\n");
 			return false;
 		}
 
 		if (!ValidateVersionSymbol(zhl, Libraries::zhl, Symbols::zhlVersion, zhlVersion, _zhlVersion)) {
+			_gui->LogError("[DANGER] No valid Repentogon installation found: the ZHL DLL is malformed\n");
 			return false;
 		}
 
 		if (!ValidateVersionSymbol(repentogon, Libraries::repentogon, Symbols::repentogonVersion, repentogonVersion, _repentogonVersion)) {
+			_gui->LogError("[DANGER] No valid Repentogon installation found: the Repentogon DLL is malformed\n");
 			return false;
 		}
 
 		if (_zhlVersion != _repentogonVersion || _repentogonVersion != _zhlLoaderVersion) {
+			_gui->LogError("No valid Repentogon installation found: the ZHL loader, the ZHL DLL and the Repentogon DLL are not aligned on the same version\n");
 			Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, ZHL loader version %s, Repentogon version %s)\n",
 				_zhlVersion.c_str(), _zhlLoaderVersion.c_str(), _repentogonVersion.c_str());
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
@@ -290,8 +279,10 @@ namespace Launcher {
 		_repentogonZHLVersionMatch = true;
 
 		if (Filesystem::FileExists((_isaacFolder + "dsound.dll").c_str())) {
+			_gui->LogWarn("Found a valid legacy installation of Repentogon (dsound.dll found)\n");
 			_installationState = REPENTOGON_INSTALLATION_STATE_LEGACY;
 		} else {
+			_gui->Log("Found a valid installation of Repentogon (version %s)\n", _zhlVersion.c_str());
 			_installationState = REPENTOGON_INSTALLATION_STATE_MODERN;
 		}
 
@@ -406,123 +397,148 @@ namespace Launcher {
 		return _isaacExecutable;
 	}
 
-	std::string const& Installation::GetRepentogonInstallationFolder() const {
-		return _repentogonFolder;
-	}
-
 	int Installation::GetConfigurationFileSyntaxErrorLine() const {
 		return _configFileParseErrorLine;
 	}
 
-	IsaacInstallationPathInitResult Installation::ProcessConfigurationFile(std::string const& path) {
-		_configurationFile.reset(new INIReader(path));
-		if (int error = _configurationFile->ParseError(); error != 0) {
+	std::unique_ptr<INIReader> const& Installation::GetConfigurationFileParser() const {
+		return _configurationFile;
+	}
+
+	bool Installation::IsValidRepentogonInstallation(bool includeLegacy) const {
+		return _installationState == REPENTOGON_INSTALLATION_STATE_MODERN ||
+			(includeLegacy && _installationState == REPENTOGON_INSTALLATION_STATE_LEGACY);
+	}
+
+	bool Installation::IsLegacyRepentogonInstallation() const {
+		return _installationState == REPENTOGON_INSTALLATION_STATE_LEGACY;
+	}
+
+	bool Installation::ProcessConfigurationFile(std::string const& path) {
+		std::unique_ptr<INIReader> reader(new INIReader(path));
+		if (int error = reader->ParseError(); error != 0) {
 			switch (error) {
 			case -1:
+				_gui->LogWarn("The configuration file %s cannot be opened, default options will be used\n", path.c_str());
 				Logger::Error("Unable to open launcher configuration file %s\n", path.c_str());
-				return INSTALLATION_PATH_INIT_ERR_OPEN_CONFIG;
+				return false;
 
 			default:
 				_configFileParseErrorLine = error;
+				_gui->LogWarn("The configuration %s contains syntax errors, default options will be used\n", path.c_str());
 				Logger::Error("INI parse error on line %d of configuration file %s\n", error, path.c_str());
-				return INSTALLATION_PATH_INIT_ERR_PARSE_CONFIG;
+				return false;
 			}
 		}
 
+		_gui->LogInfo("The configuration file %s has been successfully read !\n", path.c_str());
 		Logger::Info("Successfully opened and parsed launcher configuration file %s\n", path.c_str());
-		return INSTALLATION_PATH_INIT_OK;
+		_configurationFile = std::move(reader);
+		return true;
 	}
 
-	IsaacInstallationPathInitResult Installation::SearchSaveFolder() {
-		std::string path;
-		Filesystem::SaveFolderResult result = Filesystem::GetIsaacSaveFolder(&path);
-		switch (result) {
-		case Filesystem::SAVE_FOLDER_ERR_USERPROFILE:
-		case Filesystem::SAVE_FOLDER_ERR_GET_USER_PROFILE_DIR:
-			return INSTALLATION_PATH_INIT_ERR_PROFILE_DIR;
+	bool Installation::SearchIsaacSaveFolder() {
+		char homeDirectory[4096];
+		DWORD homeLen = 4096;
+		HANDLE token = GetCurrentProcessToken();
 
-		case Filesystem::SAVE_FOLDER_DOES_NOT_EXIST:
-			return INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR;
+		if (!Externals::pGetUserProfileDirectoryA) {
+			DWORD result = GetEnvironmentVariableA("USERPROFILE", homeDirectory, 4096);
+			if (result < 0) {
+				_gui->LogError("Unable to retrieve Isaac save folder path due to internal error\n");
+				Logger::Error("Installation::GetIsaacSaveFolder: no GetUserProfileDirectoryA and no %USERPROFILE\n");
+				return false;
+			}
+		} else {
+			BOOL result = Externals::pGetUserProfileDirectoryA(token, homeDirectory, &homeLen);
 
-		default:
-			break;
+			if (!result) {
+				_gui->LogError("Unable to retrive Isaac save folder path due to internal error\n");
+				Logger::Error("Installation::GetIsaacSaveFolder: unable to find user profile directory: %d\n", GetLastError());
+				return false;
+			}
+		}
+
+		std::string path(homeDirectory);
+		path += "\\Documents\\My Games\\Binding of Isaac Repentance";
+
+		if (!Filesystem::FolderExists(path.c_str())) {
+			_gui->LogError("No Repentance save folder found, launch the game once without the launcher please\n");
+			Logger::Error("Repentance save folder %s does not exist\n", path.c_str());
+			return false;
 		}
 
 		_saveFolder = std::move(path);
-		return INSTALLATION_PATH_INIT_OK;
+		return true;
 	}
 
-	IsaacInstallationPathInitResult Installation::SearchConfigurationFile() {
+	bool Installation::SearchConfigurationFile() {
 		std::string path = _saveFolder;
 		if (path.empty()) {
-			return INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR;
+			_gui->LogInfo("No launcher configuration file found, default options will be used\n");
+			Logger::Critical("Installation::SearchConfigurationFile: function called without a save folder, abnormal internal state\n");
+			return false;
 		}
 
 		path += "\\";
 		path += launcherConfigFile;
-		_configurationPath = std::move(path);
 
-		if (!Filesystem::FileExists(_configurationPath.c_str())) {
-			Logger::Error("No launcher configuration file found in Repentance save folder\n");
-			return INSTALLATION_PATH_INIT_ERR_NO_CONFIG;
+		if (!Filesystem::FileExists(path.c_str())) {
+			_gui->LogInfo("No launcher configuration file found in Repentance save folder, default options will be used\n");
+			Logger::Info("No launcher configuration file found in Repentance save folder\n");
+			return false;
 		}
 
-		IsaacInstallationPathInitResult parseRes = ProcessConfigurationFile(_configurationPath);
-		if (parseRes != INSTALLATION_PATH_INIT_OK) {
+		if (!ProcessConfigurationFile(path)) {
+			_gui->LogWarn("Launcher configuration file contains errors, default options will be used\n");
 			Logger::Error("Error while opening/parsing the launcher configuration file\n");
-			return parseRes;
+			return false;
 		}
 
 		
-		Logger::Info("Found configuration file %s\n", _configurationPath.c_str());
-		return parseRes;
+		_configurationPath = std::move(path);
+		_gui->LogInfo("Found launcher configuration file %s\n", _configurationPath.c_str());
+		Logger::Info("Found and processed configuration file %s\n", _configurationPath.c_str());
+		return true;
 	}
 
-	IsaacInstallationPathInitResult Installation::SearchIsaacInstallationPath() {
+	bool Installation::SearchIsaacInstallationPath() {
+		if (!_configurationFile) {
+			_gui->LogWarn("No Isaac installation folder automatically found, you'll need to specify one\n");
+			Logger::Critical("Installation::SearchIsaacInstallationPath: function called without a configuration file, abnormal internal state\n");
+			return false;
+		}
+
 		std::string isaacFolder = _configurationFile->GetString("General", "IsaacFolder", "__empty__");
 		if (isaacFolder == "__empty__") {
-			if (Filesystem::FileExists(isaacExecutable)) {
-				_isaacFolder = Filesystem::GetCurrentDirectory_();
-				Logger::Info("Found Isaac installation in %s\n", _isaacFolder.c_str());
-				return INSTALLATION_PATH_INIT_OK;
+			bool ok = ConfigureIsaacInstallationFolder(Filesystem::GetCurrentDirectory_());
+			if (!ok) {
+				_gui->LogWarn("The launcher configuration file does not indicate a path to the Isaac installation folder, you'll need to specify one\n");
+				Logger::Error("Configuration file has no Isaac installation folder and no isaac-ng.exe found in current folder\n");
+			} else {
+				_gui->LogInfo("Autodetected Isaac installation folder %s\n", _isaacFolder.c_str());
+				Logger::Info("Autodetected Isaac installation in %s\n", _isaacFolder.c_str());
 			}
 
-			Logger::Error("Configuration file has no Isaac installation folder and no isaac-ng.exe found in current folder\n");
-			return INSTALLATION_PATH_INIT_ERR_NO_ISAAC;
+			return ok;
 		}
 
 		if (!Filesystem::FolderExists(isaacFolder.c_str())) {
+			_gui->LogWarn("The launcher configuration file indicates a non existent Isaac installation folder (%s)," 
+				"you'll need to specify a correct one\n", _isaacFolder.c_str());
 			Logger::Error("Isaac installation folder %s in launcher configuration file does not exist\n", isaacFolder.c_str());
-			return INSTALLATION_PATH_INIT_ERR_BAD_ISAAC_FOLDER;
+			return false;
 		}
 
-		_isaacFolder = std::move(isaacFolder);
+		_gui->LogInfo("Launcher configuration file indicates %s as Isaac installation folder, checking it is valid\n", isaacFolder.c_str());
+		if (!ConfigureIsaacInstallationFolder(isaacFolder)) {
+			_gui->LogWarn("Isaac installation folder %s is not valid, you'll be prompted for a valid one\n", isaacFolder.c_str());
+			return false;
+		}
+
+		_gui->Log("Isaac installation folder %s is valid !\n", _isaacFolder.c_str());
 		Logger::Info("Found Isaac installation in %s\n", _isaacFolder.c_str());
-		return INSTALLATION_PATH_INIT_OK;
-	}
-
-	IsaacInstallationPathInitResult Installation::SearchRepentogonInstallationPath() {
-		std::string repentogonFolder = _configurationFile->GetString("General", "RepentogonFolder", "__empty__");
-		if (repentogonFolder == "__empty__") {
-			if (Filesystem::FolderExists(defaultRepentogonFolder)) {
-				_repentogonFolder = (Filesystem::GetCurrentDirectory_() + "\\") + defaultRepentogonFolder;
-				Logger::Info("Found Repentogon installation folder in %s\n", _repentogonFolder.c_str());
-			} else {
-				Logger::Info("No Repentogon installation folder in launcher configuration file\n");
-			}
-
-			/* In this context it is not an error to not find a folder. */
-			return INSTALLATION_PATH_INIT_OK;
-		}
-
-		if (!Filesystem::FolderExists(repentogonFolder.c_str())) {
-			Logger::Error("Repentogon installation folder %s in launcher configuration file does not exist\n", repentogonFolder.c_str());
-			return INSTALLATION_PATH_INIT_ERR_BAD_REPENTOGON_FOLDER;
-		}
-
-		_repentogonFolder = std::move(repentogonFolder);
-		Logger::Info("Found Repentogon installation folder %s\n", _repentogonFolder.c_str());
-		return INSTALLATION_PATH_INIT_OK;
+		return true;
 	}
 
 	void Installation::WriteLauncherConfigurationFile() {
@@ -677,5 +693,40 @@ namespace Launcher {
 		free(content);
 		result = std::string(startVersion, endVersion);
 		return READ_VERSION_STRING_OK;
+	}
+
+	bool Installation::IsCompatibleWithRepentogon() {
+		Version const* version = GetIsaacVersion();
+		bool compatible = false;
+		if (!version) {
+			_gui->LogWarn("This installation of Isaac is non-standard (could be the result of running a Steamless version)\n"
+				"Attempting to determine its version to check compatibility with Repentogon\n");
+			std::string versionStr;
+			ReadVersionStringResult result = GetVersionString(versionStr);
+
+			if (result != READ_VERSION_STRING_OK) {
+				_gui->LogError("An error occured while attempting to determine the version of Isaac. Assuming it is not REPENTOGON compatible\n");
+				return false;
+			}
+
+			_gui->LogInfo("Identified Isaac version %s\n", versionStr.c_str());
+			compatible = IsCompatibleWithRepentogon(versionStr);
+		} else {
+			_gui->LogInfo("Identified Isaac version %s\n", version->version);
+			compatible = version->valid;
+		}
+
+		if (compatible) {
+			_gui->LogInfo("This version is compatible with Repentogon !\n");
+		} else {
+			_gui->LogWarn("This version is incompatible with Repentogon. Disabling Repentogon launch options.\n");
+		}
+
+		return compatible;
+	}
+
+	bool Installation::IsCompatibleWithRepentogon(std::string const& ver) {
+		_gui->LogError("Called Installation::IsCompatibleWithRepentogon before it is finalized\n");
+		return false;
 	}
 }

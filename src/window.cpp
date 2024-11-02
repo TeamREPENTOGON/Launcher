@@ -70,8 +70,7 @@ namespace Launcher {
 
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 	
-	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
-		_installationManager(this), _launcherUpdaterMgr(this), _installation(this) {
+	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"), _installation(this) {
 		memset(&_options, 0, sizeof(_options));
 		// _optionsGrid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
@@ -114,7 +113,7 @@ namespace Launcher {
 	}
 
 	MainFrame::~MainFrame() {
-		_options.WriteConfiguration(this, _installationManager._installation);
+		_options.WriteConfiguration(this, _installation);
 	}
 
 	void MainFrame::AddLauncherConfigurationOptions() {
@@ -319,38 +318,41 @@ namespace Launcher {
 		Log("\t\tLua debug: %s", _options.luaDebug ? "yes" : "no");
 		Log("\t\tLua heap size: %dM", _options.luaHeapSize);
 
-		_options.WriteConfiguration(this, _installationManager._installation);
+		_options.WriteConfiguration(this, _installation);
 		::Launch(_isaacFileText->GetValue().c_str().AsChar(), _options);
 	}
 
-	void MainFrame::InitializeIsaacFolderPath(bool needIsaacFolder, bool canWriteConfiguration) {
-		if (needIsaacFolder || !_installationManager.CheckIsaacInstallation()) {
+	bool MainFrame::InitializeIsaacFolderPath(bool shouldPrompt) {
+		if (shouldPrompt) {
 			std::string path = PromptIsaacInstallation();
 			std::filesystem::path p(path);
 			p.remove_filename();
-			if (!_installationManager._installation.SetIsaacInstallationFolder(p.string())) {
+			if (!_installation.ConfigureIsaacInstallationFolder(p.string())) {
 				LogError("Unable to configure the Isaac installation folder");
-				return;
+				return false;
 			} else {
 				Log("Set Isaac installation folder to %s", p.string().c_str());
 			}
 
 			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
 		} else {
-			OnFileSelected(_installationManager._installation.GetIsaacInstallationFolder() + "isaac-ng.exe", 
+			OnFileSelected(_installation.GetIsaacInstallationFolder() + "isaac-ng.exe",
 				NoIsaacColor, _isaacFileText, NoIsaacText);
 		}
+
+		return true;
 	}
 
 	void MainFrame::HandleLauncherUpdates(bool allowPreReleases) {
 		using lu = Updater::LauncherUpdateManager;
 		std::string version, url;
+		Updater::LauncherUpdateManager manager(this);
 		lu::SelfUpdateCheckResult result = 
-			this->_launcherUpdaterMgr.CheckSelfUpdateAvailability(allowPreReleases, version, url);
+			manager.CheckSelfUpdateAvailability(allowPreReleases, version, url);
 		if (result == lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE) {
 			if (PromptLauncherUpdate(version, url)) {
 				Log("Initiating update");
-				if (!_launcherUpdaterMgr.DoUpdate(Launcher::version, version.c_str(), url.c_str())) {
+				if (!manager.DoUpdate(Launcher::version, version.c_str(), url.c_str())) {
 					LogError("Error while updating the launcher\n");
 				}
 			} else {
@@ -392,17 +394,28 @@ namespace Launcher {
 
 		LPSTR cli = GetCommandLineA();
 		Log("Command line: %s", cli);
-		Log("Loading Repentogon configuration...");
-				
-		bool needIsaacFolder = true;
-		bool canWriteConfiguration = false;
 
-		_installationManager.InitFolders(&needIsaacFolder, &canWriteConfiguration);
-		InitializeIsaacFolderPath(needIsaacFolder, canWriteConfiguration);
+		Log("Attempting to autodetect Isaac save folder, launcher configuration and Isaac installation folder...");
+		bool shouldPromptForIsaac = !_installation.InitFolders();
+		bool abortInitialization = false;
+		while (!abortInitialization && !InitializeIsaacFolderPath(shouldPromptForIsaac)) {
+			wxMessageDialog dialog(this, "Invalid Isaac folder path given, do you want to retry ? (Answering \"No\" will abort)", "Invalid folder", wxYES_NO);
+			int result = dialog.ShowModal();
+			abortInitialization = (result == wxID_NO);
+		}
+
+		if (abortInitialization) {
+			Logger::Fatal("User did not provide a valid Isaac installation folder, aborting\n");
+			wxAbort();
+		}
+
+		/* Guarantee: Isaac installation folder is okay, Repentogon installation
+		 * has been identified.
+		 */
 
 		InitializeOptions();
 
-		if (!_installationManager.CheckIsaacVersion()) {
+		if (!_installation.IsCompatibleWithRepentogon()) {
 			if (_repentogonLaunchModeIdx != -1) {
 				_launchMode->Delete(_repentogonLaunchModeIdx);
 				DisableRepentogonOptions();
@@ -410,37 +423,92 @@ namespace Launcher {
 			return;
 		}
 
-		auto installationState = _installationManager.CheckRepentogonInstallation(false, false);
-		bool checkUpdates = (installationState != InstallationManager::REPENTOGON_INSTALLATION_CHECK_LEGACY);
-		if (installationState == InstallationManager::REPENTOGON_INSTALLATION_CHECK_KO) {
+		// Guarantee: installation is compatible with Repentogon.
+		PostInitHandleRepentogon();
+	}
+
+	void MainFrame::PostInitHandleRepentogon() {
+		bool needCheckRepentogonUpdates = true;
+		bool successfullyInstalledRepentogon = false;
+		bool attemptedToInstallRepentogon = false;
+		bool attemptedToUpdateRepentogon = false;
+		bool isLegacy = false;
+		bool needToDisableRepentogonOptions = false;
+
+		InstallationManager repentogonUpdateMgr(this, &_installation);
+
+		if (_installation.GetRepentogonInstallationState() == REPENTOGON_INSTALLATION_STATE_NONE) {
 			if (PromptRepentogonInstallation()) {
-				_installationManager.InstallLatestRepentogon(true, _options.unstableUpdates);
-				installationState = _installationManager.CheckRepentogonInstallation(true, false);
+				attemptedToInstallRepentogon = true;
+				repentogonUpdateMgr.InstallLatestRepentogon(true, _options.unstableUpdates);
+				successfullyInstalledRepentogon = _installation.CheckRepentogonInstallation();
 			}
 
-			checkUpdates = false;
+			needCheckRepentogonUpdates = false;
+		} else {
+			isLegacy = _installation.IsLegacyRepentogonInstallation();
+			// If an update occurs, this value is reassessed.
+			needToDisableRepentogonOptions = isLegacy;
 		}
 
-		if (checkUpdates && _options.update) {
+		/* If installation is legacy, then an update is available _by construction_.
+		 * Therefore there is no need to do a specific check.
+		 */
+		if (needCheckRepentogonUpdates && _options.update) {
 			Log("Checking for Repentogon updates...");
 			rapidjson::Document release;
-			if (!_installationManager.CheckRepentogonUpdates(release, _options.unstableUpdates, false)) {
+			InstallationManager::CheckRepentogonUpdatesResult checkUpdates = 
+				repentogonUpdateMgr.CheckRepentogonUpdates(release, _options.unstableUpdates, false);
+			if (checkUpdates == InstallationManager::CHECK_REPENTOGON_UPDATES_UTD) {
 				Log("Repentogon is up-to-date");
-			} else {
+			} else if (checkUpdates == InstallationManager::CHECK_REPENTOGON_UPDATES_NEW) {
 				Log("An update is available. Updating Repentogon...");
-				_installationManager.InstallRepentogon(release);
-				installationState = _installationManager.CheckRepentogonInstallation(false, false);
+				attemptedToInstallRepentogon = true;
+				attemptedToUpdateRepentogon = true;
+				repentogonUpdateMgr.InstallRepentogon(release);
+				successfullyInstalledRepentogon = _installation.CheckRepentogonInstallation();
+			} else {
+				LogError("Unable to check for availability of Repentogon updates\n");
+				// No need to return, installation may be valid regardless
+			}
+		}
+		
+		if (attemptedToInstallRepentogon) {
+			if (successfullyInstalledRepentogon) {
+				if (_installation.IsLegacyRepentogonInstallation()) {
+					Log("Legacy installation of Repentogon found. Repentogon will work, but the launcher cannot configure it.");
+					needToDisableRepentogonOptions = true;
+					isLegacy = true;
+				} else {
+					if (attemptedToUpdateRepentogon) {
+						Log("Suscessfully updated Repentogon to version %s\n", _installation.GetRepentogonVersion().c_str());
+					} else {
+						Log("Successfully installed Repentogon version %s\n", _installation.GetRepentogonVersion().c_str());
+					}
+
+					Log("State of the current Repentogon installation:\n");
+					repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, attemptedToUpdateRepentogon);
+				}
+			} else {
+				if (attemptedToUpdateRepentogon) {
+					LogError("Unable to update Repentogon\n");
+				} else {
+					LogError("Unable to install Repentogon\n");
+				}
+
+				Log("Information regarding what happened during the installation:\n");
+				repentogonUpdateMgr.DebugDumpBrokenRepentogonInstallation();
+				needToDisableRepentogonOptions = true;
 			}
 		}
 
-		if (installationState != InstallationManager::REPENTOGON_INSTALLATION_CHECK_OK) {
-			if (installationState == InstallationManager::REPENTOGON_INSTALLATION_CHECK_LEGACY) {
-				Log("Legacy installation of Repentogon found. Repentogon will work, but the launcher cannot configure it.");
+		if (needToDisableRepentogonOptions) {
+			if (isLegacy) {
+				LogWarn("Disabling Repentogon configuration options due to legacy installation\n");
 			} else {
-				LogWarn("No valid installation of Repentogon found.");
+				LogWarn("Disabling Repentogon configuration options due to previous errors\n");
 			}
 
-			LogWarn("Disabling Repentogon configuration options");
 			DisableRepentogonOptions();
 		}
 	}
@@ -614,22 +682,9 @@ namespace Launcher {
 	}
 
 	void MainFrame::InitializeOptions() {
-		std::string configurationFile = _installationManager._installation.GetLauncherConfigurationPath();
-		char readerMem[sizeof(INIReader)];
-
-		bool invokeReader = false;
-		if (!configurationFile.empty() && Filesystem::FileExists(configurationFile.c_str())) {
-			new (readerMem) INIReader(configurationFile);
-			invokeReader = true;
-		}
-
-		INIReader* reader = reinterpret_cast<INIReader*>(readerMem);
-		if (!invokeReader || reader->ParseError() == -1) {
-			if (!invokeReader) {
-				LogError("No configuration file found, using defaults");
-			} else {
-				LogError("Malformed configuration file found (%s), using defaults", configurationFile.c_str());
-			}
+		std::unique_ptr<INIReader> const& reader = _installation.GetConfigurationFileParser();
+		if (!reader) {
+			Log("No launcher configuration file found, default initializing options\n");
 
 			wxMessageDialog dialog(this, "Do you want to have the launcher automatically update Repentogon?\n(Selecting \"Yes\" will immediately update Repentogon to the latest versions)", "Automatic Repentogon updates", wxYES_NO | wxCANCEL);
 			int result = dialog.ShowModal();
@@ -639,11 +694,11 @@ namespace Launcher {
 
 			_options.InitializeDefaults(this, result == wxID_OK || result == wxID_YES,
 				result == wxID_OK || result == wxID_YES, 
-				_installationManager.IsValidRepentogonInstallation(true));
+				_installation.IsValidRepentogonInstallation(true));
 		} else {
 			Log("Found configuration file launcher.ini");
 			_options.InitializeFromConfig(this, *reader,
-				_installationManager.IsValidRepentogonInstallation(true));
+				_installation.IsValidRepentogonInstallation(true));
 		}
 		
 		InitializeGUIFromOptions();
@@ -716,47 +771,25 @@ namespace Launcher {
 		_launchMode->SetValue("Vanilla");
 	}
 
-	void MainFrame::ForceRepentogonUpdate(bool unstable) {
+	void MainFrame::ForceRepentogonUpdate(bool allowPreReleases) {
 		Log("Forcibly updating Repentogon to the latest version");
-		if (_installationManager.IsLegacyRepentogonInstallation()) {
-			if (!_installationManager.UninstallLegacyRepentogon() && 
-				Filesystem::FileExists((_installationManager._installation.GetIsaacInstallationFolder() + "/dsound.dll").c_str())) {
-				LogWarn("[Force update] Identified a legacy Repentogon installation, but couldn't remove dsound.dll. Repentogon may not work after the update");
-			}
+
+		InstallationManager repentogonUpdateMgr(this, &_installation);
+		InstallationManager::DownloadInstallRepentogonResult result = repentogonUpdateMgr.InstallLatestRepentogon(true, allowPreReleases);
+
+		if (result == InstallationManager::DOWNLOAD_INSTALL_REPENTOGON_ERR || 
+			result == InstallationManager::DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES) {
+			LogError("Unable to force Repentogon update\n");
+			return;
 		}
 
-		_installationManager.InstallLatestRepentogon(true, unstable);
-		_installationManager.CheckRepentogonInstallation(false, true);
-	}
-
-	Launcher::ConfigurationFileLocation MainFrame::PromptConfigurationFileLocation() {
-		wxString message("The launcher was not able to find a configuration file. If this is your first run, it is normal.\n");
-		std::string saveFolder = _installationManager._installation.GetSaveFolder();
-		if (saveFolder.empty()) {
-			message += "The launcher was not able to find your user profile directory. As such, the configuration fille will be created next to the launcher.";
-			wxMessageDialog dialog(this, message, "Information", wxOK);
-			dialog.ShowModal();
-			return Launcher::CONFIG_FILE_LOCATION_HERE;
+		if (!_installation.CheckRepentogonInstallation()) {
+			LogError("Installation of Repentogon post update is not valid\n");
+			repentogonUpdateMgr.DebugDumpBrokenRepentogonInstallation();
 		} else {
-			message += "The launcher will proceed to create its configuration file.\n\n"
-				"You can decide whether you want that file to be installed next to the launcher, or in the same folder as the Repentance save files\n"
-				"The launcher identified your Repentance save folder as: ";
-			message += _installationManager._installation.GetSaveFolder();
-			wxString options[] = {
-				"Install next to launcher",
-				"Install in Repentance save folder"
-			};
-			wxSingleChoiceDialog dialog(this, message, "Create the launcher's configuration file", 2, options);
-			dialog.ShowModal();
-
-			if (dialog.GetSelection() == 0) {
-				return Launcher::CONFIG_FILE_LOCATION_HERE;
-			} else {
-				return Launcher::CONFIG_FILE_LOCATION_SAVE;
-			}
+			Log("State of the Repentogon installation:\n");
+			repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, true);
 		}
-
-		return Launcher::CONFIG_FILE_LOCATION_HERE;
 	}
 
 	std::string MainFrame::PromptIsaacInstallation() {
@@ -820,11 +853,11 @@ namespace Launcher {
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE:
-			_launcherUpdaterMgr.ForceSelfUpdate(true);
+			Updater::LauncherUpdateManager(this).ForceSelfUpdate(true);
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE:
-			_launcherUpdaterMgr.ForceSelfUpdate(false);
+			Updater::LauncherUpdateManager(this).ForceSelfUpdate(false);
 			break;
 
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE:

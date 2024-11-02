@@ -31,15 +31,6 @@ namespace Filesystem {
 
 	std::string GetCurrentDirectory_();
 
-	enum SaveFolderResult {
-		SAVE_FOLDER_ERR_USERPROFILE,
-		SAVE_FOLDER_ERR_GET_USER_PROFILE_DIR,
-		SAVE_FOLDER_DOES_NOT_EXIST,
-		SAVE_FOLDER_OK
-	};
-
-	SaveFolderResult GetIsaacSaveFolder(std::string* saveFolder);
-
 	/* Remove a file. Return false on failure, true on success. */
 	bool RemoveFile(const char* filename);
 }

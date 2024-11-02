@@ -79,30 +79,6 @@ namespace Launcher {
 		REPENTOGON_INSTALLATION_STATE_MODERN
 	};
 
-	enum IsaacInstallationPathInitResult {
-		INSTALLATION_PATH_INIT_OK,
-		/* Error while retrieving the profile directory. */
-		INSTALLATION_PATH_INIT_ERR_PROFILE_DIR,
-		/* Error: the save folder does not exist. */
-		INSTALLATION_PATH_INIT_ERR_NO_SAVE_DIR,
-		/* Error: the configuration file does not exist. */
-		INSTALLATION_PATH_INIT_ERR_NO_CONFIG,
-		/* Error: can't open configuration file. */
-		INSTALLATION_PATH_INIT_ERR_OPEN_CONFIG,
-		/* Error: can't parse configuration file. */
-		INSTALLATION_PATH_INIT_ERR_PARSE_CONFIG,
-		/* Error: configuration file does not point towards an Isaac folder, 
-		 * and no isaac-ng.exe found in current folder. 
-		 */
-		INSTALLATION_PATH_INIT_ERR_NO_ISAAC,
-		/* Error: configuration file does not point towards a valid Isaac folder. */
-		INSTALLATION_PATH_INIT_ERR_BAD_ISAAC_FOLDER,
-		/* Error: configuration file does not point towards a valid Repentogon folder. */
-		INSTALLATION_PATH_INIT_ERR_BAD_REPENTOGON_FOLDER,
-		/* Error: malformed configuration file. */
-		INSTALLATION_PATH_INIT_ERR_MALFORMED_CONFIG
-	};
-
 	enum ConfigurationFileLocation {
 		CONFIG_FILE_LOCATION_HERE,
 		CONFIG_FILE_LOCATION_SAVE,
@@ -121,34 +97,61 @@ namespace Launcher {
 	/* Global array of all known versions of the game. */
 	extern Version const knownVersions[];
 
+	/* Class representing the state of an installation of Isaac and Repentogon.
+	 * 
+	 * This class acts as a STATE MACHINE. Attributes are default initialized
+	 * to empty values. 
+	 * 
+	 * The states are the following
+	 *	* Empty (default initialized)
+	 *  * Isaac save folder found
+	 *  * Launcher configuration file found (dependent on Isaac save folder found)
+	 *  * Isaac installation found (can be entered from the launcher configuration
+	 * file found state, but can be triggered manually).
+	 *  * Repentogon installation found (dependent on Isaac installation found)
+	 * 
+	 * Because states form a complex graph, it is recommended to check for
+	 * co-dependent states.
+	 */
 	class Installation {
 	public:
 		Installation(ILoggableGUI* gui);
 
-		/* Initialize the save folder, Isaac installation, launcher 
-		 * configuration and Repentogon installation (if any) paths.
+		/* Initialize the save folder, Isaac installation, and launcher 
+		 * configuration file paths.
 		 * 
-		 * If the function succeeds, the functions GetIsaacInstallationFolder(),
-		 * GetLauncherConfigurationFolder() and GetRepentogonInstallationFolder()
-		 * return the found values.
+		 * The function works in three steps, each step progressing only if the
+		 * previous one succeeded: first it searches the save folder, then the 
+		 * launcher configuration file, then the Isaac installation.
 		 * 
-		 * If the function fails, the aforementioned functions can work 
-		 * depending on where the failure occured (an error while searching
-		 * the Isaac folder still allows GetLauncherConfigurationFolder()
-		 * to work).
+		 * Rationale: the save folder contains the configuration file that should
+		 * contain the Isaac installation path. If the save folder does not exist,
+		 * there is no configuration to load. If there is no configuration to load,
+		 * there is no available path to Isaac.
+		 * 
+		 * The function returns true if all paths are found, false if any of 
+		 * them are missing. The getters for the three different paths will
+		 * return empty values for not found / searched paths, existing paths
+		 * otherwise.
 		 */
-		IsaacInstallationPathInitResult InitFolders();
+		bool InitFolders();
 
-		/* Check that the installation of Isaac is valid.
-		 *
-		 * An installation of Isaac is valid if _isaacFolder contains a file 
-		 * called isaac-ng.exe.
-		 *
-		 * After a call to this function, GetIsaacVersion() can be used to
-		 * query information about the currently installed version, if 
-		 * an installation was found.
+		/* Configure the path to the Isaac installation folder.
+		 * 
+		 * The function first checks if the given path is a valid Isaac
+		 * installation folder (i.e. it contains a file called isaac-ng.exe).
+		 * If the path is not a valid installation folder, the function returns
+		 * false.
+		 * 
+		 * This function additionally attempts to find a Repentogon installation
+		 * in the given folder, if the Isaac installation is valid.
+		 * 
+		 * If the path is a valid installation folder, GetIsaacVersion(),
+		 * GetIsaacInstallationPath() and GetIsaacExecutablePath() will return
+		 * exploitable values. All functions related to an installation of 
+		 * Repentogon become usable as well.
 		 */
-		bool CheckIsaacInstallation();
+		bool ConfigureIsaacInstallationFolder(std::string const& folder);
 
 		/* Check for an installation of Repentogon.
 		 *
@@ -164,13 +167,14 @@ namespace Launcher {
 		 */
 		bool CheckRepentogonInstallation();
 
+		bool IsCompatibleWithRepentogon();
+
 		ScopedModule LoadModule(const char* shortName, const char* path, LoadableDlls dll);
 		FARPROC RetrieveSymbol(HMODULE module, const char* libname, const char* symbol);
 		bool ValidateVersionSymbol(HMODULE module, const char* libname, const char* symbolName, 
 			FARPROC versionSymbol, std::string& target);
 
 		void SetLauncherConfigurationPath(ConfigurationFileLocation loc);
-		bool SetIsaacInstallationFolder(std::string const& folder);
 		void WriteLauncherConfigurationFile();
 
 		RepentogonInstallationState GetRepentogonInstallationState() const;
@@ -186,11 +190,15 @@ namespace Launcher {
 		std::string const& GetLauncherConfigurationPath() const;
 		std::string const& GetIsaacInstallationFolder() const;
 		std::string const& GetIsaacExecutablePath() const;
-		std::string const& GetRepentogonInstallationFolder() const;
+
+		bool IsValidRepentogonInstallation(bool includeLegacy) const;
+		bool IsLegacyRepentogonInstallation() const;
 
 		int GetConfigurationFileSyntaxErrorLine() const;
 
 		ReadVersionStringResult GetVersionString(std::string& version) const;
+
+		std::unique_ptr<INIReader> const& GetConfigurationFileParser() const;
 
 	private:
 		ILoggableGUI* _gui = NULL;
@@ -233,10 +241,6 @@ namespace Launcher {
 		std::string _isaacFolder;
 		/* Path to the Isaac executable, or empty if not found. */
 		std::string _isaacExecutable;
-		/* Path to the folder containing the current installation of 
-		 * Repentogon, if any. 
-		 */
-		std::string _repentogonFolder;
 		/* Eventual line in the launcher configuration file that resulted
 		 * in a parse error. 
 		 */
@@ -250,15 +254,6 @@ namespace Launcher {
 		 */
 		HMODULE LoadLib(const char* name, LoadableDlls dll);
 
-		/* Find the folder containing the Repentance save files. 
-		 * 
-		 * The function will look in the user's profile dir, as does the
-		 * game.
-		 * 
-		 * This function can fail.
-		 */
-		IsaacInstallationPathInitResult SearchSaveFolder();
-
 		/* Find the folder containing the configuration of the launcher.
 		 * 
 		 * The function first checks for a file named repentogon_launcher.ini
@@ -269,7 +264,7 @@ namespace Launcher {
 		 * 
 		 * This function can fail.
 		 */
-		IsaacInstallationPathInitResult SearchConfigurationFile();
+		bool SearchConfigurationFile();
 
 		/* Find the folder containing the installation of Isaac. 
 		 * 
@@ -285,29 +280,24 @@ namespace Launcher {
 		 * 
 		 * This function can fail.
 		 */
-		IsaacInstallationPathInitResult SearchIsaacInstallationPath();
-
-		/* Find the folder containing the installation of Repentogon.
-		 * 
-		 * The function first checks the content of the configuration file.
-		 * If the config indicates an installation folder, the function
-		 * checks that it is an existing folder, but doesn't check the
-		 * validaity of the installation (see CheckRepentogonInstallation()).
-		 * 
-		 * If the configuration file does not indicate an installation
-		 * folder, the function checks for a folder called repentogon in 
-		 * the current folder. If such a folder is found, it becomes the 
-		 * Repentogon installation folder (no validation is performed).
-		 * 
-		 * This function can fail.
-		 */
-		IsaacInstallationPathInitResult SearchRepentogonInstallationPath();
+		bool SearchIsaacInstallationPath();
 
 		/* Open and parse the configuration file pointed by path.
 		 * 
 		 * This function can fail.
 		 */
-		IsaacInstallationPathInitResult ProcessConfigurationFile(std::string const& path);
+		bool ProcessConfigurationFile(std::string const& path);
+
+		bool SearchIsaacSaveFolder();
+
+		bool IsCompatibleWithRepentogon(std::string const& version);
+
+		/* Check that an installation of Isaac is valid.
+		 *
+		 * An installation of Isaac is valid if path contains a file
+		 * called isaac-ng.exe.
+		 */
+		bool CheckIsaacInstallationFolder(std::string const& path);
 	};
 
 	/* Validate a string in an unsafe module.

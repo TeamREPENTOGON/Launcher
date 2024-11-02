@@ -65,12 +65,8 @@ namespace Launcher {
 		void LogError(const char* fmt, ...);
 		void PostInit();
 
-		static Version const* GetVersion(const char* hash);
-
 	private:
 		Installation _installation;
-		InstallationManager _installationManager;
-		Updater::LauncherUpdateManager _launcherUpdaterMgr;
 
 		/* Window building. */
 		void AddLauncherConfigurationOptions();
@@ -81,15 +77,6 @@ namespace Launcher {
 		void AddLauncherConfigurationTextField(const char* intro, 
 			const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
 			wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId);
-
-		/* Check Isaac version, Repentogon installation and Repentogon version. 
-		 * Disable Repentogon options if Repentogon is not installed correctly.
-		 * 
-		 * This only checks the consistency of Repentogon's version, i.e. both
-		 * ZHL and the main mod have the same version. See CheckRepentogonUpdates
-		 * for the function that checks if updates are available.
-		 */
-		void CheckVersionsAndInstallation();
 
 		bool PromptLauncherUpdate(std::string const& version, std::string const& url);
 
@@ -115,13 +102,9 @@ namespace Launcher {
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
 
-		void ForceRepentogonUpdate(bool unstable);
+		void ForceRepentogonUpdate(bool allowPreReleases);
 
 		void Launch(wxCommandEvent& event);
-		void Inject();
-
-		/* Prompt the user for a place to store the configuration file.	*/
-		Launcher::ConfigurationFileLocation PromptConfigurationFileLocation();
 
 		/* Prompt the user for the folder containing an Isaac installation. */
 		std::string PromptIsaacInstallation();
@@ -148,8 +131,10 @@ namespace Launcher {
 		bool SanityCheckLauncherUpdate();
 		void SanitizeLauncherUpdate();
 
-		void InitializeIsaacFolderPath(bool needIsaacFolder, bool canWriteConfiguration);
+		bool InitializeIsaacFolderPath(bool shouldPrompt);
 		void HandleLauncherUpdates(bool allowDrafts);
+
+		void PostInitHandleRepentogon();
 
 		IsaacOptions _options;
 		wxStaticBoxSizer* _optionsSizer;
