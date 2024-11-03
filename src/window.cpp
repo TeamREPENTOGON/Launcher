@@ -697,7 +697,7 @@ namespace Launcher {
 				result == wxID_OK || result == wxID_YES, 
 				_installation.IsValidRepentogonInstallation(true));
 		} else {
-			Log("Found configuration file launcher.ini");
+			Log("Found configuration file %s\n", _installation.GetLauncherConfigurationPath().c_str());
 			_options.InitializeFromConfig(this, *reader,
 				_installation.IsValidRepentogonInstallation(true));
 		}

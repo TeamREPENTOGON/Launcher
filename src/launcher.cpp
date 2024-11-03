@@ -53,7 +53,7 @@ void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bo
 	unstableUpdates = reader.GetBoolean(Sections::shared, Keys::unstableUpdates, Defaults::unstableUpdates);
 
 	if (mode != LAUNCH_MODE_REPENTOGON && mode != LAUNCH_MODE_VANILLA) {
-		gui->LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", mode, Keys::launchMode);
+		gui->LogWarn("Invalid value %d for %s field in repentogon_launcher.ini. Overriding with default", mode, Keys::launchMode);
 		if (validRepentogon) {
 			mode = LAUNCH_MODE_REPENTOGON;
 		} else {
@@ -62,23 +62,23 @@ void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bo
 	}
 
 	if (luaHeapSize < 0) {
-		gui->LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", luaHeapSize, Keys::luaHeapSize.c_str());
+		gui->LogWarn("Invalid value %d for %s field in repentogon_launcher.ini. Overriding with default", luaHeapSize, Keys::luaHeapSize.c_str());
 		luaHeapSize = Defaults::luaHeapSize;
 	}
 
 	if (levelStage < IsaacInterface::STAGE_NULL || levelStage > IsaacInterface::STAGE8) {
-		gui->LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", levelStage, Keys::levelStage.c_str());
+		gui->LogWarn("Invalid value %d for %s field in repentogon_launcher.ini. Overriding with default", levelStage, Keys::levelStage.c_str());
 		levelStage = Defaults::levelStage;
 		stageType = Defaults::stageType;
 	}
 
 	if (stageType < IsaacInterface::STAGETYPE_ORIGINAL || stageType > IsaacInterface::STAGETYPE_REPENTANCE_B) {
-		gui->LogWarn("Invalid value %d for %s field in launcher.ini. Overriding with default", stageType, Keys::stageType.c_str());
+		gui->LogWarn("Invalid value %d for %s field in repentogon_launcher.ini. Overriding with default", stageType, Keys::stageType.c_str());
 		stageType = Defaults::stageType;
 	}
 
 	if (stageType == IsaacInterface::STAGETYPE_GREEDMODE) {
-		gui->LogWarn("Value 3 (Greed mode) for %s field in launcher.ini is deprecated since Repentance."
+		gui->LogWarn("Value 3 (Greed mode) for %s field in repentogon_launcher.ini is deprecated since Repentance."
 			"Overriding with default", Keys::stageType.c_str());
 		stageType = Defaults::stageType;
 	}
@@ -87,7 +87,7 @@ void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bo
 	if (levelStage == IsaacInterface::STAGE4_1 || levelStage == IsaacInterface::STAGE4_2) {
 		if (stageType == IsaacInterface::STAGETYPE_REPENTANCE_B) {
 			gui->LogWarn("Invalid value %d for %s field associated with value %d "
-				"for %s field in launcher.ini. Overriding with default", stageType, Keys::levelStage.c_str(),
+				"for %s field in repentogon_launcher.ini. Overriding with default", stageType, Keys::levelStage.c_str(),
 				stageType, Keys::stageType.c_str());
 			stageType = Defaults::stageType;
 		}
@@ -97,7 +97,7 @@ void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bo
 	if (levelStage >= IsaacInterface::STAGE4_3 && levelStage <= IsaacInterface::STAGE8) {
 		if (stageType != IsaacInterface::STAGETYPE_ORIGINAL) {
 			gui->LogWarn("Invalid value %d for %s field associated with value %d "
-				"for %s field in launcher.ini. Overriding with default", levelStage, Keys::levelStage.c_str(),
+				"for %s field in repentogon_launcher.ini. Overriding with default", levelStage, Keys::levelStage.c_str(),
 				stageType, Keys::stageType.c_str());
 			stageType = Defaults::stageType;
 		}
