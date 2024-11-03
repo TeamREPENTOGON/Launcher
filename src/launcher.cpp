@@ -50,7 +50,7 @@ void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bo
 	stageType = reader.GetInteger(Sections::vanilla, Keys::stageType, Defaults::stageType);
 	mode = (LaunchMode)reader.GetInteger(Sections::shared, Keys::launchMode, LAUNCH_MODE_REPENTOGON);
 	update = reader.GetBoolean(Sections::repentogon, Keys::update, Defaults::update);
-	unstableUpdates = reader.GetBoolean(Sections::shared, Keys::unstableUpdates, Defaults::unstableUpdates);
+	unstableUpdates = reader.GetBoolean(Sections::repentogon, Keys::unstableUpdates, Defaults::unstableUpdates);
 
 	if (mode != LAUNCH_MODE_REPENTOGON && mode != LAUNCH_MODE_VANILLA) {
 		gui->LogWarn("Invalid value %d for %s field in repentogon_launcher.ini. Overriding with default", mode, Keys::launchMode);
@@ -125,7 +125,7 @@ void IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::Installation 
 	fprintf(f, "[%s]\n", Sections::repentogon.c_str());
 	fprintf(f, "%s = %d\n", Keys::console.c_str(), console);
 	fprintf(f, "%s = %d\n", Keys::update.c_str(), update);
-	fprintf(f, "%s = %d\n", Keys::unstableUpdates.c_str(), unstableUpdates);
+	fprintf(f, "%s = %d\n", Keys::unstableUpdates.c_str(), unstableUpdates ? 1 : 0);
 
 	fprintf(f, "[%s]\n", Sections::vanilla.c_str());
 	fprintf(f, "%s = %d\n", Keys::levelStage.c_str(), levelStage);
