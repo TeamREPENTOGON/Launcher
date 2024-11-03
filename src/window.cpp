@@ -486,9 +486,10 @@ namespace Launcher {
 						Log("Successfully installed Repentogon version %s\n", _installation.GetRepentogonVersion().c_str());
 					}
 
-					Log("State of the current Repentogon installation:\n");
-					repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, attemptedToUpdateRepentogon);
 				}
+
+				Log("State of the current Repentogon installation:\n");
+				repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, attemptedToUpdateRepentogon);
 			} else {
 				if (attemptedToUpdateRepentogon) {
 					LogError("Unable to update Repentogon\n");
