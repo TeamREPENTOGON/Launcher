@@ -381,7 +381,7 @@ namespace Updater {
 		Github::DownloadAsStringResult downloadReleasesResult;
 		if (_selfUpdater.IsSelfUpdateAvailable(allowPreReleases, false, version, url, &downloadReleasesResult)) {
 			_gui->Log("OK");
-			_gui->Log("New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
+			_gui->Log("", "New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
 			return SELF_UPDATE_CHECK_UPDATE_AVAILABLE;
 		} else {
 			_gui->Log("KO");
