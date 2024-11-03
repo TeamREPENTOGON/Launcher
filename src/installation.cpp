@@ -240,6 +240,10 @@ namespace Launcher {
 			}
 		}
 
+		if (!loaderMissing && dsoundFound) {
+			_gui->LogWarn("Installation of Repentogon contains both the ZHL loader and dsound.dll. For safety, the launcher will ignore the ZHL loader.\n");
+		}
+
 		ScopedModule loader = LoadModule(Libraries::loader, (repentogonFolder + Libraries::loader).c_str(), LOADABLE_DLL_ZHL_LOADER);
 		if (!loader && !loaderMissing) {
 			_gui->LogError("No valid Repentogon installation found: ZHL loader missing\n");
@@ -261,16 +265,16 @@ namespace Launcher {
 		FARPROC zhlVersion			= RetrieveSymbol(zhl,			Libraries::zhl,			Symbols::zhlVersion);
 		FARPROC repentogonVersion	= RetrieveSymbol(repentogon,	Libraries::repentogon,	Symbols::repentogonVersion);
 		FARPROC loaderVersion		= NULL;
-		if (!loaderVersion) {
+		if (!loaderMissing) {
 			loaderVersion			= RetrieveSymbol(loader, Libraries::loader, Symbols::loaderVersion);
 		}
 
-		if (!zhlVersion || !repentogonVersion || (!loaderVersion && !loaderMissing)) {
+		if (!zhlVersion || !repentogonVersion || (!dsoundFound && !loaderVersion && !loaderMissing)) {
 			_gui->LogError("No valid Repentogon installation found: some DLLs do not indicate a version\n");
 			return false;
 		}
 
-		if (!loaderMissing) {
+		if (!loaderMissing && !dsoundFound) {
 			if (!ValidateVersionSymbol(loader, Libraries::loader, Symbols::loaderVersion, loaderVersion, _zhlLoaderVersion)) {
 				_gui->LogError("[DANGER] No valid Repentogon installation found: the ZHL loader DLL is malformed\n");
 				return false;
@@ -287,7 +291,7 @@ namespace Launcher {
 			return false;
 		}
 
-		if (_zhlVersion != _repentogonVersion || (!loaderMissing && _repentogonVersion != _zhlLoaderVersion)) {
+		if (_zhlVersion != _repentogonVersion || (!dsoundFound && !loaderMissing && _repentogonVersion != _zhlLoaderVersion)) {
 			if (!loaderMissing) {
 				_gui->LogError("No valid Repentogon installation found: the ZHL loader, the ZHL DLL and the Repentogon DLL are not aligned on the same version\n");
 				Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, ZHL loader version %s, Repentogon version %s)\n",
