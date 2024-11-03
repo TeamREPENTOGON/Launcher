@@ -96,6 +96,12 @@ namespace Launcher {
 			return false;
 		}
 
+		if (!ProcessConfigurationFile(_configurationPath)) {
+			_gui->LogWarn("Launcher configuration file contains errors, default options will be used\n");
+			Logger::Error("Error while opening/parsing the launcher configuration file\n");
+			return false;
+		}
+
 		return SearchIsaacInstallationPath();
 	}
 
@@ -504,21 +510,14 @@ namespace Launcher {
 
 		path += "\\";
 		path += launcherConfigFile;
+		_configurationPath = std::move(path);
 
-		if (!Filesystem::FileExists(path.c_str())) {
+		if (!Filesystem::FileExists(_configurationPath.c_str())) {
 			_gui->LogInfo("No launcher configuration file found in Repentance save folder, default options will be used\n");
 			Logger::Info("No launcher configuration file found in Repentance save folder\n");
 			return false;
 		}
 
-		if (!ProcessConfigurationFile(path)) {
-			_gui->LogWarn("Launcher configuration file contains errors, default options will be used\n");
-			Logger::Error("Error while opening/parsing the launcher configuration file\n");
-			return false;
-		}
-
-		
-		_configurationPath = std::move(path);
 		_gui->LogInfo("Found launcher configuration file %s\n", _configurationPath.c_str());
 		Logger::Info("Found and processed configuration file %s\n", _configurationPath.c_str());
 		return true;
