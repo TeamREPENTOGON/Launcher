@@ -322,10 +322,17 @@ namespace Launcher {
 			outputPath += name;
 			FILE* output = fopen(outputPath.c_str(), "wb");
 			if (!output) {
-				Logger::Error("RepentogonUpdater::ExtractRepentogon: cannot create file %s\n", name);
-				ok = false;
+				DWORD attributes = GetFileAttributesA(outputPath.c_str());
+				bool fileOk = false;
+				if (attributes != INVALID_FILE_ATTRIBUTES && attributes & FILE_ATTRIBUTE_DIRECTORY) {
+					fileOk = true;
+				} else {
+					Logger::Error("RepentogonUpdater::ExtractRepentogon: cannot create file %s\n", name);
+					ok = false;
+				}
+
 				zip_fclose(file);
-				filesState.push_back(std::make_tuple(name, false));
+				filesState.push_back(std::make_tuple(name, fileOk));
 				continue;
 			}
 
