@@ -193,8 +193,9 @@ namespace Launcher {
 	bool Installation::CheckRepentogonInstallation() {
 		std::string repentogonFolder = _isaacFolder;
 		_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
+		memset(_dllStates, LOAD_DLL_STATE_NONE, sizeof(_dllStates));
 
-		_gui->Log("Checking for a Repentogon installation...\n");
+		_gui->Log("Checking for validity of Repentogon installation...\n");
 
 		if (repentogonFolder.empty()) {
 			_gui->LogError("Cannot check for a Repentogon installation without being given an Isaac installation folder\n");
@@ -206,6 +207,7 @@ namespace Launcher {
 
 		const char** mandatoryFile = mandatoryFileNames;
 		bool ok = true;
+		bool loaderMissing = false;
 		while (*mandatoryFile) {
 			std::string fullName = repentogonFolder + *mandatoryFile;
 			FoundFile& file = _repentogonFiles.emplace_back();
@@ -214,19 +216,26 @@ namespace Launcher {
 
 			if (!file.found) {
 				Logger::Error("Updater::CheckRepentogonInstallation: %s not found\n", *mandatoryFile);
+				loaderMissing = (strcmp(*mandatoryFile, Libraries::loader) == 0);
 			}
 
 			ok = ok && file.found;
 			++mandatoryFile;
 		}
 
+		bool dsoundFound = Filesystem::FileExists((_isaacFolder + "\\dsound.dll").c_str());
+
 		if (!ok) {
-			_gui->LogError("No valid Repentogon installation found in %s: missing files detected\n", _isaacFolder.c_str());
-			return false;
+			if (loaderMissing && dsoundFound) {
+				_gui->LogWarn("Installation of Repentogon is missing the ZHL loader DLL, but dsound.dll is present: possible legacy installation\n");
+			} else {
+				_gui->LogError("No valid Repentogon installation found in %s: missing files detected\n", _isaacFolder.c_str());
+				return false;
+			}
 		}
 
 		ScopedModule loader = LoadModule(Libraries::loader, (repentogonFolder + Libraries::loader).c_str(), LOADABLE_DLL_ZHL_LOADER);
-		if (!loader) {
+		if (!loader && !loaderMissing) {
 			_gui->LogError("No valid Repentogon installation found: ZHL loader missing\n");
 			return false;
 		}
@@ -245,16 +254,21 @@ namespace Launcher {
 
 		FARPROC zhlVersion			= RetrieveSymbol(zhl,			Libraries::zhl,			Symbols::zhlVersion);
 		FARPROC repentogonVersion	= RetrieveSymbol(repentogon,	Libraries::repentogon,	Symbols::repentogonVersion);
-		FARPROC loaderVersion		= RetrieveSymbol(loader,		Libraries::loader,		Symbols::loaderVersion);
+		FARPROC loaderVersion		= NULL;
+		if (!loaderVersion) {
+			loaderVersion			= RetrieveSymbol(loader, Libraries::loader, Symbols::loaderVersion);
+		}
 
-		if (!zhlVersion || !repentogonVersion || !loaderVersion) {
+		if (!zhlVersion || !repentogonVersion || (!loaderVersion && !loaderMissing)) {
 			_gui->LogError("No valid Repentogon installation found: some DLLs do not indicate a version\n");
 			return false;
 		}
 
-		if (!ValidateVersionSymbol(loader, Libraries::loader, Symbols::loaderVersion, loaderVersion, _zhlLoaderVersion)) {
-			_gui->LogError("[DANGER] No valid Repentogon installation found: the ZHL loader DLL is malformed\n");
-			return false;
+		if (!loaderMissing) {
+			if (!ValidateVersionSymbol(loader, Libraries::loader, Symbols::loaderVersion, loaderVersion, _zhlLoaderVersion)) {
+				_gui->LogError("[DANGER] No valid Repentogon installation found: the ZHL loader DLL is malformed\n");
+				return false;
+			}
 		}
 
 		if (!ValidateVersionSymbol(zhl, Libraries::zhl, Symbols::zhlVersion, zhlVersion, _zhlVersion)) {
@@ -267,10 +281,17 @@ namespace Launcher {
 			return false;
 		}
 
-		if (_zhlVersion != _repentogonVersion || _repentogonVersion != _zhlLoaderVersion) {
-			_gui->LogError("No valid Repentogon installation found: the ZHL loader, the ZHL DLL and the Repentogon DLL are not aligned on the same version\n");
-			Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, ZHL loader version %s, Repentogon version %s)\n",
-				_zhlVersion.c_str(), _zhlLoaderVersion.c_str(), _repentogonVersion.c_str());
+		if (_zhlVersion != _repentogonVersion || (!loaderMissing && _repentogonVersion != _zhlLoaderVersion)) {
+			if (!loaderMissing) {
+				_gui->LogError("No valid Repentogon installation found: the ZHL loader, the ZHL DLL and the Repentogon DLL are not aligned on the same version\n");
+				Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, ZHL loader version %s, Repentogon version %s)\n",
+					_zhlVersion.c_str(), _zhlLoaderVersion.c_str(), _repentogonVersion.c_str());
+			} else {
+				_gui->LogError("No valid Repentogon installation found: the ZHL DLL and the Repentogon DLL are not aligned on the same version\n");
+				Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, Repentogon version %s)\n",
+					_zhlVersion.c_str(), _repentogonVersion.c_str());
+			}
+
 			_installationState = REPENTOGON_INSTALLATION_STATE_NONE;
 			_repentogonZHLVersionMatch = false;
 			return false;
@@ -278,7 +299,7 @@ namespace Launcher {
 
 		_repentogonZHLVersionMatch = true;
 
-		if (Filesystem::FileExists((_isaacFolder + "dsound.dll").c_str())) {
+		if (dsoundFound) {
 			_gui->LogWarn("Found a valid legacy installation of Repentogon (dsound.dll found)\n");
 			_installationState = REPENTOGON_INSTALLATION_STATE_LEGACY;
 		} else {
@@ -311,10 +332,11 @@ namespace Launcher {
 		 */
 		HMODULE lib = LoadLibraryExA(name, NULL, DONT_RESOLVE_DLL_REFERENCES);
 		if (!lib) {
+			_dllStates[dll] = LOAD_DLL_STATE_FAIL;
 			return NULL;
 		}
 
-		_dllStates[dll] = true;
+		_dllStates[dll] = LOAD_DLL_STATE_OK;
 		return lib;
 	}
 
@@ -357,7 +379,7 @@ namespace Launcher {
 		return _isaacVersion;
 	}
 
-	bool Installation::WasLibraryLoaded(LoadableDlls dll) const {
+	LoadDLLState Installation::GetDLLLoadState(LoadableDlls dll) const {
 		return _dllStates[dll];
 	}
 

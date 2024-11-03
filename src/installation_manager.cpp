@@ -66,7 +66,9 @@ namespace Launcher {
 	void InstallationManager::DebugDumpBrokenRepentogonInstallationDLL(const char* context, const char* libname, LoadableDlls dll,
 		std::string const& (Installation::* ptr)() const, bool* found) {
 		_gui->LogNoNL("\tLoad status of %s (%s): ", context, libname);
-		if (_installation->WasLibraryLoaded(dll)) {
+		LoadDLLState loadState = _installation->GetDLLLoadState(dll);
+
+		if (loadState == LOAD_DLL_STATE_OK) {
 			std::string const& version = (_installation->*ptr)();
 			if (version.empty()) {
 				_gui->Log("unable to find version");
@@ -74,8 +76,10 @@ namespace Launcher {
 				*found = true;
 				_gui->Log("found version %s", version.c_str());
 			}
-		} else {
+		} else if (loadState == LOAD_DLL_STATE_FAIL) {
 			_gui->Log("unable to load");
+		} else {
+			_gui->Log("no load attempted");
 		}
 	}
 

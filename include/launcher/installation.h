@@ -61,6 +61,12 @@ namespace Launcher {
 		LOADABLE_DLL_MAX
 	};
 
+	enum LoadDLLState {
+		LOAD_DLL_STATE_NONE,
+		LOAD_DLL_STATE_OK,
+		LOAD_DLL_STATE_FAIL
+	};
+
 	/* Pair <string, bool> indicating whether a file was found on the fileystem. */
 	struct FoundFile {
 		std::string filename;
@@ -179,7 +185,7 @@ namespace Launcher {
 
 		RepentogonInstallationState GetRepentogonInstallationState() const;
 		Version const* GetIsaacVersion() const;
-		bool WasLibraryLoaded(LoadableDlls dll) const;
+		LoadDLLState GetDLLLoadState(LoadableDlls dll) const;
 		std::vector<FoundFile> const& GetRepentogonInstallationFilesState() const;
 		std::string const& GetRepentogonVersion() const;
 		std::string const& GetZHLVersion() const;
@@ -232,7 +238,7 @@ namespace Launcher {
 		/* For all DLLs that need to be loaded to retrieve data, indicate whether
 		 * the load was successful or not.
 		 */
-		bool _dllStates[LOADABLE_DLL_MAX] = { false };
+		LoadDLLState _dllStates[LOADABLE_DLL_MAX] = { LOAD_DLL_STATE_NONE };
 		/* Path to the folder containing the Repentance save file. */
 		std::string _saveFolder;
 		/* Path to the folder containing the configuration of the launcher. */
