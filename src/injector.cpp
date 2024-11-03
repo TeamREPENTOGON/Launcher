@@ -28,12 +28,12 @@
  * 
  * Return true of the initialization was sucessful, false otherwise.
  */
-static int FirstStageInit(const char* path, struct IsaacOptions const* options, HANDLE* process, void** page,
+static int FirstStageInit(const char* path, struct Launcher::IsaacOptions const* options, HANDLE* process, void** page,
 	size_t* functionOffset, size_t* paramOffset, PROCESS_INFORMATION* processInfo);
 
-static void GenerateCLI(const struct IsaacOptions* options, char cli[256]);
+static void GenerateCLI(const struct Launcher::IsaacOptions* options, char cli[256]);
 
-void GenerateCLI(const struct IsaacOptions* options, char cli[256]) {
+void GenerateCLI(const struct Launcher::IsaacOptions* options, char cli[256]) {
 	memset(cli, 0, sizeof(cli));
 
 	if (options->luaDebug) {
@@ -60,7 +60,7 @@ void GenerateCLI(const struct IsaacOptions* options, char cli[256]) {
 	}
 }
 
-DWORD CreateIsaac(const char* path, struct IsaacOptions const* options, PROCESS_INFORMATION* processInfo) {
+DWORD CreateIsaac(const char* path, struct Launcher::IsaacOptions const* options, PROCESS_INFORMATION* processInfo) {
 	STARTUPINFOA startupInfo;
 	memset(&startupInfo, 0, sizeof(startupInfo));
 
@@ -86,7 +86,7 @@ DWORD CreateIsaac(const char* path, struct IsaacOptions const* options, PROCESS_
 }
 
 // #pragma code_seg(push, r1, ".trampo")
-int UpdateMemory(struct IsaacOptions const* options, HANDLE process, PROCESS_INFORMATION const* processInfo, void** page, size_t* functionOffset, size_t* paramOffset) {
+int UpdateMemory(struct Launcher::IsaacOptions const* options, HANDLE process, PROCESS_INFORMATION const* processInfo, void** page, size_t* functionOffset, size_t* paramOffset) {
 	HMODULE self = GetModuleHandle(NULL);
 	PIMAGE_NT_HEADERS ntHeaders = ImageNtHeader(self);
 	char* base = (char*)&(ntHeaders->OptionalHeader);
@@ -167,7 +167,7 @@ int UpdateMemory(struct IsaacOptions const* options, HANDLE process, PROCESS_INF
 }
 // #pragma code_seg(pop, r1)
 
-int FirstStageInit(const char* path, struct IsaacOptions const* options, HANDLE* outProcess, void** page, 
+int FirstStageInit(const char* path, struct Launcher::IsaacOptions const* options, HANDLE* outProcess, void** page,
 	size_t* functionOffset, size_t* paramOffset, PROCESS_INFORMATION* processInfo) {
 	Logger::Info("Starting injector\n");
 	DWORD processId = CreateIsaac(path, options, processInfo);
@@ -184,8 +184,10 @@ int FirstStageInit(const char* path, struct IsaacOptions const* options, HANDLE*
 		Logger::Info("Acquired handle to isaac-ng.exe, process ID = %d\n", processInfo->dwProcessId);
 	}
 
-	if (UpdateMemory(options, process, processInfo, page, functionOffset, paramOffset)) {
-		return -1;
+	if (options->mode == Launcher::LAUNCH_MODE_REPENTOGON) {
+		if (UpdateMemory(options, process, processInfo, page, functionOffset, paramOffset)) {
+			return -1;
+		}
 	}
 
 	*outProcess = process;
@@ -227,25 +229,31 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	return 0;
 }
 
-int InjectIsaac(const char* path, int updates, int console, int lua_debug, int level_stage, int stage_type, int lua_heap_size) {
+bool Launcher::App::OnInit() {
+	Logger::Init("launcher.log", "w");
+	Externals::Init();
+
+	MainFrame* frame = new MainFrame();
+	frame->Show();
+	frame->PostInit();
+
+	return true;
+}
+
+int Launcher::Launch(const char* path, Launcher::IsaacOptions const& options) {
 	HANDLE process;
 	void* remotePage;
 	size_t functionOffset, paramOffset;
 	PROCESS_INFORMATION processInfo;
 
-	struct IsaacOptions options;
-	options.console = console;
-	options.luaDebug = lua_debug;
-	options.levelStage = level_stage;
-	options.stageType = stage_type;
-	options.luaHeapSize = lua_heap_size;
-
 	if (FirstStageInit(path, &options, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
 		return -1;
 	}
 
-	if (CreateAndWait(process, remotePage, functionOffset, paramOffset)) {
-		return -1;
+	if (options.mode == Launcher::LAUNCH_MODE_REPENTOGON) {
+		if (CreateAndWait(process, remotePage, functionOffset, paramOffset)) {
+			return -1;
+		}
 	}
 
 	DWORD result = ResumeThread(processInfo.hThread);
@@ -264,22 +272,6 @@ int InjectIsaac(const char* path, int updates, int console, int lua_debug, int l
 	CloseHandle(processInfo.hThread);
 
 	return 0;
-}
-
-bool Launcher::App::OnInit() {
-	Logger::Init("launcher.log", "w");
-	Externals::Init();
-
-	MainFrame* frame = new MainFrame();
-	frame->Show();
-	frame->PostInit();
-
-	return true;
-}
-
-void Launch(const char* path, IsaacOptions const& options) {
-	InjectIsaac(path, options.update, options.console, options.luaDebug,
-		options.levelStage, options.stageType, options.luaHeapSize);
 }
 
 wxIMPLEMENT_APP(Launcher::App);

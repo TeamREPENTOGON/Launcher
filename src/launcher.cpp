@@ -31,7 +31,7 @@ namespace Keys {
 	const std::string unstableUpdates("UnstableUpdates");
 }
 
-void IsaacOptions::InitializeDefaults(ILoggableGUI* gui, bool allowUpdates, bool allowUnstableUpdates, bool validRepentogon) {
+void Launcher::IsaacOptions::InitializeDefaults(ILoggableGUI* gui, bool allowUpdates, bool allowUnstableUpdates, bool validRepentogon) {
 	console = Defaults::console;
 	levelStage = Defaults::levelStage;
 	luaDebug = Defaults::luaDebug;
@@ -42,7 +42,7 @@ void IsaacOptions::InitializeDefaults(ILoggableGUI* gui, bool allowUpdates, bool
 	unstableUpdates = allowUnstableUpdates;
 }
 
-void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bool validRepentogon) {
+void Launcher::IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bool validRepentogon) {
 	console = reader.GetBoolean(Sections::repentogon, Keys::console, Defaults::console);
 	levelStage = reader.GetInteger(Sections::vanilla, Keys::levelStage, Defaults::levelStage);
 	luaDebug = reader.GetBoolean(Sections::vanilla, Keys::luaDebug, Defaults::luaDebug);
@@ -104,7 +104,7 @@ void IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bo
 	}
 }
 
-void IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::Installation const& installation) {
+void Launcher::IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::Installation const& installation) {
 	std::string filename = installation.GetLauncherConfigurationPath();
 	if (filename.empty()) {
 		gui->LogError("No launcher configuration file found previously, cannot save settings\n");
