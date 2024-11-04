@@ -418,7 +418,7 @@ namespace Launcher {
 		if (!_installation.IsCompatibleWithRepentogon()) {
 			if (_repentogonLaunchModeIdx != -1) {
 				_launchMode->Delete(_repentogonLaunchModeIdx);
-				DisableRepentogonOptions();
+				UpdateRepentogonOptionsFromInstallation();
 			}
 			return;
 		}
@@ -509,9 +509,9 @@ namespace Launcher {
 			} else {
 				LogWarn("Disabling Repentogon configuration options due to previous errors\n");
 			}
-
-			DisableRepentogonOptions();
 		}
+
+		UpdateRepentogonOptionsFromInstallation();
 	}
 
 	bool MainFrame::PromptRepentogonInstallation() {
@@ -755,21 +755,38 @@ namespace Launcher {
 	}
 
 	void MainFrame::UpdateRepentogonOptionsFromLaunchMode() {
-		if (_launchMode->GetValue() == "Repentogon") {
+		/* if (_launchMode->GetValue() == "Repentogon") {
 			_repentogonOptions->Enable(true);
 			// _console->Enable(true);
 		} else {
 			_repentogonOptions->Enable(false);
 			// _console->Enable(false);
-		}
+		} */
 	}
 
-	void MainFrame::DisableRepentogonOptions() {
-		_repentogonOptions->Disable();
-		if (_repentogonLaunchModeIdx != -1) {
-			_launchMode->Delete(_repentogonLaunchModeIdx);
+	void MainFrame::UpdateRepentogonOptionsFromInstallation() {
+		Launcher::RepentogonInstallationState state = _installation.GetRepentogonInstallationState();
+		if (state != REPENTOGON_INSTALLATION_STATE_MODERN) {
+			if (_repentogonLaunchModeIdx != -1) {
+				_launchMode->Delete(_repentogonLaunchModeIdx);
+				_repentogonLaunchModeIdx = -1;
+			}
+
+			_launchMode->SetValue("Vanilla");
+		} else {
+			if (_repentogonLaunchModeIdx == -1) {
+				_repentogonLaunchModeIdx = _launchMode->Append("Repentogon");
+			}
+
+			/* Intentionally not changing the selected launch mode value.
+			 * 
+			 * While the change in the above if branch is mandatory to prevent
+			 * the game from incorrectly being injected with Repentogon in case
+			 * of a legacy installation, or broken installation, changing the
+			 * value here would override the value selected by the user the
+			 * last time.
+			 */
 		}
-		_launchMode->SetValue("Vanilla");
 	}
 
 	void MainFrame::ForceRepentogonUpdate(bool allowPreReleases) {
@@ -790,6 +807,7 @@ namespace Launcher {
 		} else {
 			Log("State of the Repentogon installation:\n");
 			repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, true);
+			UpdateRepentogonOptionsFromInstallation();
 		}
 	}
 

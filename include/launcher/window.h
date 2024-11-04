@@ -89,7 +89,7 @@ namespace Launcher {
 		/* Enable/disable Repentogon options depending on the selected launch mode (in GUI). */
 		void UpdateRepentogonOptionsFromLaunchMode();
 
-		void DisableRepentogonOptions();
+		void UpdateRepentogonOptionsFromInstallation();
 
 		/* Event handlers. */
 		void OnIsaacSelectClick(wxCommandEvent& event);
