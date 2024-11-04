@@ -5,7 +5,7 @@
 #include <UserEnv.h>
 
 namespace Unpacker::Utils {
-	static const char* LockFileBasePath = "My Games\\Binding of Isaac Repetance";
+	static const char* LockFileBasePath = "Documents\\My Games\\Binding of Isaac Repentance";
 	static const char* RepentogonSubFolder = "Repentogon";
 	static const char* LockFileName = "unpacker.lock";
 
