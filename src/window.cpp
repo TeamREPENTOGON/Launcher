@@ -455,6 +455,8 @@ namespace Launcher {
 			needToDisableRepentogonOptions = isLegacy;
 		}
 
+		bool updateAttemptSucceeded = true;
+		bool stillValidAfterUpdate;
 		/* If installation is legacy, then an update is available _by construction_.
 		 * Therefore there is no need to do a specific check.
 		 */
@@ -469,8 +471,13 @@ namespace Launcher {
 				Log("An update is available. Updating Repentogon...");
 				attemptedToInstallRepentogon = true;
 				attemptedToUpdateRepentogon = true;
-				repentogonUpdateMgr.InstallRepentogon(release);
-				successfullyInstalledRepentogon = _installation.CheckRepentogonInstallation();
+				if (!repentogonUpdateMgr.InstallRepentogon(release)) {
+					updateAttemptSucceeded = false;
+					LogError("An error occured while downloading the Repentogon update.\n");
+				}
+
+				stillValidAfterUpdate = _installation.CheckRepentogonInstallation();
+				successfullyInstalledRepentogon = stillValidAfterUpdate && updateAttemptSucceeded;
 			} else {
 				LogError("Unable to check for availability of Repentogon updates\n");
 				// No need to return, installation may be valid regardless
@@ -493,7 +500,7 @@ namespace Launcher {
 				}
 
 				Log("State of the current Repentogon installation:\n");
-				repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, attemptedToUpdateRepentogon);
+				repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, attemptedToUpdateRepentogon && updateAttemptSucceeded);
 			} else {
 				if (attemptedToUpdateRepentogon) {
 					LogError("Unable to update Repentogon\n");
@@ -501,9 +508,13 @@ namespace Launcher {
 					LogError("Unable to install Repentogon\n");
 				}
 
-				Log("Information regarding what happened during the installation:\n");
-				repentogonUpdateMgr.DebugDumpBrokenRepentogonInstallation();
-				needToDisableRepentogonOptions = true;
+				if (attemptedToUpdateRepentogon && stillValidAfterUpdate) {
+					Log("Your previous installation of Repentogon is still valid and can be used\n");
+				} else {
+					Log("Information regarding what happened during the installation:\n");
+					repentogonUpdateMgr.DebugDumpBrokenRepentogonInstallation();
+					needToDisableRepentogonOptions = true;
+				}
 			}
 		}
 
