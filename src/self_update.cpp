@@ -47,7 +47,7 @@ namespace Launcher {
 		rapidjson::Document& releases = _releasesInfo;
 		_hasRelease = true;
 		
-		return SelectTargetRelease(releases, allowDrafts, force, version, url);
+		return SelectTargetRelease(releases, allowDrafts, force, version, url) && strcmp(::Launcher::version, version.c_str());
 	}
 
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
