@@ -381,11 +381,11 @@ namespace Updater {
 		Github::DownloadAsStringResult downloadReleasesResult;
 		if (_selfUpdater.IsSelfUpdateAvailable(allowPreReleases, false, version, url, &downloadReleasesResult)) {
 			_gui->Log("OK");
-			_gui->Log("", "New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
+			_gui->Log("", true, "New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
 			return SELF_UPDATE_CHECK_UPDATE_AVAILABLE;
 		} else {
-			_gui->Log("KO");
 			if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
+				_gui->Log("KO");
 				_gui->LogError("Error encountered while checking for availability of launcher update");
 				switch (downloadReleasesResult) {
 				case Github::DOWNLOAD_AS_STRING_BAD_CURL:
@@ -411,6 +411,7 @@ namespace Updater {
 
 				return SELF_UPDATE_CHECK_ERR_GENERIC;
 			} else {
+				_gui->Log("Up-to-date");
 				return SELF_UPDATE_CHECK_UP_TO_DATE;
 			}
 		}
