@@ -104,8 +104,8 @@ namespace Launcher {
 		AddVanillaOptions();
 		AddLaunchOptions();
 		
-		wxButton* advancedOptionsButton = new wxButton(this, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options");
-		verticalSizer->Add(advancedOptionsButton, 0, wxALIGN_RIGHT | wxRIGHT, 20);
+		_advancedOptionsButton = new wxButton(this, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options");
+		verticalSizer->Add(_advancedOptionsButton, 0, wxALIGN_RIGHT | wxRIGHT, 20);
 
 		SetSizer(verticalSizer);
 
@@ -152,8 +152,8 @@ namespace Launcher {
 
 		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 5);
 
-		wxButton* launchButton = new wxButton(launchModeBox, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game");
-		launchModeBoxSizer->Add(launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
+		_launchButton = new wxButton(launchModeBox, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game");
+		launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
 		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxBOTTOM, 5);
 
@@ -320,6 +320,10 @@ namespace Launcher {
 
 		_options.WriteConfiguration(this, _installation);
 		::Launcher::Launch(this, _isaacFileText->GetValue().c_str().AsChar(), _options);
+	}
+
+	void MainFrame::EnableInterface(bool enable) {
+		LogWarn("Interface freezing / unfreezing when launching the game is not yet implemented\n");
 	}
 
 	bool MainFrame::InitializeIsaacFolderPath(bool shouldPrompt) {

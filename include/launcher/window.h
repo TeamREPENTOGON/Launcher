@@ -136,6 +136,8 @@ namespace Launcher {
 
 		void PostInitHandleRepentogon();
 
+		void EnableInterface(bool enable);
+
 		IsaacOptions _options;
 		wxStaticBoxSizer* _optionsSizer;
 		wxStaticBoxSizer* _configurationSizer;
@@ -151,6 +153,8 @@ namespace Launcher {
 		wxStaticBox* _repentogonOptions;
 		wxTextCtrl* _isaacFileText;
 		wxTextCtrl* _repentogonInstallFolderText;
+		wxButton* _launchButton;
+		wxButton* _advancedOptionsButton;
 		int _repentogonLaunchModeIdx = -1;
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
 
