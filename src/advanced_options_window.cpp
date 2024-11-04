@@ -80,7 +80,7 @@ namespace Launcher {
 		repentogonSizer->Add(updateButton, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, 5);
 
 		wxButton* unstableUpdateButton = new wxButton(repentogonOptions, ADVANCED_CONTROLS_BUTTON_FORCE_UNSTABLE_UPDATE, 
-			"Update Repentogon(force, unstable version)");
+			"Update Repentogon (force, unstable version)");
 		repentogonSizer->Add(unstableUpdateButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
 		mainSizer->Add(launcherSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxBOTTOM | wxRIGHT, 10);
