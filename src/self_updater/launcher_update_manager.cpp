@@ -78,19 +78,19 @@ namespace Updater {
 				while (std::optional<Github::GithubDownloadNotification> message = s->monitor->Get()) {
 					switch (message->type) {
 					case Github::GH_NOTIFICATION_INIT_CURL:
-						_gui->Log("[%s] Initializing cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						_gui->LogInfo("[%s] Initializing cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case Github::GH_NOTIFICATION_INIT_CURL_DONE:
-						_gui->Log("[%s] Initialized cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						_gui->LogInfo("[%s] Initialized cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case Github::GH_NOTIFICATION_CURL_PERFORM:
-						_gui->Log("[%s] Performing cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						_gui->LogInfo("[%s] Performing cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case Github::GH_NOTIFICATION_CURL_PERFORM_DONE:
-						_gui->Log("[%s] Performed cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						_gui->LogInfo("[%s] Performed cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case Github::GH_NOTIFICATION_DATA_RECEIVED:
@@ -99,23 +99,23 @@ namespace Updater {
 
 						std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 						if (std::chrono::duration_cast<std::chrono::nanoseconds>(now - lastReceived).count() > 100000000) {
-							_gui->Log("[%s] Downloaded %lu bytes\n", s->name.c_str(), totalDownloadSize);
+							_gui->LogInfo("[%s] Downloaded %lu bytes\n", s->name.c_str(), totalDownloadSize);
 							lastReceived = now;
 						}
 						break;
 					}
 
 					case Github::GH_NOTIFICATION_PARSE_RESPONSE:
-						_gui->Log("[%s] Parsing result of cURL request from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						_gui->LogInfo("[%s] Parsing result of cURL request from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case Github::GH_NOTIFICATION_PARSE_RESPONSE_DONE:
-						_gui->Log("[%s] Parsed result of cURL request from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						_gui->LogInfo("[%s] Parsed result of cURL request from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case Github::GH_NOTIFICATION_DONE:
 						s->done = true;
-						_gui->Log("[%s] Successfully downloaded content from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						_gui->LogInfo("[%s] Successfully downloaded content from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					default:
@@ -163,14 +163,14 @@ namespace Updater {
 
 			return false;
 		} else {
-			_gui->Log("Checking release integrity...\n");
+			_gui->LogInfo("Checking release integrity...\n");
 
 			data->TrimHash();
 			if (!_updater.CheckHashConsistency(data->_zipFileName.c_str(), data->_hash.c_str())) {
 				_gui->LogError("Hash mismatch: download was corrupted\n");
 				return false;
 			} else {
-				_gui->Log("OK\n");
+				_gui->LogInfo("OK\n");
 			}
 
 			return true;
@@ -181,8 +181,8 @@ namespace Updater {
 	}
 
 	bool LauncherUpdateManager::DoUpdate(const char* from, const char* to, const char* url) {
-		_gui->Log("Updating the REPENTOGON launcher\n");
-		_gui->Log("Update scheduled from version %s to version %s\n", from, to);
+		_gui->LogInfo("Updating the REPENTOGON launcher\n");
+		_gui->LogInfo("Update scheduled from version %s to version %s\n", from, to);
 
 		new (&_updater) LauncherUpdater(from, to, url);
 
@@ -203,7 +203,7 @@ namespace Updater {
 			return false;
 		}
 
-		_gui->Log("Successfully downloaded and extracted the new release\n");
+		_gui->LogInfo("Successfully downloaded and extracted the new release\n");
 		FinalizeUpdate();
 		_gui->LogError("Error while finalizing the update of the launcher\n");
 		return false;
@@ -214,7 +214,7 @@ namespace Updater {
 		ExtractArchiveResult result = _updater.ExtractArchive(filename);
 		switch (result.errCode) {
 		case EXTRACT_ARCHIVE_OK:
-			_gui->Log("Sucessfully extracted new version\n");
+			_gui->LogInfo("Sucessfully extracted new version\n");
 			return true;
 
 		case EXTRACT_ARCHIVE_ERR_NO_EXE:
@@ -250,32 +250,32 @@ namespace Updater {
 			break;
 		}
 
-		_gui->Log("", true, "************ Archive content read before error ************");
+		_gui->LogInfo("", true, "************ Archive content read before error ************");
 		for (auto const& [name, state] : result.files) {
-			_gui->Log("\t", false, "%s: ", name.c_str());
+			_gui->LogInfo("\t", false, "%s: ", name.c_str());
 			switch (state) {
 			case Zip::EXTRACT_FILE_OK:
-				_gui->Log("", true, "OK");
+				_gui->LogInfo("", true, "OK");
 				break;
 
 			case Zip::EXTRACT_FILE_ERR_ZIP_FREAD:
-				_gui->Log("", true, "error while reading file content");
+				_gui->LogInfo("", true, "error while reading file content");
 				break;
 
 			case Zip::EXTRACT_FILE_ERR_FOPEN:
-				_gui->Log("", true, "unable to open file on disk to write content");
+				_gui->LogInfo("", true, "unable to open file on disk to write content");
 				break;
 
 			case Zip::EXTRACT_FILE_ERR_FWRITE:
-				_gui->Log("", true, "unable to write extracted file");
+				_gui->LogInfo("", true, "unable to write extracted file");
 				break;
 
 			case Zip::EXTRACT_FILE_ERR_ZIP_STAT:
-				_gui->Log("", true, "unable to read file size");
+				_gui->LogInfo("", true, "unable to read file size");
 				break;
 
 			default:
-				_gui->Log("", true, "unknown error");
+				_gui->LogInfo("", true, "unknown error");
 				break;
 			}
 		}
@@ -349,7 +349,7 @@ namespace Updater {
 	void LauncherUpdateManager::LogGithubDownloadAsString(const char* prefix, Github::DownloadAsStringResult result) {
 		switch (result) {
 		case Github::DOWNLOAD_AS_STRING_OK:
-			_gui->Log("%s: successfully downloaded\n", prefix);
+			_gui->LogInfo("%s: successfully downloaded\n", prefix);
 			break;
 
 		case Github::DOWNLOAD_AS_STRING_BAD_CURL:
@@ -380,12 +380,12 @@ namespace Updater {
 		rapidjson::Document launcherResponse;
 		Github::DownloadAsStringResult downloadReleasesResult;
 		if (_selfUpdater.IsSelfUpdateAvailable(allowPreReleases, false, version, url, &downloadReleasesResult)) {
-			_gui->Log("OK");
-			_gui->Log("", true, "New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
+			_gui->LogInfo("OK");
+			_gui->LogInfo("", true, "New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
 			return SELF_UPDATE_CHECK_UPDATE_AVAILABLE;
 		} else {
 			if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
-				_gui->Log("KO");
+				_gui->LogInfo("KO");
 				_gui->LogError("Error encountered while checking for availability of launcher update");
 				switch (downloadReleasesResult) {
 				case Github::DOWNLOAD_AS_STRING_BAD_CURL:
@@ -411,7 +411,7 @@ namespace Updater {
 
 				return SELF_UPDATE_CHECK_ERR_GENERIC;
 			} else {
-				_gui->Log("Up-to-date");
+				_gui->LogInfo("Up-to-date");
 				return SELF_UPDATE_CHECK_UP_TO_DATE;
 			}
 		}
@@ -436,15 +436,33 @@ namespace Updater {
 			return;
 		}
 
+		std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+		uint32_t diff = 0;
 		do {
 			commResult = finalizer.ResumeFinalize();
-		} while (commResult == Updater::FINALIZATION_COMM_INTERNAL_OK || commResult == Updater::FINALIZATION_COMM_INFO_TIMEOUT);
+			std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+			diff = std::chrono::duration_cast<std::chrono::seconds>(now - begin).count();
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-		HandleFinalizationResult(commResult);
+			if (diff < 3) {
+				_gui->LogInfo("Waiting for unpacker...\n");
+			} else if (diff < 7) {
+				_gui->LogWarn("Waiting for unpacker (possibly hanging)...\n");
+			} else {
+				_gui->LogError("Waiting for unpacker (probably hanging, considering aborting update)...\n");
+			}
+		} while ((commResult == Updater::FINALIZATION_COMM_INTERNAL_OK || commResult == Updater::FINALIZATION_COMM_INFO_TIMEOUT) && 
+			diff < 10);
+
+		if (diff >= 10) {
+			_gui->LogError("Fatal timeout while waiting for the unpacker, update aborted\n");
+		} else {
+			HandleFinalizationResult(commResult);
+		}
 	}
 
 	void LauncherUpdateManager::ForceSelfUpdate(bool allowPreReleases) {
-		_gui->Log("Performing self-update (forcibly triggered)");
+		_gui->LogInfo("Performing self-update (forcibly triggered)");
 		Launcher::SelfUpdateErrorCode result = _selfUpdater.SelectReleaseTarget(allowPreReleases, true);
 		if (result.base != Launcher::SELF_UPDATE_CANDIDATE) {
 			_gui->LogError("Error %d while selecting target release\n", result.base);
