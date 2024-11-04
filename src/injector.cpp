@@ -240,18 +240,20 @@ bool Launcher::App::OnInit() {
 	return true;
 }
 
-int Launcher::Launch(const char* path, Launcher::IsaacOptions const& options) {
+int Launcher::Launch(ILoggableGUI* gui, const char* path, Launcher::IsaacOptions const& options) {
 	HANDLE process;
 	void* remotePage;
 	size_t functionOffset, paramOffset;
 	PROCESS_INFORMATION processInfo;
 
 	if (FirstStageInit(path, &options, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
+		gui->LogError("Low level error encountered while starting the game, check log files\n");
 		return -1;
 	}
 
 	if (options.mode == Launcher::LAUNCH_MODE_REPENTOGON) {
 		if (CreateAndWait(process, remotePage, functionOffset, paramOffset)) {
+			gui->LogError("Error encountered while injecting Repentogon, check log files\n");
 			return -1;
 		}
 	}
@@ -259,6 +261,7 @@ int Launcher::Launch(const char* path, Launcher::IsaacOptions const& options) {
 	DWORD result = ResumeThread(processInfo.hThread);
 	if (result == -1) {
 		Logger::Error("Failed to resume isaac-ng.exe main thread: %d\n", GetLastError());
+		gui->LogError("Game was unable to leave its suspended state, aborting launch\n");
 		return -1;
 	} else {
 		Logger::Info("Resumed main thread of isaac-ng.exe, previous supend count was %d\n", result);

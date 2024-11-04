@@ -319,7 +319,7 @@ namespace Launcher {
 		Log("\t\tLua heap size: %dM", _options.luaHeapSize);
 
 		_options.WriteConfiguration(this, _installation);
-		::Launcher::Launch(_isaacFileText->GetValue().c_str().AsChar(), _options);
+		::Launcher::Launch(this, _isaacFileText->GetValue().c_str().AsChar(), _options);
 	}
 
 	bool MainFrame::InitializeIsaacFolderPath(bool shouldPrompt) {
