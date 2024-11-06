@@ -1,5 +1,6 @@
 #include <curl/curl.h>
 
+#include "shared/filesystem.h"
 #include "shared/github.h"
 #include "shared/logger.h"
 #include "shared/scoped_curl.h"
@@ -157,6 +158,26 @@ namespace Github {
 		headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
 		headers = curl_slist_append(headers, "X-GitHub-Api-Version: 2022-11-28");
 		headers = curl_slist_append(headers, "User-Agent: REPENTOGON");
+
+		const char* file = "github.token";
+		if (Filesystem::FileExists(file)) {
+			FILE* f = fopen(file, "r");
+			fpos_t begin = ftell(f);
+			fseek(f, 0, SEEK_END);
+			fpos_t end = ftell(f);
+			fseek(f, begin, SEEK_SET);
+
+			const char* base = "Authorization: Bearer ";
+			size_t baseLen = strlen(base);
+			size_t len = baseLen + end - begin + 1;
+			char* buffer = (char*)malloc(len);
+			sprintf(buffer, "%s", base);
+			fread(buffer + baseLen, 1, end - begin, f);
+			buffer[len - 1] = '\0';
+			fclose(f);
+			Logger::Info("Adding Authorization header: %s\n", buffer);
+			headers = curl_slist_append(headers, buffer);
+		}
 
 		curl_easy_setopt(curl, CURLOPT_URL, url);
 		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
