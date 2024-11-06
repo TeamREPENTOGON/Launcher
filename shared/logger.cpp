@@ -18,6 +18,13 @@ void Logger::Init(const char* filename, bool append) {
 	}
 }
 
+void Logger::Debug(const char* fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	Log("[DEBUG] ", fmt, va);
+	va_end(va);
+}
+
 void Logger::Info(const char* fmt, ...) {
 	va_list va;
 	va_start(va, fmt);

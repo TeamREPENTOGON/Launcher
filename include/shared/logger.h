@@ -5,6 +5,7 @@
 
 class Logger {
 public:
+	static void Debug(const char* fmt, ...);
 	static void Info(const char* fmt, ...);
 	static void Warn(const char* fmt, ...);
 	static void Error(const char* fmt, ...);
