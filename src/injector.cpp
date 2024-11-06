@@ -28,12 +28,12 @@
  * 
  * Return true of the initialization was sucessful, false otherwise.
  */
-static int FirstStageInit(const char* path, struct Launcher::IsaacOptions const* options, HANDLE* process, void** page,
+static int FirstStageInit(const char* path, bool isLegacy, struct Launcher::IsaacOptions const* options, HANDLE* process, void** page,
 	size_t* functionOffset, size_t* paramOffset, PROCESS_INFORMATION* processInfo);
 
-static void GenerateCLI(const struct Launcher::IsaacOptions* options, char cli[256]);
+static void GenerateCLI(const struct Launcher::IsaacOptions* options, bool isLegacy, char cli[256]);
 
-void GenerateCLI(const struct Launcher::IsaacOptions* options, char cli[256]) {
+void GenerateCLI(const struct Launcher::IsaacOptions* options, bool isLegacy, char cli[256]) {
 	memset(cli, 0, sizeof(cli));
 
 	if (options->luaDebug) {
@@ -56,18 +56,24 @@ void GenerateCLI(const struct Launcher::IsaacOptions* options, char cli[256]) {
 
 	if (options->luaHeapSize) {
 		strcat(cli, "--luaheapsize=");
-		strcat(cli, "M");
+		char buffer[14];
+		sprintf(buffer, "%dM ", options->luaHeapSize);
+		strcat(cli, buffer);
+	}
+
+	if (isLegacy && options->mode == Launcher::LAUNCH_MODE_VANILLA) {
+		strcat(cli, "-repentogonoff ");
 	}
 }
 
-DWORD CreateIsaac(const char* path, struct Launcher::IsaacOptions const* options, PROCESS_INFORMATION* processInfo) {
+DWORD CreateIsaac(const char* path, bool isLegacy, struct Launcher::IsaacOptions const* options, PROCESS_INFORMATION* processInfo) {
 	STARTUPINFOA startupInfo;
 	memset(&startupInfo, 0, sizeof(startupInfo));
 
 	memset(processInfo, 0, sizeof(*processInfo));
 
 	char cli[256];
-	GenerateCLI(options, cli);
+	GenerateCLI(options, isLegacy, cli);
 
 	std::filesystem::path filepath(path);
 	std::filesystem::path parent = filepath.parent_path();
@@ -167,10 +173,10 @@ int UpdateMemory(struct Launcher::IsaacOptions const* options, HANDLE process, P
 }
 // #pragma code_seg(pop, r1)
 
-int FirstStageInit(const char* path, struct Launcher::IsaacOptions const* options, HANDLE* outProcess, void** page,
+int FirstStageInit(const char* path, bool isLegacy, struct Launcher::IsaacOptions const* options, HANDLE* outProcess, void** page,
 	size_t* functionOffset, size_t* paramOffset, PROCESS_INFORMATION* processInfo) {
 	Logger::Info("Starting injector\n");
-	DWORD processId = CreateIsaac(path, options, processInfo);
+	DWORD processId = CreateIsaac(path, isLegacy, options, processInfo);
 	if (processId == -1) {
 		return -1;
 	}
@@ -245,13 +251,13 @@ int Launcher::App::OnExit() {
 	return 0;
 }
 
-int Launcher::Launch(ILoggableGUI* gui, const char* path, Launcher::IsaacOptions const& options) {
+int Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy, Launcher::IsaacOptions const& options) {
 	HANDLE process;
 	void* remotePage;
 	size_t functionOffset, paramOffset;
 	PROCESS_INFORMATION processInfo;
 
-	if (FirstStageInit(path, &options, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
+	if (FirstStageInit(path, isLegacy, &options, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
 		gui->LogError("Low level error encountered while starting the game, check log files\n");
 		return -1;
 	}

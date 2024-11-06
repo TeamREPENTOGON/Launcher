@@ -87,9 +87,6 @@ namespace Launcher {
 		void InitializeGUIFromOptions();
 		/* Helper to initialize the level selection field from the IsaacOptions structure. */
 		void InitializeLevelSelectFromOptions();
-		/* Enable/disable Repentogon options depending on the selected launch mode (in GUI). */
-		void UpdateRepentogonOptionsFromLaunchMode();
-
 		void UpdateRepentogonOptionsFromInstallation();
 
 		/* Event handlers. */

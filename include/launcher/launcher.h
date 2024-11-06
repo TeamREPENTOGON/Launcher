@@ -29,5 +29,5 @@ namespace Launcher {
 		void WriteConfiguration(ILoggableGUI* gui, Launcher::Installation const& installation);
 	};
 
-	int Launch(ILoggableGUI* gui, const char* path, IsaacOptions const& options);
+	int Launch(ILoggableGUI* gui, const char* path, bool isLegacy, IsaacOptions const& options);
 }

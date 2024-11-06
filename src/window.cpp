@@ -269,8 +269,6 @@ namespace Launcher {
 		} else {
 			_options.mode = LAUNCH_MODE_REPENTOGON;
 		}
-
-		UpdateRepentogonOptionsFromLaunchMode();
 	}
 
 	void MainFrame::OnCharacterWritten(wxCommandEvent& event) {
@@ -321,7 +319,7 @@ namespace Launcher {
 		Log("\t\tLua heap size: %dM", _options.luaHeapSize);
 
 		_options.WriteConfiguration(this, _installation);
-		::Launcher::Launch(this, _isaacFileText->GetValue().c_str().AsChar(), _options);
+		::Launcher::Launch(this, _isaacFileText->GetValue().c_str().AsChar(), _installation.IsLegacyRepentogonInstallation(), _options);
 	}
 
 	void MainFrame::EnableInterface(bool enable) {
@@ -404,16 +402,11 @@ namespace Launcher {
 
 		InitializeOptions();
 
-		if (!_installation.IsCompatibleWithRepentogon()) {
-			if (_repentogonLaunchModeIdx != -1) {
-				_launchMode->Delete(_repentogonLaunchModeIdx);
-				UpdateRepentogonOptionsFromInstallation();
-			}
-			return;
-		}
+		UpdateRepentogonOptionsFromInstallation();
 
-		// Guarantee: installation is compatible with Repentogon.
-		PostInitHandleRepentogon();
+		if (_installation.IsCompatibleWithRepentogon()) {
+			PostInitHandleRepentogon();
+		}
 	}
 
 	void MainFrame::PostInitHandleRepentogon() {
@@ -722,8 +715,6 @@ namespace Launcher {
 		} else {
 			_launchMode->SetValue("Vanilla");
 		}
-
-		UpdateRepentogonOptionsFromLaunchMode();
 	}
 
 	void MainFrame::InitializeLevelSelectFromOptions() {
@@ -754,19 +745,9 @@ namespace Launcher {
 		_levelSelect->SetValue(wxString(value));
 	}
 
-	void MainFrame::UpdateRepentogonOptionsFromLaunchMode() {
-		/* if (_launchMode->GetValue() == "Repentogon") {
-			_repentogonOptions->Enable(true);
-			// _console->Enable(true);
-		} else {
-			_repentogonOptions->Enable(false);
-			// _console->Enable(false);
-		} */
-	}
-
 	void MainFrame::UpdateRepentogonOptionsFromInstallation() {
 		Launcher::RepentogonInstallationState state = _installation.GetRepentogonInstallationState();
-		if (state != REPENTOGON_INSTALLATION_STATE_MODERN) {
+		if (state == REPENTOGON_INSTALLATION_STATE_NONE || !_installation.IsCompatibleWithRepentogon()) {
 			if (_repentogonLaunchModeIdx != -1) {
 				_launchMode->Delete(_repentogonLaunchModeIdx);
 				_repentogonLaunchModeIdx = -1;
