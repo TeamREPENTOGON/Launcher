@@ -370,7 +370,7 @@ namespace Launcher {
 	}
 
 	bool MainFrame::SanityCheckLauncherUpdate() {
-		return Filesystem::FileExists(Comm::UnpackedArchiveName);
+		return !Filesystem::FileExists(Comm::UnpackedArchiveName);
 	}
 
 	void MainFrame::SanitizeLauncherUpdate() {
