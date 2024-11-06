@@ -380,12 +380,12 @@ namespace Launcher {
 	}
 
 	void MainFrame::PostInit() {
-#ifdef LAUNCHER_UNSTABLE
+/* #ifdef LAUNCHER_UNSTABLE
 		wxMessageBox("You are running an unstable version of the REPENTOGON launcher.\n"
 			"If you wish to run a stable version, use the \"Self-update (stable version)\" button",
 			"Unstable launcher version", wxCENTER | wxICON_WARNING);
 		LogWarn("Running an unstable version of the launcher");
-#endif
+#endif */
 		Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::version);
 		std::string currentDir = Filesystem::GetCurrentDirectory_();
 		Log("Current directory is: %s", currentDir.c_str());
