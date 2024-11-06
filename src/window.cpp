@@ -220,7 +220,9 @@ namespace Launcher {
 			"Select isaac-ng.exe executable");
 		dialog.ShowModal();
 		std::string path = dialog.GetPath().ToStdString();
-		OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
+		if (!path.empty()) {
+			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
+		}
 	}
 
 	void MainFrame::OnSelectRepentogonFolderClick(wxCommandEvent& event) {
