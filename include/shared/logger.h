@@ -13,6 +13,7 @@ public:
 	static void Memory(const char* ctx);
 
 	static void Init(const char* filename, bool append);
+	static void End();
 
 private:
 	static void Log(const char* prefix, const char* fmt, va_list va);

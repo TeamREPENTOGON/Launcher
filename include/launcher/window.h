@@ -37,6 +37,7 @@ namespace Launcher {
 	class App : public wxApp {
 	public:
 		bool OnInit() override;
+		int OnExit() override;
 		void ParseCommandLine();
 	};
 

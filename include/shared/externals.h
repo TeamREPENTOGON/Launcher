@@ -8,6 +8,7 @@
  */
 namespace Externals {
 	void Init();
+	void End();
 
 	extern BOOL(WINAPI *pGetUserProfileDirectoryA)(HANDLE, LPSTR, LPDWORD);
 }

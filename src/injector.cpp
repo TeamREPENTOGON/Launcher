@@ -240,6 +240,11 @@ bool Launcher::App::OnInit() {
 	return true;
 }
 
+int Launcher::App::OnExit() {
+	Externals::End();
+	return 0;
+}
+
 int Launcher::Launch(ILoggableGUI* gui, const char* path, Launcher::IsaacOptions const& options) {
 	HANDLE process;
 	void* remotePage;

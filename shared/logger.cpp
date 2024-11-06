@@ -80,3 +80,10 @@ void Logger::Memory(const char* ctx) {
 	fputs(MemoryError, _file);
 	fputs(ctx, _file);
 }
+
+void Logger::End() {
+	if (Logger::_file) {
+		fflush(Logger::_file);
+		fclose(Logger::_file);
+	}
+}
