@@ -132,8 +132,9 @@ namespace Launcher {
 		bool SanityCheckLauncherUpdate();
 		void SanitizeLauncherUpdate();
 
-		bool InitializeIsaacFolderPath(bool shouldPrompt);
+		bool InitializeIsaacExecutablePath(bool shouldPrompt);
 		void HandleLauncherUpdates(bool allowDrafts);
+		bool HandleIsaacExecutableSelection(std::string const& path);
 
 		void PostInitHandleRepentogon();
 

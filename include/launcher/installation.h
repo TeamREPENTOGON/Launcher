@@ -17,7 +17,6 @@
  * checking an installation of Isaac / Repentogon, or hashing files.
  */
 namespace Launcher {
-	static constexpr const char* isaacExecutable = "isaac-ng.exe";
 	static constexpr const char* launcherConfigFile = "repentogon_launcher.ini";
 	static constexpr const char* defaultRepentogonFolder = "repentogon";
 
@@ -38,7 +37,7 @@ namespace Launcher {
 		static constexpr const char* GeneralSection = "General";
 
 		// Keys (General section)
-		static constexpr const char* IsaacFolderKey = "IsaacFolder";
+		static constexpr const char* IsaacExecutableKey = "IsaacExecutable";
 		static constexpr const char* RepentogonFolderKey = "RepentogonFolder";
 
 		// Default values (General section)
@@ -142,22 +141,21 @@ namespace Launcher {
 		 */
 		bool InitFolders();
 
-		/* Configure the path to the Isaac installation folder.
+		/* Configure the path to the Isaac executable.
 		 * 
 		 * The function first checks if the given path is a valid Isaac
-		 * installation folder (i.e. it contains a file called isaac-ng.exe).
-		 * If the path is not a valid installation folder, the function returns
-		 * false.
+		 * executable (i.e. the file exists). If the path is not a valid 
+		 * executable file, the function returns false.
 		 * 
 		 * This function additionally attempts to find a Repentogon installation
-		 * in the given folder, if the Isaac installation is valid.
+		 * in the folder of the executable, if the path is a valid executable.
 		 * 
-		 * If the path is a valid installation folder, GetIsaacVersion(),
-		 * GetIsaacInstallationPath() and GetIsaacExecutablePath() will return
-		 * exploitable values. All functions related to an installation of 
-		 * Repentogon become usable as well.
+		 * If the path is a valid executable folder, GetIsaacVersion()and 
+		 * GetIsaacExecutablePath() will return exploitable values. All 
+		 * functions related to an installation of  Repentogon become usable as 
+		 * well, but may still return an empty path.
 		 */
-		bool ConfigureIsaacInstallationFolder(std::string const& folder);
+		bool ConfigureIsaacExecutableFile(std::string const& folder);
 
 		/* Check for an installation of Repentogon.
 		 *
@@ -194,8 +192,8 @@ namespace Launcher {
 
 		std::string const& GetSaveFolder() const;
 		std::string const& GetLauncherConfigurationPath() const;
-		std::string const& GetIsaacInstallationFolder() const;
 		std::string const& GetIsaacExecutablePath() const;
+		std::string const& GetIsaacInstallationFolder() const;
 
 		bool IsValidRepentogonInstallation(bool includeLegacy) const;
 		bool IsLegacyRepentogonInstallation() const;
@@ -243,7 +241,7 @@ namespace Launcher {
 		std::string _saveFolder;
 		/* Path to the folder containing the configuration of the launcher. */
 		std::string _configurationPath;
-		/* Path to the Isaac installation folder, or empty if not found. */
+		/* Path to the folder containing the Isaac executable, derived from _isaacExecutable. */
 		std::string _isaacFolder;
 		/* Path to the Isaac executable, or empty if not found. */
 		std::string _isaacExecutable;
@@ -272,17 +270,17 @@ namespace Launcher {
 		 */
 		bool SearchConfigurationFile();
 
-		/* Find the folder containing the installation of Isaac. 
+		/* Find the BoI executable to run. 
 		 * 
 		 * The function first checks the content of the configuration file.
-		 * If the config indicates an installation folder, the function 
-		 * checks that it is an existing folder, but doesn't check the 
+		 * If the config indicates an executable file, the function 
+		 * checks that it is a valid executable, but doesn't check the 
 		 * validity of the installation (see CheckIsaacInstallation()). 
 		 * 
-		 * If the configuration file does not indicate an installation 
-		 * folder, the function checks for a file called isaac-ng.exe in
-		 * the current folder. If such a file is found, the current folder
-		 * becomes the Isaac installation folder.
+		 * If the configuration file does not indicate an executable 
+		 * path, the function checks for a file called isaac-ng.exe in
+		 * the current folder. If such a file is found, it becomes the path
+		 * to the executable to run.
 		 * 
 		 * This function can fail.
 		 */
@@ -298,12 +296,7 @@ namespace Launcher {
 
 		bool IsCompatibleWithRepentogon(std::string const& version);
 
-		/* Check that an installation of Isaac is valid.
-		 *
-		 * An installation of Isaac is valid if path contains a file
-		 * called isaac-ng.exe.
-		 */
-		bool CheckIsaacInstallationFolder(std::string const& path);
+		bool CheckIsaacExecutable(std::string const& path);
 	};
 
 	/* Validate a string in an unsafe module.

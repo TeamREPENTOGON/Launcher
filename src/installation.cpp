@@ -5,6 +5,7 @@
 #include <Psapi.h>
 #include <UserEnv.h>
 
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <sstream>
@@ -105,32 +106,38 @@ namespace Launcher {
 		return SearchIsaacInstallationPath();
 	}
 
-	bool Installation::CheckIsaacInstallationFolder(std::string const& path) {
-		if (path.empty()) {
-			Logger::Info("Installation::CheckIsaacInstallationFolder: empty path given\n");
+	bool Installation::CheckIsaacExecutable(std::string const& path) {
+		if (!Filesystem::FileExists(path.c_str())) {
+			_gui->LogError("BoI executable %s does not exist\n", path.c_str());
+			Logger::Error("Installation::CheckIsaacExecutable: executable %s does not exist\n", path.c_str());
 			return false;
 		}
 
-		std::string fullPath = (path + "\\") + isaacExecutable;
-		if (!Filesystem::FileExists(fullPath.c_str())) {
-			Logger::Info("Installation::CheckIsaacInstallationFolder:: no isaac-ng.exe file in %s\n", fullPath.c_str());
+		DWORD subsystem = -1;
+		if (!GetBinaryTypeA(path.c_str(), &subsystem)) {
+			_gui->LogError("BoI executable %s is not executable !\n", path.c_str());
+			Logger::Error("Installation::CheckIsaacExecutable: file %s is not executable\n", path.c_str());
+			return false;
+		}
+
+		if (subsystem != SCS_32BIT_BINARY) {
+			_gui->LogError("BoI executable %s is not a 32-bit Windows application !\n", path.c_str());
+			Logger::Error("Installation::CheckIsaacExecutable: file %s is not a Win32 application\n", path.c_str());
 			return false;
 		}
 
 		return true;
 	}
 
-	bool Installation::ConfigureIsaacInstallationFolder(std::string const& path) {
-		if (!CheckIsaacInstallationFolder(path)) {
-			_gui->LogError("%s is not a valid Isaac installation folder (no isaac-ng.exe found)\n", path.c_str());
-			Logger::Error("Installation::ConfigurationIsaacInstallationFolder: invalid folder given\n");
+	bool Installation::ConfigureIsaacExecutableFile(std::string const& path) {
+		if (!CheckIsaacExecutable(path)) {
+			_gui->LogError("%s is not a valid Isaac executable\n", path.c_str());
+			Logger::Error("Installation::ConfigurationIsaacInstallationFile: invalid file given\n");
 			return false;
 		}
 
-		std::string fullPath = (path + "\\") + isaacExecutable;
-
 		try {
-			std::string hash = Sha256::Sha256F(fullPath.c_str());
+			std::string hash = Sha256::Sha256F(path.c_str());
 			_isaacVersion = GetIsaacVersionFromHash(hash.c_str());
 			Logger::Info("Computed hash of isaac-ng.exe: %s\n", hash.c_str());
 		} catch (std::runtime_error& e) {
@@ -140,8 +147,10 @@ namespace Launcher {
 		/* Not an error to not have _isaacVersion here : second attempt will be 
 		 * performed later, state remains consistent.
 		 */
-		_isaacFolder = path;
-		_isaacExecutable = std::move(fullPath);
+		_isaacExecutable = path;
+		std::filesystem::path fsPath(path);
+		fsPath.remove_filename();
+		_isaacFolder = fsPath.string();
 
 		CheckRepentogonInstallation();
 
@@ -204,7 +213,7 @@ namespace Launcher {
 		_gui->Log("Checking for validity of Repentogon installation...\n");
 
 		if (repentogonFolder.empty()) {
-			_gui->LogError("Cannot check for a Repentogon installation without being given an Isaac installation folder\n");
+			_gui->LogError("Cannot check for a Repentogon installation without being given an Isaac executable\n");
 			Logger::Critical("Installation::CheckRepentogonInstallation: function called without an Isaac folder, abnormal internal state\n");
 			return false;
 		}
@@ -421,12 +430,12 @@ namespace Launcher {
 		return _configurationPath;
 	}
 
-	std::string const& Installation::GetIsaacInstallationFolder() const {
-		return _isaacFolder;
-	}
-
 	std::string const& Installation::GetIsaacExecutablePath() const {
 		return _isaacExecutable;
+	}
+
+	std::string const& Installation::GetIsaacInstallationFolder() const {
+		return _isaacFolder;
 	}
 
 	int Installation::GetConfigurationFileSyntaxErrorLine() const {
@@ -529,40 +538,41 @@ namespace Launcher {
 
 	bool Installation::SearchIsaacInstallationPath() {
 		if (!_configurationFile) {
-			_gui->LogWarn("No Isaac installation folder automatically found, you'll need to specify one\n");
+			_gui->LogWarn("No Isaac executable automatically found, you'll need to specify one\n");
 			Logger::Critical("Installation::SearchIsaacInstallationPath: function called without a configuration file, abnormal internal state\n");
 			return false;
 		}
 
-		std::string isaacFolder = _configurationFile->GetString("General", "IsaacFolder", "__empty__");
-		if (isaacFolder == "__empty__") {
-			bool ok = ConfigureIsaacInstallationFolder(Filesystem::GetCurrentDirectory_());
+		std::string isaacExecutable = _configurationFile->GetString(Launcher::Configuration::GeneralSection, 
+			Launcher::Configuration::IsaacExecutableKey, Launcher::Configuration::EmptyPath);
+		if (isaacExecutable == Launcher::Configuration::EmptyPath) {
+			bool ok = ConfigureIsaacExecutableFile(Filesystem::GetCurrentDirectory_() + "isaac-ng.exe");
 			if (!ok) {
-				_gui->LogWarn("The launcher configuration file does not indicate a path to the Isaac installation folder, you'll need to specify one\n");
-				Logger::Error("Configuration file has no Isaac installation folder and no isaac-ng.exe found in current folder\n");
+				_gui->LogWarn("The launcher configuration file does not indicate a path to the Isaac executable, you'll need to specify one\n");
+				Logger::Error("Configuration file has no Isaac executable and no isaac-ng.exe found in current folder\n");
 			} else {
-				_gui->LogInfo("Autodetected Isaac installation folder %s\n", _isaacFolder.c_str());
-				Logger::Info("Autodetected Isaac installation in %s\n", _isaacFolder.c_str());
+				_gui->LogInfo("Autodetected Isaac executable %s\n", _isaacExecutable.c_str());
+				Logger::Info("Autodetected Isaac executable %s\n", _isaacExecutable.c_str());
 			}
 
 			return ok;
 		}
 
-		if (!Filesystem::FolderExists(isaacFolder.c_str())) {
-			_gui->LogWarn("The launcher configuration file indicates a non existent Isaac installation folder (%s)," 
-				"you'll need to specify a correct one\n", _isaacFolder.c_str());
-			Logger::Error("Isaac installation folder %s in launcher configuration file does not exist\n", isaacFolder.c_str());
+		if (!Filesystem::FileExists(isaacExecutable.c_str())) {
+			_gui->LogWarn("The launcher configuration file indicates a non existent Isaac executable (%s)," 
+				"you'll need to specify a correct one\n", isaacExecutable.c_str());
+			Logger::Error("Isaac executable %s in launcher configuration file does not exist\n", isaacExecutable.c_str());
 			return false;
 		}
 
-		_gui->LogInfo("Launcher configuration file indicates %s as Isaac installation folder, checking it is valid\n", isaacFolder.c_str());
-		if (!ConfigureIsaacInstallationFolder(isaacFolder)) {
-			_gui->LogWarn("Isaac installation folder %s is not valid, you'll be prompted for a valid one\n", isaacFolder.c_str());
+		_gui->LogInfo("Launcher configuration file indicates %s as Isaac executable, checking it is valid\n", isaacExecutable.c_str());
+		if (!ConfigureIsaacExecutableFile(isaacExecutable)) {
+			_gui->LogWarn("Isaac executable %s is not valid, you'll be prompted for a valid one\n", isaacExecutable.c_str());
 			return false;
 		}
 
-		_gui->Log("Isaac installation folder %s is valid !\n", _isaacFolder.c_str());
-		Logger::Info("Found Isaac installation in %s\n", _isaacFolder.c_str());
+		_gui->Log("Isaac executable %s is valid !\n", _isaacExecutable.c_str());
+		Logger::Info("Found Isaac installation %s\n", _isaacExecutable.c_str());
 		return true;
 	}
 
@@ -572,14 +582,14 @@ namespace Launcher {
 			throw std::runtime_error("Inconsistent runtime state: attempted to write launcher configuration without a valid path");
 		}
 
-		if (_isaacFolder.empty()) {
-			Logger::Fatal("Installation::WriteLauncherConfigurationFile: _isaacFolder is empty\n");
+		if (_isaacExecutable.empty()) {
+			Logger::Fatal("Installation::WriteLauncherConfigurationFile: _isaacExecutable is empty\n");
 			throw std::runtime_error("Inconsistent runtime state: attempted to write launcher configuration without a valid Isaac folder");
 		}
 
 		std::ofstream configuration(_configurationPath, std::ios::out);
 		configuration << "[" << Configuration::GeneralSection << "]" << std::endl;
-		configuration << Configuration::IsaacFolderKey << " = " << _isaacFolder << std::endl;
+		configuration << Configuration::IsaacExecutableKey << " = " << _isaacExecutable << std::endl;
 		configuration.close();
 
 		_configurationFile.reset(new INIReader(_configurationPath));

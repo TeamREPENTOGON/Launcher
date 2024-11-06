@@ -154,6 +154,7 @@ namespace Launcher {
 		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 5);
 
 		_launchButton = new wxButton(launchModeBox, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game");
+		_launchButton->Disable();
 		launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
 		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxBOTTOM, 5);
@@ -216,14 +217,12 @@ namespace Launcher {
 	}
 
 	void MainFrame::OnIsaacSelectClick(wxCommandEvent& event) {
-		wxFileDialog dialog(this, "Please select the isaac-ng.exe to launch", wxEmptyString, wxEmptyString, 
-			"isaac-ng.exe", wxFD_FILE_MUST_EXIST, wxDefaultPosition, wxDefaultSize, 
-			"Select isaac-ng.exe executable");
+		wxFileDialog dialog(this, "Please select the Binding of Isaac executable to launch", wxEmptyString, wxEmptyString, 
+			wxEmptyString, wxFD_FILE_MUST_EXIST, wxDefaultPosition, wxDefaultSize, 
+			"Select Binding of Isaac executable");
 		dialog.ShowModal();
-		std::string path = dialog.GetPath().ToStdString();
-		if (!path.empty()) {
-			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
-		}
+		HandleIsaacExecutableSelection(dialog.GetPath().ToStdString());
+		
 	}
 
 	void MainFrame::OnSelectRepentogonFolderClick(wxCommandEvent& event) {
@@ -329,25 +328,12 @@ namespace Launcher {
 		LogWarn("Interface freezing / unfreezing when launching the game is not yet implemented\n");
 	}
 
-	bool MainFrame::InitializeIsaacFolderPath(bool shouldPrompt) {
+	bool MainFrame::InitializeIsaacExecutablePath(bool shouldPrompt) {
 		if (shouldPrompt) {
-			std::string path = PromptIsaacInstallation();
-			std::filesystem::path p(path);
-			p.remove_filename();
-			if (!_installation.ConfigureIsaacInstallationFolder(p.string())) {
-				LogError("Unable to configure the Isaac installation folder");
-				return false;
-			} else {
-				Log("Set Isaac installation folder to %s", p.string().c_str());
-			}
-
-			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
+			return HandleIsaacExecutableSelection(PromptIsaacInstallation());
 		} else {
-			OnFileSelected(_installation.GetIsaacInstallationFolder() + "isaac-ng.exe",
-				NoIsaacColor, _isaacFileText, NoIsaacText);
+			return HandleIsaacExecutableSelection(_installation.GetIsaacExecutablePath());
 		}
-
-		return true;
 	}
 
 	void MainFrame::HandleLauncherUpdates(bool allowPreReleases) {
@@ -405,7 +391,7 @@ namespace Launcher {
 		Log("Attempting to autodetect Isaac save folder, launcher configuration and Isaac installation folder...");
 		bool shouldPromptForIsaac = !_installation.InitFolders();
 		bool abortInitialization = false;
-		while (!abortInitialization && !InitializeIsaacFolderPath(shouldPromptForIsaac)) {
+		while (!abortInitialization && !InitializeIsaacExecutablePath(shouldPromptForIsaac)) {
 			wxMessageDialog dialog(this, "Invalid Isaac folder path given, do you want to retry ? (Answering \"No\" will abort)", "Invalid folder", wxYES_NO);
 			int result = dialog.ShowModal();
 			abortInitialization = (result == wxID_NO);
@@ -415,10 +401,6 @@ namespace Launcher {
 			Logger::Fatal("User did not provide a valid Isaac installation folder, aborting\n");
 			wxAbort();
 		}
-
-		/* Guarantee: Isaac installation folder is okay, Repentogon installation
-		 * has been identified.
-		 */
 
 		InitializeOptions();
 
@@ -830,10 +812,10 @@ namespace Launcher {
 	}
 
 	std::string MainFrame::PromptIsaacInstallation() {
-		wxString message("No Isaac installation found, please select isaac-ng.exe in the Isaac installation folder");
+		wxString message("No Isaac installation found, please select Isaac executable to run");
 		// wxDirDialog dialog(this, message, wxEmptyString, wxDD_DIR_MUST_EXIST, wxDefaultPosition, wxDefaultSize, "Select Isaac folder");
-		wxFileDialog dialog(this, message, wxEmptyString, wxEmptyString, "isaac-ng.exe", wxFD_FILE_MUST_EXIST, wxDefaultPosition,
-			wxDefaultSize, "Select isaac-ng.exe executable");
+		wxFileDialog dialog(this, message, wxEmptyString, wxEmptyString, wxEmptyString, wxFD_FILE_MUST_EXIST, wxDefaultPosition,
+			wxDefaultSize, "Select Isaac executable");
 		dialog.ShowModal();
 		return dialog.GetPath().ToStdString();
 	}
@@ -909,5 +891,18 @@ namespace Launcher {
 			LogError("Unhandled result from ShowModal: %d", result);
 			break;
 		}
+	}
+
+	bool MainFrame::HandleIsaacExecutableSelection(std::string const& path) {
+		bool result = _installation.ConfigureIsaacExecutableFile(path);
+		if (!result) {
+			LogError("Unable to configure the Isaac executable");
+		} else {
+			Log("Set Isaac executable to %s", path.c_str());
+			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
+			_launchButton->Enable();
+		}
+
+		return result;
 	}
 }

@@ -117,10 +117,10 @@ void Launcher::IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::Ins
 		return;
 	}
 
-	std::string isaacFolder = installation.GetIsaacInstallationFolder();
+	std::string isaacExecutable = installation.GetIsaacExecutablePath();
 	fprintf(f, "[%s]\n", Launcher::Configuration::GeneralSection);
-	fprintf(f, "%s = %s\n", Launcher::Configuration::IsaacFolderKey, isaacFolder.empty() ? 
-		Launcher::Configuration::EmptyPath : isaacFolder.c_str());
+	fprintf(f, "%s = %s\n", Launcher::Configuration::IsaacExecutableKey, isaacExecutable.empty() ?
+		Launcher::Configuration::EmptyPath : isaacExecutable.c_str());
 
 	fprintf(f, "[%s]\n", Sections::repentogon.c_str());
 	fprintf(f, "%s = %d\n", Keys::console.c_str(), console);
