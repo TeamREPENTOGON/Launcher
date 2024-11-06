@@ -10,6 +10,7 @@
 
 namespace Filesystem {
 	bool CreateFileHierarchy(const char* name) {
+		Logger::Debug("Creating file hierarchy %s\n", name);
 		char* copy = (char*)malloc(strlen(name) + 1);
 		if (!copy) {
 			Logger::Error("CreateFileHierarchy: unable to allocate memory to duplicate %s\n", name);

@@ -309,7 +309,8 @@ namespace Launcher {
 				continue;
 			}
 
-			if (!Filesystem::CreateFileHierarchy(name)) {
+			std::string fullName = (outputDirBase + name);
+			if (!Filesystem::CreateFileHierarchy(fullName.c_str())) {
 				Logger::Error("RepentogonUpdater::ExtractRepentogon: cannot create intermediate folders for file %s\n", name);
 				ok = false;
 				zip_fclose(file);
