@@ -6,6 +6,8 @@
 #include "launcher/self_update.h"
 #include "launcher/version.h"
 #include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/prettywriter.h"
 #include "shared/github.h"
 #include "shared/logger.h"
 
@@ -52,6 +54,14 @@ namespace Launcher {
 
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
 		bool force, std::string& version, std::string& url) {
+		if (!releases.IsArray()) {
+			rapidjson::StringBuffer buffer;
+			rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
+			releases.Accept(writer);
+			Logger::Error("SelectTargetRelease: malformed answer (got %s)\n", buffer.GetString());
+			return false;
+		}
+
 		auto releaseArray = releases.GetArray();
 		for (auto const& release : releaseArray) {
 			if (!release["prerelease"].IsTrue() || allowPre) {
