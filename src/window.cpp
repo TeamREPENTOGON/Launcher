@@ -77,22 +77,22 @@ namespace Launcher {
 		_console = nullptr;
 		_luaHeapSize = nullptr;
 
-		SetSize(1024, 700);
-
 		wxStaticBox* optionsBox = new wxStaticBox(this, -1, "Game configuration");
 		wxStaticBoxSizer* optionsSizer = new wxStaticBoxSizer(optionsBox, wxHORIZONTAL);
 
 		wxSizer* verticalSizer = new wxBoxSizer(wxVERTICAL);
-		wxTextCtrl* logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, 400), 
+		wxTextCtrl* logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1), 
 			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH);
 		logWindow->SetBackgroundColour(*wxWHITE);
 
 		wxStaticBox* configurationBox = new wxStaticBox(this, -1, "Launcher configuration");
 		wxStaticBoxSizer* configurationSizer = new wxStaticBoxSizer(configurationBox, wxHORIZONTAL);
 
-		verticalSizer->Add(logWindow, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 20);
-		verticalSizer->Add(configurationSizer, 0, wxLEFT | wxEXPAND | wxRIGHT, 20);
-		verticalSizer->Add(optionsSizer, 0, wxLEFT | wxEXPAND | wxRIGHT | wxTOP, 20);
+		wxSizerFlags logFlags = wxSizerFlags().Expand().Proportion(5).Border(wxLEFT | wxRIGHT | wxTOP);
+		verticalSizer->Add(logWindow, logFlags);
+		logFlags.Proportion(0);
+		verticalSizer->Add(configurationSizer, logFlags);
+		verticalSizer->Add(optionsSizer, logFlags);
 
 		_logWindow = logWindow;
 		_configurationBox = configurationBox;
@@ -105,10 +105,11 @@ namespace Launcher {
 		AddVanillaOptions();
 		AddLaunchOptions();
 		
-		_advancedOptionsButton = new wxButton(this, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options");
-		verticalSizer->Add(_advancedOptionsButton, 0, wxALIGN_RIGHT | wxRIGHT, 20);
+		_advancedOptionsButton = new wxButton(this, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
+		wxSizerFlags advancedOptionsFlags = wxSizerFlags().Right();
+		verticalSizer->Add(_advancedOptionsButton, advancedOptionsFlags);
 
-		SetSizer(verticalSizer);
+		SetSizerAndFit(verticalSizer);
 
 		SetBackgroundColour(wxColour(237, 237, 237));
 	}
@@ -119,8 +120,8 @@ namespace Launcher {
 
 	void MainFrame::AddLauncherConfigurationOptions() {
 		wxBoxSizer* isaacSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
-		AddLauncherConfigurationTextField("Indicate the path of the isaac-ng.exe file",
-			"Select file", NoIsaacText, 
+		AddLauncherConfigurationTextField("Indicate the path of the Isaac executable file",
+			"Select Isaac executable...", NoIsaacText, 
 			NoIsaacColor, isaacSelectionSizer, &_isaacFileText, WINDOW_BUTTON_SELECT_ISAAC);
 
 		/* wxBoxSizer* repentogonSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -807,7 +808,7 @@ namespace Launcher {
 		_configurationSizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 20);
 		wxButton* isaacSelectionButton = new wxButton(_configurationBox, windowId, buttonText);
 		_configurationSizer->Add(isaacSelectionButton, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
-		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxSize(400, -1), wxTE_READONLY | wxTE_RICH);
+		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1), wxTE_READONLY | wxTE_RICH);
 		textCtrl->SetBackgroundColour(*wxWHITE);
 
 		wxTextAttr textAttr = textCtrl->GetDefaultStyle();
@@ -815,7 +816,8 @@ namespace Launcher {
 		textCtrl->AppendText(emptyText);
 		textCtrl->SetDefaultStyle(textAttr);
 
-		_configurationSizer->Add(textCtrl, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
+		wxSizerFlags flags = wxSizerFlags().Expand().Proportion(1);
+		_configurationSizer->Add(textCtrl, flags);
 
 		if (result) {
 			*result = textCtrl;
