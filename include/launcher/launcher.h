@@ -10,9 +10,9 @@
 #endif
 
 #include "curl/curl.h"
+#include "launcher/configuration.h"
 #include "launcher/installation.h"
 #include "launcher/installation_manager.h"
-#include "launcher/launcher.h"
 #include "launcher/self_update.h"
 #include "launcher/repentogon_updater.h"
 #include "launcher/self_updater/launcher_update_manager.h"

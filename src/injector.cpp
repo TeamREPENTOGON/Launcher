@@ -12,9 +12,9 @@
 
 #include <wx/wx.h>
 
+#include "launcher/configuration.h"
 #include "launcher/launcher.h"
 #include "launcher/loader.h"
-#include "launcher/window.h"
 
 #include "shared/externals.h"
 #include "shared/logger.h"
@@ -235,22 +235,6 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	return 0;
 }
 
-bool Launcher::App::OnInit() {
-	Logger::Init("launcher.log", "w");
-	Externals::Init();
-
-	MainFrame* frame = new MainFrame();
-	frame->Show();
-	frame->PostInit();
-
-	return true;
-}
-
-int Launcher::App::OnExit() {
-	Externals::End();
-	return 0;
-}
-
 int Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy, Launcher::IsaacOptions const& options) {
 	HANDLE process;
 	void* remotePage;
@@ -287,5 +271,3 @@ int Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy, Launche
 
 	return 0;
 }
-
-wxIMPLEMENT_APP(Launcher::App);

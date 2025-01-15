@@ -1,8 +1,8 @@
 #include <cstdio>
 #include <string>
 
+#include "launcher/configuration.h"
 #include "launcher/isaac.h"
-#include "launcher/launcher.h"
 
 namespace Defaults {
 	constexpr const bool console = false;

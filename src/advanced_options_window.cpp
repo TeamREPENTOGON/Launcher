@@ -1,7 +1,7 @@
 #include <WinSock2.h>
 
 #include "launcher/advanced_options_window.h"
-#include "launcher/window.h"
+#include "launcher/launcher.h"
 
 wxBEGIN_EVENT_TABLE(Launcher::AdvancedOptionsWindow, wxDialog)
 EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UNSTABLE_UPDATE, 
