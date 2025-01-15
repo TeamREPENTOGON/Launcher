@@ -18,11 +18,11 @@
 
 #include "comm/messages.h"
 #include "curl/curl.h"
-#include "launcher/advanced_options_window.h"
+#include "launcher/windows/advanced_options.h"
 #include "launcher/configuration.h"
 #include "launcher/installation.h"
 #include "launcher/isaac.h"
-#include "launcher/launcher.h"
+#include "launcher/windows/launcher.h"
 #include "launcher/self_update.h"
 #include "launcher/version.h"
 #include "shared/github.h"

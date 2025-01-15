@@ -13,7 +13,6 @@
 #include <wx/wx.h>
 
 #include "launcher/configuration.h"
-#include "launcher/launcher.h"
 #include "launcher/loader.h"
 
 #include "shared/externals.h"

@@ -1,6 +1,8 @@
 #include "shared/externals.h"
-#include "launcher/launcher.h"
+#include "launcher/windows/launcher.h"
 #include "shared/logger.h"
+#include "launcher/self_updater/launcher_update_manager.h"
+
 
 bool Launcher::App::OnInit() {
 	Logger::Init("launcher.log", "w");
