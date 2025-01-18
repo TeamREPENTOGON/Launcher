@@ -16,6 +16,7 @@
 #include "launcher/self_update.h"
 #include "launcher/repentogon_updater.h"
 #include "launcher/self_updater/launcher_update_manager.h"
+#include "launcher/widgets/text_ctrl_log_widget.h"
 #include "rapidjson/document.h"
 #include "shared/loggable_gui.h"
 
@@ -43,7 +44,7 @@ namespace Launcher {
 
 	class AdvancedOptionsWindow;
 
-	class MainFrame : public wxFrame, public ILoggableGUI {
+	class MainFrame : public wxFrame {
 	public:
 		friend class AdvancedOptionsWindow;
 
@@ -58,17 +59,9 @@ namespace Launcher {
 		MainFrame();
 		~MainFrame();
 
-		void Log(const char* prefix, bool nl, const char* fmt, ...);
-		void LogNoNL(const char* fmt, ...);
-		void Log(const char* fmt, ...);
-		void LogInfo(const char* fmt, ...);
-		void LogWarn(const char* fmt, ...);
-		void LogError(const char* fmt, ...);
 		void PostInit();
 
 	private:
-		Installation _installation;
-
 		/* Window building. */
 		void AddLauncherConfigurationOptions();
 		void AddLaunchOptions();
@@ -157,8 +150,8 @@ namespace Launcher {
 		int _repentogonLaunchModeIdx = -1;
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
 
-		std::mutex _logMutex;
-		wxTextCtrl* _logWindow;
+		wxTextCtrlLog _logWindow;
+		Installation _installation;
 		/* Log string used in CheckUpdates to indicate which tool is being checked. */
 		std::string _currentUpdate;
 

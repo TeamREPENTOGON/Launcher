@@ -72,7 +72,10 @@ namespace Launcher {
 
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 	
-	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"), _installation(this) {
+	MainFrame::MainFrame() : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"), 
+		_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1),
+			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)),
+		_installation(&_logWindow) {
 		memset(&_options, 0, sizeof(_options));
 		// _optionsGrid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
@@ -82,8 +85,7 @@ namespace Launcher {
 		wxStaticBoxSizer* optionsSizer = new wxStaticBoxSizer(optionsBox, wxHORIZONTAL);
 
 		wxSizer* verticalSizer = new wxBoxSizer(wxVERTICAL);
-		wxTextCtrl* logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1), 
-			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH);
+		wxTextCtrl* logWindow = _logWindow.Get();
 		logWindow->SetBackgroundColour(*wxWHITE);
 
 		wxStaticBox* configurationBox = new wxStaticBox(this, -1, "Launcher configuration");
@@ -95,7 +97,6 @@ namespace Launcher {
 		verticalSizer->Add(configurationSizer, logFlags);
 		verticalSizer->Add(optionsSizer, logFlags);
 
-		_logWindow = logWindow;
 		_configurationBox = configurationBox;
 		_configurationSizer = configurationSizer;
 		_optionsSizer = optionsSizer;
@@ -116,7 +117,7 @@ namespace Launcher {
 	}
 
 	MainFrame::~MainFrame() {
-		_options.WriteConfiguration(this, _installation);
+		_options.WriteConfiguration(&_logWindow, _installation);
 	}
 
 	void MainFrame::AddLauncherConfigurationOptions() {
@@ -303,29 +304,29 @@ namespace Launcher {
 	}
 
 	void MainFrame::Launch(wxCommandEvent& event) {
-		Log("Launching the game with the following options:");
-		Log("\tRepentogon:");
+		_logWindow.Log("Launching the game with the following options:");
+		_logWindow.Log("\tRepentogon:");
 		if (_options.mode == LAUNCH_MODE_VANILLA) {
-			Log("\t\tRepentogon is disabled");
+			_logWindow.Log("\t\tRepentogon is disabled");
 		} else {
-			Log("\t\tRepentogon is enabled");
-			Log("\t\tEnable Repentogon console window: %s", _options.console ? "yes" : "no");
+			_logWindow.Log("\t\tRepentogon is enabled");
+			_logWindow.Log("\t\tEnable Repentogon console window: %s", _options.console ? "yes" : "no");
 		}
-		Log("\tVanilla:");
+		_logWindow.Log("\tVanilla:");
 		if (_options.levelStage) {
-			Log("\t\tStarting stage: %d.%d", _options.levelStage, _options.stageType);
+			_logWindow.Log("\t\tStarting stage: %d.%d", _options.levelStage, _options.stageType);
 		} else {
-			Log("\t\tStarting stage: not selected");
+			_logWindow.Log("\t\tStarting stage: not selected");
 		}
-		Log("\t\tLua debug: %s", _options.luaDebug ? "yes" : "no");
-		Log("\t\tLua heap size: %dM", _options.luaHeapSize);
+		_logWindow.Log("\t\tLua debug: %s", _options.luaDebug ? "yes" : "no");
+		_logWindow.Log("\t\tLua heap size: %dM", _options.luaHeapSize);
 
-		_options.WriteConfiguration(this, _installation);
-		::Launcher::Launch(this, _isaacFileText->GetValue().c_str().AsChar(), _installation.IsLegacyRepentogonInstallation(), _options);
+		_options.WriteConfiguration(&_logWindow, _installation);
+		::Launcher::Launch(&_logWindow, _isaacFileText->GetValue().c_str().AsChar(), _installation.IsLegacyRepentogonInstallation(), _options);
 	}
 
 	void MainFrame::EnableInterface(bool enable) {
-		LogWarn("Interface freezing / unfreezing when launching the game is not yet implemented\n");
+		_logWindow.LogWarn("Interface freezing / unfreezing when launching the game is not yet implemented\n");
 	}
 
 	bool MainFrame::InitializeIsaacExecutablePath(bool shouldPrompt) {
@@ -339,22 +340,22 @@ namespace Launcher {
 	void MainFrame::HandleLauncherUpdates(bool allowPreReleases) {
 		using lu = Updater::LauncherUpdateManager;
 		std::string version, url;
-		Updater::LauncherUpdateManager manager(this);
+		Updater::LauncherUpdateManager manager(&_logWindow);
 		lu::SelfUpdateCheckResult result = 
 			manager.CheckSelfUpdateAvailability(allowPreReleases, version, url);
 		if (result == lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE) {
 			if (PromptLauncherUpdate(version, url)) {
-				Log("Initiating update");
+				_logWindow.Log("Initiating update");
 				if (!manager.DoUpdate(Launcher::version, version.c_str(), url.c_str())) {
-					LogError("Error while updating the launcher\n");
+					_logWindow.LogError("Error while updating the launcher\n");
 				}
 			} else {
-				Log("Skipping self-update as per user choice");
+				_logWindow.Log("Skipping self-update as per user choice");
 			}
 		} else if (result == lu::SELF_UPDATE_CHECK_ERR_GENERIC) {
-			LogError("Error while checking for the availability of launcher updates");
+			_logWindow.LogError("Error while checking for the availability of launcher updates");
 		} else {
-			Log("Launcher is up-to-date");
+			_logWindow.Log("Launcher is up-to-date");
 		}
 	}
 
@@ -363,7 +364,7 @@ namespace Launcher {
 	}
 
 	void MainFrame::SanitizeLauncherUpdate() {
-		LogWarn("Found launcher update file %s in the current folder."
+		_logWindow.LogWarn("Found launcher update file %s in the current folder."
 			"This may indicate a broken update. Deleting it.\n", Comm::UnpackedArchiveName);
 		Filesystem::RemoveFile(Comm::UnpackedArchiveName);
 	}
@@ -375,9 +376,9 @@ namespace Launcher {
 			"Unstable launcher version", wxCENTER | wxICON_WARNING);
 		LogWarn("Running an unstable version of the launcher");
 #endif */
-		Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::version);
+		_logWindow.Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::version);
 		std::string currentDir = Filesystem::GetCurrentDirectory_();
-		Log("Current directory is: %s", currentDir.c_str());
+		_logWindow.Log("Current directory is: %s", currentDir.c_str());
 
 		if (!SanityCheckLauncherUpdate()) {
 			SanitizeLauncherUpdate();
@@ -386,9 +387,9 @@ namespace Launcher {
 		HandleLauncherUpdates(true);
 
 		LPSTR cli = GetCommandLineA();
-		Log("Command line: %s", cli);
+		_logWindow.Log("Command line: %s", cli);
 
-		Log("Attempting to autodetect Isaac save folder, launcher configuration and Isaac installation folder...");
+		_logWindow.Log("Attempting to autodetect Isaac save folder, launcher configuration and Isaac installation folder...");
 		bool shouldPromptForIsaac = !_installation.InitFolders();
 		bool abortInitialization = false;
 		while (!abortInitialization && !InitializeIsaacExecutablePath(shouldPromptForIsaac)) {
@@ -419,7 +420,7 @@ namespace Launcher {
 		bool isLegacy = false;
 		bool needToDisableRepentogonOptions = false;
 
-		InstallationManager repentogonUpdateMgr(this, &_installation);
+		InstallationManager repentogonUpdateMgr(&_logWindow, &_installation);
 
 		if (_installation.GetRepentogonInstallationState() == REPENTOGON_INSTALLATION_STATE_NONE) {
 			if (PromptRepentogonInstallation()) {
@@ -441,25 +442,25 @@ namespace Launcher {
 		 * Therefore there is no need to do a specific check.
 		 */
 		if (needCheckRepentogonUpdates && _options.update) {
-			Log("Checking for Repentogon updates...");
+			_logWindow.Log("Checking for Repentogon updates...");
 			rapidjson::Document release;
 			InstallationManager::CheckRepentogonUpdatesResult checkUpdates = 
 				repentogonUpdateMgr.CheckRepentogonUpdates(release, _options.unstableUpdates, false);
 			if (checkUpdates == InstallationManager::CHECK_REPENTOGON_UPDATES_UTD) {
-				Log("Repentogon is up-to-date");
+				_logWindow.Log("Repentogon is up-to-date");
 			} else if (checkUpdates == InstallationManager::CHECK_REPENTOGON_UPDATES_NEW) {
-				Log("An update is available. Updating Repentogon...");
+				_logWindow.Log("An update is available. Updating Repentogon...");
 				attemptedToInstallRepentogon = true;
 				attemptedToUpdateRepentogon = true;
 				if (!repentogonUpdateMgr.InstallRepentogon(release)) {
 					updateAttemptSucceeded = false;
-					LogError("An error occured while downloading the Repentogon update.\n");
+					_logWindow.LogError("An error occured while downloading the Repentogon update.\n");
 				}
 
 				stillValidAfterUpdate = _installation.CheckRepentogonInstallation();
 				successfullyInstalledRepentogon = stillValidAfterUpdate && updateAttemptSucceeded;
 			} else {
-				LogError("Unable to check for availability of Repentogon updates\n");
+				_logWindow.LogError("Unable to check for availability of Repentogon updates\n");
 				// No need to return, installation may be valid regardless
 			}
 		}
@@ -467,31 +468,31 @@ namespace Launcher {
 		if (attemptedToInstallRepentogon) {
 			if (successfullyInstalledRepentogon) {
 				if (_installation.IsLegacyRepentogonInstallation()) {
-					Log("Legacy installation of Repentogon found. Repentogon will work, but the launcher cannot configure it.");
+					_logWindow.Log("Legacy installation of Repentogon found. Repentogon will work, but the launcher cannot configure it.");
 					needToDisableRepentogonOptions = true;
 					isLegacy = true;
 				} else {
 					if (attemptedToUpdateRepentogon) {
-						Log("Suscessfully updated Repentogon to version %s\n", _installation.GetRepentogonVersion().c_str());
+						_logWindow.Log("Suscessfully updated Repentogon to version %s\n", _installation.GetRepentogonVersion().c_str());
 					} else {
-						Log("Successfully installed Repentogon version %s\n", _installation.GetRepentogonVersion().c_str());
+						_logWindow.Log("Successfully installed Repentogon version %s\n", _installation.GetRepentogonVersion().c_str());
 					}
 
 				}
 
-				Log("State of the current Repentogon installation:\n");
+				_logWindow.Log("State of the current Repentogon installation:\n");
 				repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, attemptedToUpdateRepentogon && updateAttemptSucceeded);
 			} else {
 				if (attemptedToUpdateRepentogon) {
-					LogError("Unable to update Repentogon\n");
+					_logWindow.LogError("Unable to update Repentogon\n");
 				} else {
-					LogError("Unable to install Repentogon\n");
+					_logWindow.LogError("Unable to install Repentogon\n");
 				}
 
 				if (attemptedToUpdateRepentogon && stillValidAfterUpdate) {
-					Log("Your previous installation of Repentogon is still valid and can be used\n");
+					_logWindow.Log("Your previous installation of Repentogon is still valid and can be used\n");
 				} else {
-					Log("Information regarding what happened during the installation:\n");
+					_logWindow.Log("Information regarding what happened during the installation:\n");
 					repentogonUpdateMgr.DebugDumpBrokenRepentogonInstallation();
 					needToDisableRepentogonOptions = true;
 				}
@@ -500,9 +501,9 @@ namespace Launcher {
 
 		if (needToDisableRepentogonOptions) {
 			if (isLegacy) {
-				LogWarn("Disabling Repentogon configuration options due to legacy installation\n");
+				_logWindow.LogWarn("Disabling Repentogon configuration options due to legacy installation\n");
 			} else {
-				LogWarn("Disabling Repentogon configuration options due to previous errors\n");
+				_logWindow.LogWarn("Disabling Repentogon configuration options due to previous errors\n");
 			}
 		}
 
@@ -513,134 +514,6 @@ namespace Launcher {
 		wxMessageDialog dialog(this, "No valid REPENTOGON installation found.\nDo you want to install now ?", "REPENTOGON Installation", wxYES_NO | wxCANCEL);
 		int result = dialog.ShowModal();
 		return result == wxID_OK || result == wxID_YES;
-	}
-
-	void MainFrame::Log(const char* prefix, bool nl, const char* fmt, ...) {
-		char buffer[4096] = { 0 };
-		size_t prefixLen = strlen(prefix);
-		strncpy(buffer, prefix, 4096);
-
-		{
-			wxString text(buffer);
-			std::unique_lock<std::mutex> lck(_logMutex);
-			_logWindow->AppendText(text);
-
-			memset(buffer, 0, sizeof(buffer));
-		}
-
-		va_list va;
-		va_start(va, fmt);
-		int count = vsnprintf(buffer, 4096, fmt, va);
-		va_end(va);
-
-		if (count <= 0)
-			return;
-
-		wxString text(buffer);
-		if (buffer[count - 1] != '\n' && nl)
-			text += '\n';
-
-		std::unique_lock<std::mutex> lck(_logMutex);
-		_logWindow->AppendText(text);
-	}
-
-	void MainFrame::Log(const char* fmt, ...) {
-		char buffer[4096];
-		va_list va;
-		va_start(va, fmt);
-		int count = vsnprintf(buffer, 4096, fmt, va);
-		va_end(va);
-
-		if (count <= 0)
-			return;
-
-		wxString text(buffer);
-		if (buffer[count - 1] != '\n')
-			text += '\n';
-
-		std::unique_lock<std::mutex> lck(_logMutex);
-		_logWindow->AppendText(text);
-	}
-
-	void MainFrame::LogNoNL(const char* fmt, ...) {
-		char buffer[4096];
-		va_list va;
-		va_start(va, fmt);
-		int count = vsnprintf(buffer, 4096, fmt, va);
-		va_end(va);
-
-		if (count <= 0)
-			return;
-
-		wxString text(buffer);
-		std::unique_lock<std::mutex> lck(_logMutex);
-		_logWindow->AppendText(text);
-	}
-
-	void MainFrame::LogInfo(const char* fmt, ...) {
-		char buffer[4096];
-		va_list va;
-		va_start(va, fmt);
-		int count = vsnprintf(buffer, 4096, fmt, va);
-		va_end(va);
-
-		if (count <= 0)
-			return;
-
-		wxString text(buffer);
-		text.Prepend("[INFO] ");
-		if (buffer[count - 1] != '\n')
-			text += '\n';
-
-		std::unique_lock<std::mutex> lck(_logMutex);
-		_logWindow->AppendText(text);
-	}
-
-	void MainFrame::LogWarn(const char* fmt, ...) {
-		char buffer[4096];
-		va_list va;
-		va_start(va, fmt);
-		int count = vsnprintf(buffer, 4096, fmt, va);
-		va_end(va);
-
-		if (count <= 0)
-			return;
-
-		wxString text(buffer);
-		text.Prepend("[WARN] ");
-		if (buffer[count - 1] != '\n')
-			text += '\n';
-
-		wxTextAttr attr = _logWindow->GetDefaultStyle();
-		wxColour color;
-		color.Set(235, 119, 52);
-
-		std::unique_lock<std::mutex> lck(_logMutex);
-		_logWindow->SetDefaultStyle(wxTextAttr(color));
-		_logWindow->AppendText(text);
-		_logWindow->SetDefaultStyle(attr);
-	}
-
-	void MainFrame::LogError(const char* fmt, ...) {
-		char buffer[4096];
-		va_list va;
-		va_start(va, fmt);
-		int count = vsnprintf(buffer, 4096, fmt, va);
-		va_end(va);
-
-		if (count <= 0)
-			return;
-
-		wxString text(buffer);
-		text.Prepend("[ERROR] ");
-		if (buffer[count - 1] != '\n')
-			text += '\n';
-
-		wxTextAttr attr = _logWindow->GetDefaultStyle();
-		std::unique_lock<std::mutex> lck(_logMutex);
-		_logWindow->SetDefaultStyle(wxTextAttr(*wxRED));
-		_logWindow->AppendText(text);
-		_logWindow->SetDefaultStyle(attr);
 	}
 
 	std::tuple<wxFont, wxFont> MakeBoldFont(wxWindow* window) {
@@ -680,7 +553,7 @@ namespace Launcher {
 	void MainFrame::InitializeOptions() {
 		std::unique_ptr<INIReader> const& reader = _installation.GetConfigurationFileParser();
 		if (!reader) {
-			Log("No launcher configuration file found, default initializing options\n");
+			_logWindow.Log("No launcher configuration file found, default initializing options\n");
 
 			wxMessageDialog dialog(this, "Do you want to have the launcher automatically update Repentogon?\n(Selecting \"Yes\" will immediately update Repentogon to the latest versions)", "Automatic Repentogon updates", wxYES_NO | wxCANCEL);
 			int result = dialog.ShowModal();
@@ -688,12 +561,12 @@ namespace Launcher {
 			wxMessageDialog unstableDialog(this, "Do you want to download unstable updates ?\n(If you are not a modder, you probably don't want this)", "Unstable Repentogon updates", wxYES_NO | wxCANCEL);
 			int unstableResult = unstableDialog.ShowModal();
 
-			_options.InitializeDefaults(this, result == wxID_OK || result == wxID_YES,
+			_options.InitializeDefaults(&_logWindow, result == wxID_OK || result == wxID_YES,
 				result == wxID_OK || result == wxID_YES, 
 				_installation.IsValidRepentogonInstallation(true));
 		} else {
-			Log("Found configuration file %s\n", _installation.GetLauncherConfigurationPath().c_str());
-			_options.InitializeFromConfig(this, *reader,
+			_logWindow.Log("Found configuration file %s\n", _installation.GetLauncherConfigurationPath().c_str());
+			_options.InitializeFromConfig(&_logWindow, *reader,
 				_installation.IsValidRepentogonInstallation(true));
 		}
 		
@@ -773,22 +646,22 @@ namespace Launcher {
 	}
 
 	void MainFrame::ForceRepentogonUpdate(bool allowPreReleases) {
-		Log("Forcibly updating Repentogon to the latest version");
+		_logWindow.Log("Forcibly updating Repentogon to the latest version");
 
-		InstallationManager repentogonUpdateMgr(this, &_installation);
+		InstallationManager repentogonUpdateMgr(&_logWindow, &_installation);
 		InstallationManager::DownloadInstallRepentogonResult result = repentogonUpdateMgr.InstallLatestRepentogon(true, allowPreReleases);
 
 		if (result == InstallationManager::DOWNLOAD_INSTALL_REPENTOGON_ERR || 
 			result == InstallationManager::DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES) {
-			LogError("Unable to force Repentogon update\n");
+			_logWindow.LogError("Unable to force Repentogon update\n");
 			return;
 		}
 
 		if (!_installation.CheckRepentogonInstallation()) {
-			LogError("Installation of Repentogon post update is not valid\n");
+			_logWindow.LogError("Installation of Repentogon post update is not valid\n");
 			repentogonUpdateMgr.DebugDumpBrokenRepentogonInstallation();
 		} else {
-			Log("State of the Repentogon installation:\n");
+			_logWindow.Log("State of the Repentogon installation:\n");
 			repentogonUpdateMgr.DisplayRepentogonFilesVersion(1, true);
 			UpdateRepentogonOptionsFromInstallation();
 		}
@@ -856,11 +729,11 @@ namespace Launcher {
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE:
-			Updater::LauncherUpdateManager(this).ForceSelfUpdate(true);
+			Updater::LauncherUpdateManager(&_logWindow).ForceSelfUpdate(true);
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE:
-			Updater::LauncherUpdateManager(this).ForceSelfUpdate(false);
+			Updater::LauncherUpdateManager(&_logWindow).ForceSelfUpdate(false);
 			break;
 
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE:
@@ -872,7 +745,7 @@ namespace Launcher {
 			break;
 
 		default:
-			LogError("Unhandled result from ShowModal: %d", result);
+			_logWindow.LogError("Unhandled result from ShowModal: %d", result);
 			break;
 		}
 	}
@@ -880,9 +753,9 @@ namespace Launcher {
 	bool MainFrame::HandleIsaacExecutableSelection(std::string const& path) {
 		bool result = _installation.ConfigureIsaacExecutableFile(path);
 		if (!result) {
-			LogError("Unable to configure the Isaac executable");
+			_logWindow.LogError("Unable to configure the Isaac executable");
 		} else {
-			Log("Set Isaac executable to %s", path.c_str());
+			_logWindow.Log("Set Isaac executable to %s", path.c_str());
 			OnFileSelected(path, NoIsaacColor, _isaacFileText, NoIsaacText);
 			_launchButton->Enable();
 		}
