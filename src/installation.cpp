@@ -89,10 +89,6 @@ namespace Launcher {
 	}
 
 	bool Installation::InitFolders() {
-		if (!SearchIsaacSaveFolder()) {
-			return false;
-		}
-			
 		if (!SearchConfigurationFile()) {
 			return false;
 		}
@@ -329,19 +325,6 @@ namespace Launcher {
 		return true;
 	}
 
-	void Installation::SetLauncherConfigurationPath(ConfigurationFileLocation loc) {
-		if (loc == CONFIG_FILE_LOCATION_HERE) {
-			_configurationPath = Filesystem::GetCurrentDirectory_();
-		} else {
-			if (_saveFolder.empty()) {
-				Logger::Error("Trying to set configuration file location to save folder when no save folder was found\n");
-				return;
-			}
-
-			_configurationPath = (_saveFolder + "\\") + launcherConfigFile;
-		}
-	}
-
 	HMODULE Installation::LoadLib(const char* name, LoadableDlls dll) {
 		/* Ideally, we should load using LOAD_LIBRARY_AS_IMAGE_RESOURCE, however
 		 * this causes GetProcAddress to not work. DONT_RESOLVE_DLL_REFERENCED, 
@@ -422,10 +405,6 @@ namespace Launcher {
 		return _repentogonZHLVersionMatch;
 	}
 
-	std::string const& Installation::GetSaveFolder() const {
-		return _saveFolder;
-	}
-
 	std::string const& Installation::GetLauncherConfigurationPath() const {
 		return _configurationPath;
 	}
@@ -478,7 +457,7 @@ namespace Launcher {
 		return true;
 	}
 
-	bool Installation::SearchIsaacSaveFolder() {
+	bool Installation::SearchConfigurationFile() {
 		char homeDirectory[4096];
 		DWORD homeLen = 4096;
 		HANDLE token = GetCurrentProcessToken();
@@ -501,27 +480,16 @@ namespace Launcher {
 		}
 
 		std::string path(homeDirectory);
-		path += "\\Documents\\My Games\\Binding of Isaac Repentance";
+		path += "\\Documents\\My Games\\";
 
 		if (!Filesystem::FolderExists(path.c_str())) {
-			_gui->LogError("No Repentance save folder found, launch the game once without the launcher please\n");
-			Logger::Error("Repentance save folder %s does not exist\n", path.c_str());
-			return false;
+			_gui->LogError("%s does not exist, creating it...\n");
+			if (!Filesystem::CreateFileHierarchy(path.c_str(), "\\")) {
+				_gui->LogError("Unable to create folder %s\n", path.c_str());
+				return false;
+			}
 		}
 
-		_saveFolder = std::move(path);
-		return true;
-	}
-
-	bool Installation::SearchConfigurationFile() {
-		std::string path = _saveFolder;
-		if (path.empty()) {
-			_gui->LogInfo("No launcher configuration file found, default options will be used\n");
-			Logger::Critical("Installation::SearchConfigurationFile: function called without a save folder, abnormal internal state\n");
-			return false;
-		}
-
-		path += "\\";
 		path += launcherConfigFile;
 		_configurationPath = std::move(path);
 

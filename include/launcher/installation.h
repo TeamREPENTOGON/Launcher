@@ -84,11 +84,6 @@ namespace Launcher {
 		REPENTOGON_INSTALLATION_STATE_MODERN
 	};
 
-	enum ConfigurationFileLocation {
-		CONFIG_FILE_LOCATION_HERE,
-		CONFIG_FILE_LOCATION_SAVE,
-	};
-
 	enum ReadVersionStringResult {
 		READ_VERSION_STRING_OK,
 		READ_VERSION_STRING_ERR_NO_FILE,
@@ -178,7 +173,6 @@ namespace Launcher {
 		bool ValidateVersionSymbol(HMODULE module, const char* libname, const char* symbolName, 
 			FARPROC versionSymbol, std::string& target);
 
-		void SetLauncherConfigurationPath(ConfigurationFileLocation loc);
 		void WriteLauncherConfigurationFile();
 
 		RepentogonInstallationState GetRepentogonInstallationState() const;
@@ -190,7 +184,6 @@ namespace Launcher {
 		std::string const& GetZHLLoaderVersion() const;
 		bool RepentogonZHLVersionMatch() const;
 
-		std::string const& GetSaveFolder() const;
 		std::string const& GetLauncherConfigurationPath() const;
 		std::string const& GetIsaacExecutablePath() const;
 		std::string const& GetIsaacInstallationFolder() const;
@@ -237,8 +230,6 @@ namespace Launcher {
 		 * the load was successful or not.
 		 */
 		LoadDLLState _dllStates[LOADABLE_DLL_MAX] = { LOAD_DLL_STATE_NONE };
-		/* Path to the folder containing the Repentance save file. */
-		std::string _saveFolder;
 		/* Path to the folder containing the configuration of the launcher. */
 		std::string _configurationPath;
 		/* Path to the folder containing the Isaac executable, derived from _isaacExecutable. */
@@ -291,8 +282,6 @@ namespace Launcher {
 		 * This function can fail.
 		 */
 		bool ProcessConfigurationFile(std::string const& path);
-
-		bool SearchIsaacSaveFolder();
 
 		bool IsCompatibleWithRepentogon(std::string const& version);
 
