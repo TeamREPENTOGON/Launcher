@@ -7,10 +7,11 @@
 
 namespace Filesystem {
 	/* Create the hierarchy of folders required in order to create the file @name.
+	 * sep is the string used as the separator inside name.
 	 *
 	 * Return true if folders are created successfully, false otherwise.
 	 */
-	bool CreateFileHierarchy(const char* name);
+	bool CreateFileHierarchy(const char* name, const char* sep);
 
 	/* Check if a folder with the given name exists. Return true on success,
 	 * false on failure.

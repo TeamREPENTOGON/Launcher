@@ -9,7 +9,7 @@
 #include "shared/logger.h"
 
 namespace Filesystem {
-	bool CreateFileHierarchy(const char* name) {
+	bool CreateFileHierarchy(const char* name, const char* sep) {
 		Logger::Debug("Creating file hierarchy %s\n", name);
 		char* copy = (char*)malloc(strlen(name) + 1);
 		if (!copy) {
@@ -18,7 +18,7 @@ namespace Filesystem {
 		}
 
 		strcpy(copy, name);
-		char* next = strpbrk(copy, "/");
+		char* next = strpbrk(copy, sep);
 		while (next) {
 			char save = *next;
 			*next = '\0';
@@ -32,7 +32,7 @@ namespace Filesystem {
 				}
 			}
 			*next = save;
-			next = strpbrk(next + 1, "/");
+			next = strpbrk(next + 1, sep);
 		}
 
 		free(copy);
