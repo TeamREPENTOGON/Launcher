@@ -72,8 +72,6 @@ namespace Launcher {
 			const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
 			wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId);
 
-		bool PromptLauncherUpdate(std::string const& version, std::string const& url);
-
 		/* Initialize the IsaacOptions structure. */
 		void InitializeOptions();
 		/* Initialize GUI components from the IsaacOptions structure. */
@@ -123,7 +121,6 @@ namespace Launcher {
 		void SanitizeLauncherUpdate();
 
 		bool InitializeIsaacExecutablePath(bool shouldPrompt);
-		void HandleLauncherUpdates(bool allowDrafts);
 		bool HandleIsaacExecutableSelection(std::string const& path);
 
 		void PostInitHandleRepentogon();

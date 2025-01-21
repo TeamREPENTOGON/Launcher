@@ -337,28 +337,6 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::HandleLauncherUpdates(bool allowPreReleases) {
-		using lu = Updater::LauncherUpdateManager;
-		std::string version, url;
-		Updater::LauncherUpdateManager manager(&_logWindow);
-		lu::SelfUpdateCheckResult result = 
-			manager.CheckSelfUpdateAvailability(allowPreReleases, version, url);
-		if (result == lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE) {
-			if (PromptLauncherUpdate(version, url)) {
-				_logWindow.Log("Initiating update");
-				if (!manager.DoUpdate(Launcher::version, version.c_str(), url.c_str())) {
-					_logWindow.LogError("Error while updating the launcher\n");
-				}
-			} else {
-				_logWindow.Log("Skipping self-update as per user choice");
-			}
-		} else if (result == lu::SELF_UPDATE_CHECK_ERR_GENERIC) {
-			_logWindow.LogError("Error while checking for the availability of launcher updates");
-		} else {
-			_logWindow.Log("Launcher is up-to-date");
-		}
-	}
-
 	bool MainFrame::SanityCheckLauncherUpdate() {
 		return !Filesystem::FileExists(Comm::UnpackedArchiveName);
 	}
@@ -383,8 +361,6 @@ namespace Launcher {
 		if (!SanityCheckLauncherUpdate()) {
 			SanitizeLauncherUpdate();
 		}
-		
-		HandleLauncherUpdates(true);
 
 		LPSTR cli = GetCommandLineA();
 		_logWindow.Log("Command line: %s", cli);
@@ -696,17 +672,6 @@ namespace Launcher {
 		if (result) {
 			*result = textCtrl;
 		}
-	}
-
-	bool MainFrame::PromptLauncherUpdate(std::string const& version, std::string const& url) {
-		std::ostringstream s;
-		s << "An update is available for the launcher.\n" <<
-			"It will update from version " << Launcher::version << " to version " << version << ".\n" <<
-			"(You may also download manually from " << url << ").\n" <<
-			"Do you want to update now ?";
-		wxMessageDialog modal(this, s.str(), "Update Repentogon's Launcher ?", wxYES_NO);
-		int result = modal.ShowModal();
-		return result == wxID_YES || result == wxID_OK;
 	}
 
 	bool MainFrame::PromptLegacyUninstall() {
