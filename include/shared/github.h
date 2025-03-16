@@ -60,7 +60,10 @@ namespace Github {
 	struct GithubDownloadNotification {
 		GithubDownloadNotificationType type;
 		std::variant<std::string, size_t> data;
+		uint32_t id;
 	};
+
+	typedef Threading::Monitor<GithubDownloadNotification> DownloadMonitor;
 
 	/* Check if the latest release data is newer than the installed version.
 	 *
@@ -77,8 +80,7 @@ namespace Github {
 	 * DOWNLOAD_AS_STRING_INVALID_JSON error codes.
 	 */
 	DownloadAsStringResult DownloadAsString(const char* url,
-		std::string& response,
-		Threading::Monitor<GithubDownloadNotification>* monitor);
+		std::string& response, DownloadMonitor* monitor);
 
 	/* Fetch the content at url, assuming it to describe a release, and store it
 	 * in response. 
@@ -87,12 +89,11 @@ namespace Github {
 	 * field.
 	 */
 	DownloadAsStringResult FetchReleaseInfo(const char* url,
-		rapidjson::Document& response,
-		Threading::Monitor<GithubDownloadNotification>* monitor);
+		rapidjson::Document& response, DownloadMonitor* monitor);
 
 	/* Download file @file from the url @url. */
 	DownloadFileResult DownloadFile(const char* file, const char* url,
-		Threading::Monitor<GithubDownloadNotification>* monitor);
+		DownloadMonitor* monitor);
 
 	/* Initialize a cURL session with sane parameters.
 	 *

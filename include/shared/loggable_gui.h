@@ -9,3 +9,12 @@ public:
 	virtual void LogWarn(const char*, ...) = 0;
 	virtual void LogError(const char*, ...) = 0;
 };
+
+class NopLogGUI : public ILoggableGUI {
+	void Log(const char*, bool nl, const char* fmt, ...) { }
+	void Log(const char*, ...) { }
+	void LogInfo(const char*, ...) { }
+	void LogNoNL(const char*, ...) { }
+	void LogWarn(const char*, ...) { }
+	void LogError(const char*, ...) { }
+};

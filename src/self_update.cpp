@@ -2,7 +2,6 @@
 #include "unpacker/unpacker_resources.h"
 
 #include "comm/messages.h"
-#include "launcher/launcher.h"
 #include "launcher/self_update.h"
 #include "launcher/version.h"
 #include "rapidjson/document.h"

@@ -2,9 +2,11 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <future>
 #include <mutex>
 #include <optional>
 #include <queue>
+#include <type_traits>
 
 namespace Threading {
 	template<typename T>
@@ -21,7 +23,7 @@ namespace Threading {
 				return std::nullopt;
 			}
 
-			T result = _queue.front();
+			T result = std::move(_queue.front());
 			_queue.pop();
 
 			return result;
@@ -44,4 +46,7 @@ namespace Threading {
 		std::timed_mutex _mutex;
 		std::condition_variable _cv;
 	};
+
+	template<typename T, typename U>
+	using MonitoredFuture = std::tuple<std::future<T>, Monitor<U>*>;
 }

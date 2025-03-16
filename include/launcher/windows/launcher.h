@@ -14,7 +14,6 @@
 #include "launcher/installation.h"
 #include "launcher/installation_manager.h"
 #include "launcher/self_update.h"
-#include "launcher/repentogon_updater.h"
 #include "launcher/self_updater/launcher_update_manager.h"
 #include "launcher/widgets/text_ctrl_log_widget.h"
 #include "rapidjson/document.h"
@@ -56,10 +55,15 @@ namespace Launcher {
 			ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE
 		};
 
-		MainFrame();
+		MainFrame(Installation* installation);
 		~MainFrame();
 
-		void PostInit();
+		/* Load the configuration file and update the options accordingly.
+		 * 
+		 * If no configuration is found, perform a "one-time setup" to get the
+		 * location of the Isaac installation.
+		 */
+		void PreInit();
 
 	private:
 		/* Window building. */
@@ -95,6 +99,8 @@ namespace Launcher {
 
 		void Launch(wxCommandEvent& event);
 
+		void OneTimeIsaacPathInitialization();
+
 		/* Prompt the user for the folder containing an Isaac installation. */
 		std::string PromptIsaacInstallation();
 
@@ -104,6 +110,22 @@ namespace Launcher {
 		 * Return true if the user wants a download, false otherwise.
 		 */
 		bool PromptRepentogonInstallation();
+
+		/* Prompt the user on whether they want to have access to unstable
+		 * releases of Repentogon.
+		 * 
+		 * Return the user choice (yes or no).
+		 */
+		bool PromptUnstableUpdates();
+
+		/* Prompt the user on whether they want to have the launcher keep
+		 * Repentogon up-to-date.
+		 *
+		 * Return the user choice (yes or no).
+		 */
+		bool PromptAutomaticUpdates();
+
+		bool PromptBoolean(wxString const& message, wxString const& shortMessage);
 
 		/* Prompt the user for removal of a legacy installation.
 		 * 
@@ -120,10 +142,9 @@ namespace Launcher {
 		bool SanityCheckLauncherUpdate();
 		void SanitizeLauncherUpdate();
 
-		bool InitializeIsaacExecutablePath(bool shouldPrompt);
+		bool InitializeIsaacExecutablePath();
 		bool HandleIsaacExecutableSelection(std::string const& path);
-
-		void PostInitHandleRepentogon();
+		void OneTimeInitRepentogon();
 
 		void EnableInterface(bool enable);
 
@@ -148,7 +169,7 @@ namespace Launcher {
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
 
 		wxTextCtrlLog _logWindow;
-		Installation _installation;
+		Installation* _installation;
 		/* Log string used in CheckUpdates to indicate which tool is being checked. */
 		std::string _currentUpdate;
 
