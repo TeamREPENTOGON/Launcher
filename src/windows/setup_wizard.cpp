@@ -1,6 +1,6 @@
 #include "launcher/cancel.h"
-#include "launcher/installation_manager.h"
 #include "launcher/log_helpers.h"
+#include "launcher/repentogon_installer.h"
 #include "launcher/windows/setup_wizard.h"
 
 #include "wx/button.h"

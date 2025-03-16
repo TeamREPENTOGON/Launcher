@@ -1,7 +1,7 @@
 #include <cstdarg>
 #include <future>
 
-#include "launcher/installation_manager.h"
+#include "launcher/repentogon_installer.h"
 #include "launcher/version.h"
 #include "launcher/self_updater/finalizer.h"
 #include "shared/github_executor.h"

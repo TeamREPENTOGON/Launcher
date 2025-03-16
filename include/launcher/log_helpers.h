@@ -1,7 +1,7 @@
 #include <map>
 
 #include "launcher/installation.h"
-#include "launcher/installation_manager.h"
+#include "launcher/repentogon_installer.h"
 #include "wx/textctrl.h"
 
 using Notifications = Launcher::RepentogonInstallationNotification;
