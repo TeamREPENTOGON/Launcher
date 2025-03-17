@@ -61,9 +61,15 @@ namespace Filesystem {
 
 	std::string GetCurrentDirectory_() {
 		DWORD count = GetCurrentDirectoryA(0, NULL);
-		std::string result;
-		result.reserve(count + 1);
-		GetCurrentDirectoryA(result.capacity(), result.data());
+		char* buffer = (char*)malloc(count + 1);
+		if (!buffer) {
+			Logger::Error("GetCurrentDirectory_: unable to allocate string\n");
+			return std::string();
+		}
+
+		GetCurrentDirectoryA(count, buffer);
+		std::string result(buffer);
+		free(buffer);
 		return result;
 	}
 
