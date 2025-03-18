@@ -1,18 +1,18 @@
 [submodule "deps/curl"]
 	path = deps/curl
-	url = git@github.com:curl/curl.git
+	url = https://github.com/curl/curl.git
 [submodule "deps/zlib"]
 	path = deps/zlib
-	url = git@github.com:madler/zlib.git
+	url = https://github.com/madler/zlib.git
 [submodule "deps/inih"]
 	path = deps/inih
-	url = git@github.com:benhoyt/inih.git
+	url = https://github.com/benhoyt/inih.git
 [submodule "deps/wxWidgets"]
 	path = deps/wxWidgets
-	url = git@github.com:wxWidgets/wxWidgets.git
+	url = https://github.com/wxWidgets/wxWidgets.git
 [submodule "deps/rapidjson"]
 	path = deps/rapidjson
-	url = git@github.com:Tencent/rapidjson.git
+	url = https://github.com/Tencent/rapidjson.git
 [submodule "deps/libzip"]
 	path = deps/libzip
-	url = git@github.com:nih-at/libzip.git
+	url = https://github.com/nih-at/libzip.git
