@@ -30,11 +30,9 @@ namespace Launcher {
 	std::optional<std::string> Installation::LocateIsaac() {
 		if (_launcherConfiguration->Loaded()) {
 			std::string result = _launcherConfiguration->GetIsaacExecutablePath();
-			if (!_isaacInstallation.Validate(result)) {
-				return std::nullopt;
+			if (_isaacInstallation.Validate(result)) {
+				return result;
 			}
-
-			return result;
 		}
 
 		return _isaacInstallation.AutoDetect();
