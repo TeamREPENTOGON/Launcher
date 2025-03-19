@@ -75,6 +75,8 @@ namespace Launcher {
 			return false;
 		}
 
+		PushNotification(false, "Sucessfully installed Repentogon\n");
+
 		_installationState.phase = REPENTOGON_INSTALLATION_PHASE_DONE;
 		_installationState.result = REPENTOGON_INSTALLATION_RESULT_OK;
 
@@ -157,6 +159,11 @@ namespace Launcher {
 		if (NeedRemoveDsoundDLL()) {
 			std::string dsoundPath = GetDsoundDLLPath();
 			bool result = Filesystem::RemoveFile(dsoundPath.c_str());
+			if (!result) {
+				Logger::Error("Unable to delete dsound.dll: %d\n", GetLastError());
+			} else {
+				Logger::Info("Successfully deleted dsound.dll\n");
+			}
 			PushFileRemovalNotification(std::move(dsoundPath), result);
 			return result;
 		}
@@ -459,6 +466,7 @@ namespace Launcher {
 
 			if (fileOk) {
 				Logger::Info("RepentogonUpdater::ExtractRepentogon: successfully extracted %s to %s\n", name, outputPath.c_str());
+				PushNotification(false, "Extracting %s\n", name);
 			}
 
 			filesState.push_back(std::make_tuple(name, fileOk));

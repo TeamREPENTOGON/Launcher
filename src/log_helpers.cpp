@@ -44,9 +44,9 @@ void NotificationVisitor::operator()(Notifications::FileRemoval const& removal) 
     _wasLastDownload = false;
 
 	if (removal._ok) {
-		LogError(_text, "Unable to remove %s\n", removal._name.c_str());
-	} else {
 		Log(_text, "Removing %s\n", removal._name.c_str());
+	} else {
+		LogError(_text, "Unable to remove %s\n", removal._name.c_str());
 	}
 }
 

@@ -293,6 +293,8 @@ void LauncherWizard::RepentogonInstallationThread() {
     }
     
     future.get();
+   _repentogonInstallationDone = true;
+   UpdateRepentogonInstallationNavigationButtons();
 }
 
 void LauncherWizard::OnIsaacExecutableSelected(wxCommandEvent& event) {
