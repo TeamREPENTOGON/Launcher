@@ -76,6 +76,7 @@ namespace Launcher {
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 	
 	MainFrame::MainFrame(Installation* installation) : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
+		_installation(installation),
 		_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1),
 			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)) {
 		memset(&_options, 0, sizeof(_options));
