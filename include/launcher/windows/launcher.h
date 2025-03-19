@@ -104,27 +104,6 @@ namespace Launcher {
 		/* Prompt the user for the folder containing an Isaac installation. */
 		std::string PromptIsaacInstallation();
 
-		/* Prompt the user for a Repentogon installation. This is useful if we 
-		 * don't detect a valid Repentogon installation. 
-		 * 
-		 * Return true if the user wants a download, false otherwise.
-		 */
-		bool PromptRepentogonInstallation();
-
-		/* Prompt the user on whether they want to have access to unstable
-		 * releases of Repentogon.
-		 * 
-		 * Return the user choice (yes or no).
-		 */
-		bool PromptUnstableUpdates();
-
-		/* Prompt the user on whether they want to have the launcher keep
-		 * Repentogon up-to-date.
-		 *
-		 * Return the user choice (yes or no).
-		 */
-		bool PromptAutomaticUpdates();
-
 		bool PromptBoolean(wxString const& message, wxString const& shortMessage);
 
 		/* Prompt the user for removal of a legacy installation.

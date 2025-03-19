@@ -390,7 +390,7 @@ namespace Launcher {
 		LPSTR cli = GetCommandLineA();
 		_logWindow.Log("Command line: %s", cli);
 
-		OneTimeIsaacPathInitialization();		
+		// OneTimeIsaacPathInitialization();
 		InitializeOptions();
 		OneTimeInitRepentogon();
 		UpdateRepentogonOptionsFromInstallation();
@@ -438,13 +438,7 @@ namespace Launcher {
 		RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
 
 		if (repentogon.GetState() == REPENTOGON_INSTALLATION_STATUS_NONE) {
-			if (PromptRepentogonInstallation()) {
-				attemptedToInstallRepentogon = true;
-				repentogonUpdateMgr.InstallLatestRepentogon(true, _options.unstableUpdates);
-				successfullyInstalledRepentogon = _installation->CheckRepentogonInstallation();
-			}
-
-			needCheckRepentogonUpdates = false;
+			return;
 		} else {
 			isLegacy = repentogon.IsLegacy();
 			// If an update occurs, this value is reassessed.
@@ -530,20 +524,6 @@ namespace Launcher {
 		}
 
 		UpdateRepentogonOptionsFromInstallation();
-	}
-
-	bool MainFrame::PromptRepentogonInstallation() {
-		return PromptBoolean("No valid REPENTOGON installation found.\nDo you want to install now ?", "REPENTOGON Installation");
-	}
-
-	bool MainFrame::PromptAutomaticUpdates() {
-		return PromptBoolean("Do you want the launcher to automatically keep Repentogon up-to-date ? (You can change your decision later)",
-			"Automatic Repentogon updates");
-	}
-
-	bool MainFrame::PromptUnstableUpdates() {
-		return PromptBoolean("Do you want the launcher to upgrade to unstable updates ? (You can change your decision later)",
-			"Unstable updates");
 	}
 
 	bool MainFrame::PromptBoolean(wxString const& message, wxString const& shortMessage) {
