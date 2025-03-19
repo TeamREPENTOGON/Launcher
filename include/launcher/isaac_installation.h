@@ -44,7 +44,11 @@ public:
 
     inline const char* GetVersion() const {
         if (std::holds_alternative<const Version*>(_version)) {
-            return std::get<const Version*>(_version)->version;
+            const Version* version = std::get<const Version*>(_version);
+            if (!version)
+                return "";
+            else
+                return version->version;
         } else {
             return std::get<std::string>(_version).c_str();
         }
