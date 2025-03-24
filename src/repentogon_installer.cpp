@@ -3,10 +3,11 @@
 
 #include "launcher/repentogon_installer.h"
 #include "launcher/version.h"
-#include "launcher/self_updater/finalizer.h"
 #include "shared/github_executor.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
+#include "shared/sha256.h"
+#include "shared/zip.h"
 
 namespace Launcher {
 	static const char* RepentogonReleasesURL = "https://api.github.com/repos/TeamREPENTOGON/REPENTOGON/releases";

@@ -1,22 +1,10 @@
 #include <WinSock2.h>
-#include <Windows.h>
 #include <ktmw32.h>
-#include <WinBase.h>
-
-#include <cstdint>
-#include <cstdio>
-#include <memory>
-#include <string>
 #include <vector>
 
-#include "comm/messages.h"
-#include "unpacker/logger.h"
-#include "unpacker/synchronization.h"
-#include "unpacker/unpacker.h"
-#include "unpacker/utils.h"
-
-const char* Unpacker::ResumeArg = "--resume";
-const char* Unpacker::ForcedArg = "--force";
+#include "self_updater/logger.h"
+#include "self_updater/unpacker.h"
+#include "self_updater/utils.h"
 
 namespace Unpacker {
 	struct FileContent {
@@ -58,7 +46,7 @@ namespace Unpacker {
 
 bool Unpacker::MemoryUnpack(const char* name, std::vector<Unpacker::FileContent>& files) {
 	FILE* f = fopen(name, "rb");
-	Unpacker::Utils::ScopedFile scopedFile(f);
+	Updater::Utils::ScopedFile scopedFile(f);
 
 	if (!f) {
 		Logger::Error("Failed to open file %s\n", name);
@@ -127,7 +115,7 @@ bool Unpacker::MemoryToDisk(std::vector<FileContent> const& files) {
 		return false;
 	}
 
-	Utils::ScopedHandle scopedHandle(transaction);
+	Updater::Utils::ScopedHandle scopedHandle(transaction);
 
 	for (FileContent const& content : files) {
 		HANDLE file = CreateFileTransactedA(content.name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 
@@ -175,83 +163,4 @@ bool Unpacker::ExtractArchive(const char* name) {
 	Logger::Info("Read all files\n");
 
 	return MemoryToDisk(files);
-}
-
-void Unpacker::StartLauncher() {
-	STARTUPINFOA startup;
-	memset(&startup, 0, sizeof(startup));
-
-	PROCESS_INFORMATION info;
-	memset(&info, 0, sizeof(info));
-
-	char cli[] = { 0 };
-	BOOL created = CreateProcessA("REPENTOGONLauncher.exe", cli, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
-	if (!created) {
-		ExitProcess(-1);
-	}
-
-	ExitProcess(0);
-}
-
-int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
-	Logger::Init("unpacker.log");
-
-	int argc = 0;
-	char** argv = Unpacker::Utils::CommandLineToArgvA(cli, &argc);
-	HANDLE lockFile = NULL;
-
-	Unpacker::Utils::LockUnpackerResult lockResult = Unpacker::Utils::LockUnpacker(&lockFile);
-
-	if (lockResult != Unpacker::Utils::LOCK_UNPACKER_SUCCESS) {
-		bool isForced = Unpacker::Utils::IsForced(argc, argv);
-
-		if (!isForced) {
-			if (lockResult == Unpacker::Utils::LOCK_UNPACKER_ERR_INTERNAL) {
-				MessageBoxA(NULL, "Fatal error", "Unable to check if another instance of the unpacker is already running\n"
-					"Check the log file (you may need to launch Isaac normaly at least once; otherwise rerun with --force)\n", MB_ICONERROR);
-				Logger::Fatal("Error while attempting to lock the unpacker\n");
-			} else {
-				MessageBoxA(NULL, "Fatal error", "Another instance of the unpacker is already running, "
-					"terminate it first then restart the unpacker\n"
-					"(If no other instance of the updater is running, rerun with --force)\n", MB_ICONERROR);
-				Logger::Fatal("Unpacker is already running, terminate other instances first\n");
-			}
-
-			return -1;
-		} else {
-			Logger::Warn("Cannot take unpacker lock, but ignoring (--force given)\n");
-		}
-	}
-
-	Unpacker::Utils::ScopedHandle scopedHandle(lockFile);
-
-	if (!Unpacker::Utils::IsContinuation(argc, argv)) {
-		Logger::Info("Running in non continuation mode, synchronizing with the launcher\n");
-		Synchronization::SynchronizationResult result = Synchronization::SynchronizeWithLauncher();
-		if (result != Synchronization::SYNCHRONIZATION_OK) {
-			MessageBoxA(NULL, "Fatal error", "Unable to synchronize with the launcher\n"
-				"If you are running the unpacker as a standalone, rerun it with --resume\n", MB_ICONERROR);
-			Logger::Fatal("Error while synchronizing with launcher\n");
-			return -1;
-		}
-	} else {
-		Logger::Info("Running in continuation mode, skipping synchronization\n");
-	}
-
-	if (!Unpacker::ExtractArchive(Comm::UnpackedArchiveName)) {
-		MessageBoxA(NULL, "Fatal error", "Unable to unpack the update, check log file\n", MB_ICONERROR);
-		Logger::Fatal("Error while extracting archive\n");
-		return -1;
-	}
-
-	if (!DeleteFileA(Comm::UnpackedArchiveName)) {
-		MessageBoxA(NULL, "Fatal error", "Unable to delete the archive containing the update.\n"
-			"Delete the archive (launcher_update.bin) then you can start the launcher\n", MB_ICONERROR);
-		Logger::Fatal("Error while deleting archive (%d)\n", GetLastError());
-		return -1;
-	}
-
-	Unpacker::StartLauncher();
-
-	return 0;
 }

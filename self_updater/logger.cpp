@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <ctime>
 
-#include "unpacker/logger.h"
+#include "self_updater/logger.h"
 
 namespace Logger {
 	FILE* logFile = stdout;

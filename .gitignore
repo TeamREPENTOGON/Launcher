@@ -1,2 +1,3 @@
 build/
-self_updater/updater.rc
+self_updater/self_updater.rc
+self_updater_rsrc

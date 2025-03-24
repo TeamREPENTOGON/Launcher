@@ -31,8 +31,8 @@ add_subdirectory (deps/libzip)
 include (cmake/deps/libzip.cmake)
 
 # Generate the resource file
-set (RESOURCE_PATH "${CMAKE_SOURCE_DIR}/unpacker_rsrc")
-configure_file (${CMAKE_SOURCE_DIR}/unpacker/unpacker.rc.in ${CMAKE_SOURCE_DIR}/unpacker/unpacker.rc)
+set (RESOURCE_PATH "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
+configure_file (${CMAKE_SOURCE_DIR}/self_updater/self_updater.rc.in ${CMAKE_SOURCE_DIR}/self_updater/self_updater.rc)
 
 file (GLOB_RECURSE SHARED_FILES shared/*.cpp "include/shared/*.h")
 add_library (shared STATIC ${SHARED_FILES})
@@ -44,7 +44,7 @@ target_include_directories (shared PRIVATE
 target_compile_options (shared PUBLIC "/MD")
 target_link_libraries (shared libcurl zip)
 
-file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h" unpacker/unpacker.rc)
+file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h" self_updater/self_updater.rc)
 add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES})
 target_compile_options (REPENTOGONLauncher PUBLIC "/MD")
 target_include_directories (REPENTOGONLauncher PRIVATE 
@@ -59,17 +59,17 @@ target_compile_definitions (REPENTOGONLauncher PRIVATE UNICODE INI_SHARED_LIB "C
 target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp)
 add_custom_command (TARGET REPENTOGONLauncher POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS)
 
-file (GLOB_RECURSE UNPACKER_FILES "include/unpacker/*.h" unpacker/*.cpp)
-add_executable (unpacker WIN32 ${UNPACKER_FILES})
-target_link_libraries (unpacker userenv ktmw32)
-target_include_directories (unpacker PRIVATE
-  "${CMAKE_SOURCE_DIR}/include"
-)
-target_compile_options (unpacker PUBLIC "/MD")
+file (GLOB_RECURSE UPDATER_FILES "include/self_updater/*.h" self_updater/*.cpp "include/launcher/version.h" src/version.cpp ${SHARED_FILES})
+add_executable (REPENTOGONLauncherUpdater WIN32 ${UPDATER_FILES})
+target_link_libraries (REPENTOGONLauncherUpdater libcurl_static zip zlibstatic userenv ktmw32)
+target_include_directories (REPENTOGONLauncherUpdater PRIVATE
+    "${CMAKE_SOURCE_DIR}/include"
+    "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
+    "${CMAKE_SOURCE_DIR}/deps/curl/include"
+    "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
+target_compile_options (REPENTOGONLauncherUpdater PUBLIC "/MD")
 
-add_custom_command (TARGET unpacker POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:unpacker> "${CMAKE_SOURCE_DIR}/unpacker_rsrc")
-
-add_dependencies (REPENTOGONLauncher unpacker)
+add_custom_command (TARGET REPENTOGONLauncherUpdater POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:REPENTOGONLauncherUpdater> "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
 
 if (LAUNCHER_UNSTABLE)
     # add_subdirectory (testing)

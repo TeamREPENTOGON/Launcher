@@ -1,6 +1,7 @@
 #include <atomic>
 
 #include <curl/curl.h>
+#include <sstream>
 
 #include "shared/filesystem.h"
 #include "shared/github.h"
@@ -8,6 +9,7 @@
 #include "shared/scoped_curl.h"
 #include "shared/curl/file_response_handler.h"
 #include "shared/curl/string_response_handler.h"
+#include "shared/loggable_gui.h"
 
 
 namespace Github {
@@ -237,5 +239,29 @@ namespace Github {
 		notification.type = GH_NOTIFICATION_DONE;
 		notification.data = url;
 		return notification;
+	}
+
+	std::string DownloadAsStringResultToLogString(const Github::DownloadAsStringResult result) {
+		switch (result) {
+		case Github::DOWNLOAD_AS_STRING_OK:
+			return "Successfully downloaded";
+
+		case Github::DOWNLOAD_AS_STRING_BAD_CURL:
+			return "Error while initiating cURL connection";
+
+		case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
+			return "Error while performing cURL request";
+
+		case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
+			return "Malformed JSON in answer";
+
+		case Github::DOWNLOAD_AS_STRING_NO_NAME:
+			return "JSON answer contains no \"name\" field";
+
+		default:
+			std::ostringstream str;
+			str << "Unexpected error " << result << " : Please report this as a bug";
+			return str.str();
+		}
 	}
 }

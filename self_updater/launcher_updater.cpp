@@ -6,15 +6,10 @@
 #include "shared/scoped_file.h"
 #include "shared/sha256.h"
 #include "shared/zip.h"
-#include "launcher/self_updater/launcher_updater.h"
-
-#include "zip.h"
+#include "self_updater/launcher_updater.h"
 
 namespace Updater {
-	LauncherUpdater::LauncherUpdater(const char* from,
-		const char* to, const char* url) {
-		_fromVersion = from;
-		_toVersion = to;
+	LauncherUpdater::LauncherUpdater(const char* url) {
 		_url = url;
 		_state = UPDATE_STATE_INIT;
 	}

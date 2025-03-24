@@ -8,7 +8,7 @@
 
 #include "shared/github.h"
 
-namespace Launcher {
+namespace Shared {
 	/* No OK result as the process terminates if everything goes well. */
 	enum SelfUpdateResult {
 		/* Everything up-to-date. */
@@ -30,7 +30,7 @@ namespace Launcher {
 			CandidateVersion> detail;
 	};
 
-	class SelfUpdater {
+	class LauncherUpdateChecker {
 	public:
 		/* Check if an update of the launcher is available.
 		 *

@@ -1,10 +1,8 @@
 #pragma once
 
-#include "launcher/self_updater/launcher_updater.h"
-#include "launcher/self_updater/finalizer.h"
-#include "launcher/self_update.h"
+#include "self_updater/launcher_updater.h"
+#include "shared/launcher_update_checker.h"
 #include "shared/loggable_gui.h"
-#include "unpacker/synchronization.h"
 
 namespace Updater {
 	class LauncherUpdateManager {
@@ -20,16 +18,14 @@ namespace Updater {
 		LauncherUpdateManager(ILoggableGUI* gui);
 
 		SelfUpdateCheckResult CheckSelfUpdateAvailability(bool allowPreRelease, std::string& version, std::string& url);
-		void ForceSelfUpdate(bool allowPreReleases);
-		bool DoUpdate(const char* from, const char* to, const char* url);
-		bool ProcessSynchronizationResult(Synchronization::SynchronizationResult result);
+		bool DownloadAndExtractUpdate(const char* url);
 
 	private:
 		ILoggableGUI* _gui;
 		bool _logError = false;
 		static char _printBuffer[BUFF_SIZE];
 		LauncherUpdater _updater;
-		Launcher::SelfUpdater _selfUpdater;
+		Shared::LauncherUpdateChecker _updateChecker;
 
 		void LogGithubDownloadAsString(const char* prefix, Github::DownloadAsStringResult code);
 
@@ -37,9 +33,5 @@ namespace Updater {
 		bool DownloadUpdate(LauncherUpdateData* data);
 		bool PostDownloadChecks(bool downloadOk, LauncherUpdateData* data);
 		bool ExtractArchive(LauncherUpdateData* data);
-
-		void FinalizeUpdate();
-
-		void HandleFinalizationResult(Updater::FinalizationResult const& result);
 	};
 }
