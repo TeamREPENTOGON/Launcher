@@ -10,12 +10,10 @@
 #include <variant>
 
 #include "launcher/installation.h"
-#include "launcher/self_update.h"
-#include "launcher/self_updater/launcher_update_manager.h"
-#include "launcher/self_updater/finalizer.h"
 #include "shared/loggable_gui.h"
 #include "shared/monitor.h"
 #include "shared/scoped_file.h"
+#include "shared/github.h"
 
 namespace Launcher {
 	/* Phases in the update of Repentogon. */

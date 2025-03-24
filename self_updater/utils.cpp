@@ -1,10 +1,10 @@
-#include "unpacker/logger.h"
-#include "unpacker/unpacker.h"
-#include "unpacker/utils.h"
+#include "self_updater/logger.h"
+#include "self_updater/self_updater.h"
+#include "self_updater/utils.h"
 
 #include <UserEnv.h>
 
-namespace Unpacker::Utils {
+namespace Updater::Utils {
 	static const char* LockFileBasePath = "Documents\\My Games\\Binding of Isaac Repentance";
 	static const char* RepentogonSubFolder = "Repentogon";
 	static const char* LockFileName = "unpacker.lock";
@@ -15,8 +15,9 @@ namespace Unpacker::Utils {
 	static void ReplaceQuotes(char* str, size_t* len);
 	static char** PushCLIArg(char** array, int* arraySize, int* arrayCapacity, const char* start, const char* end);
 
+	// Returns true if the provided arg (ie, `--flag`) is present in argv.
 	bool HasFlag(int argc, char** argv, const char* name) {
-		for (int i = 1; i < argc; ++i) {
+		for (int i = 0; i < argc; ++i) {
 			if (!strcmp(argv[i], name)) {
 				return true;
 			}
@@ -25,16 +26,32 @@ namespace Unpacker::Utils {
 		return false;
 	}
 
+	// Locates the provided arg (ie, `--flag`) in argv, then returns the NEXT arg.
+	// For input flags such as `--name "bob"`, in which case the string `bob` is returned.
+	// Returns nullptr if the arg is not present.
+	char* GetParamValue(int argc, char** argv, const char* name) {
+		for (int i = 0; i < argc-1; ++i) {
+			if (!strcmp(argv[i], name)) {
+				return argv[i+1];
+			}
+		}
+		return nullptr;
+	}
+
 	bool FileExists(const char* path) {
 		return GetFileAttributesA(path) != -1;
 	}
 
-	bool IsContinuation(int argc, char** argv) {
-		return HasFlag(argc, argv, Unpacker::ResumeArg);
+	bool IsForced(int argc, char** argv) {
+		return HasFlag(argc, argv, Updater::ForcedArg);
 	}
 
-	bool IsForced(int argc, char** argv) {
-		return HasFlag(argc, argv, Unpacker::ForcedArg);
+	bool AllowUnstable(int argc, char** argv) {
+		return HasFlag(argc, argv, Updater::UnstableArg);
+	}
+
+	char* GetUrl(int argc, char** argv) {
+		return GetParamValue(argc, argv, Updater::UrlArg);
 	}
 
 	void ReplaceQuotes(char* str, size_t* len) {
@@ -161,12 +178,12 @@ namespace Unpacker::Utils {
 		free(argv);
 	}
 
-	LockUnpackerResult LockUnpacker(HANDLE* result) {
+	LockUpdaterResult LockUpdater(HANDLE* result) {
 		char* lockFilePath = NULL;
 		if (!GetLockFilePath(&lockFilePath)) {
 			free(lockFilePath);
-			Logger::Error("LockUnpacker: error in call to GetLockFilePath\n");
-			return LOCK_UNPACKER_ERR_INTERNAL;
+			Logger::Error("LockUpdater: error in call to GetLockFilePath\n");
+			return LOCK_UPDATER_ERR_INTERNAL;
 		}
 
 		HANDLE file = CreateFileA(lockFilePath, GENERIC_READ, 0, NULL, CREATE_ALWAYS, 0, NULL);
@@ -175,16 +192,16 @@ namespace Unpacker::Utils {
 		if (!file) {
 			DWORD lastError = GetLastError();
 			if (lastError == ERROR_SHARING_VIOLATION) {
-				Logger::Warn("LockUnpacker: lock file is already owned by another process\n");
-				return LOCK_UNPACKER_ERR_ALREADY_LOCKED;
+				Logger::Warn("LockUpdater: lock file is already owned by another process\n");
+				return LOCK_UPDATER_ERR_ALREADY_LOCKED;
 			} else {
-				Logger::Error("LockUnpacker: CreateFileA failed (%d)\n", lastError);
-				return LOCK_UNPACKER_ERR_INTERNAL;
+				Logger::Error("LockUpdater: CreateFileA failed (%d)\n", lastError);
+				return LOCK_UPDATER_ERR_INTERNAL;
 			}
 		}
 
 		*result = file;
-		return LOCK_UNPACKER_SUCCESS;
+		return LOCK_UPDATER_SUCCESS;
 	}
 
 	bool GetLockFilePath(char** path) {

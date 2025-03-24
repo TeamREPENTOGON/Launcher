@@ -13,8 +13,6 @@
 #include "launcher/configuration.h"
 #include "launcher/installation.h"
 #include "launcher/repentogon_installer.h"
-#include "launcher/self_update.h"
-#include "launcher/self_updater/launcher_update_manager.h"
 #include "launcher/widgets/text_ctrl_log_widget.h"
 #include "rapidjson/document.h"
 #include "shared/loggable_gui.h"
@@ -96,6 +94,7 @@ namespace Launcher {
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
 
 		void ForceRepentogonUpdate(bool allowPreReleases);
+		void ForceLauncherUpdate(bool allowPreReleases);
 
 		void Launch(wxCommandEvent& event);
 

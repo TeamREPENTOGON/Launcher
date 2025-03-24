@@ -2,19 +2,17 @@
 
 /*
  * Utility functions. 
- * 
- * Separate from the shared lib because we want the unpacker to be small.
  */
 
 #include <Windows.h>
 
 #include <string>
 
-namespace Unpacker::Utils {
-	enum LockUnpackerResult {
-		LOCK_UNPACKER_SUCCESS,
-		LOCK_UNPACKER_ERR_ALREADY_LOCKED,
-		LOCK_UNPACKER_ERR_INTERNAL
+namespace Updater::Utils {
+	enum LockUpdaterResult {
+		LOCK_UPDATER_SUCCESS,
+		LOCK_UPDATER_ERR_ALREADY_LOCKED,
+		LOCK_UPDATER_ERR_INTERNAL
 	};
 
 	class ScopedHandle {
@@ -41,8 +39,9 @@ namespace Unpacker::Utils {
 
 	char** CommandLineToArgvA(const char* cli, int* argc);
 	void FreeCli(int argc, char** args);
-	LockUnpackerResult LockUnpacker(HANDLE* result);
-	bool IsContinuation(int argc, char** argv);
+	LockUpdaterResult LockUpdater(HANDLE* result);
 	bool IsForced(int argc, char** argv);
+	bool AllowUnstable(int argc, char** argv);
+	char* GetUrl(int argc, char** argv);
 	bool GetLockFilePath(char** path);
 }

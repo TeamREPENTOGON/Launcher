@@ -1,16 +1,16 @@
-#include "launcher/self_updater/launcher_updater.h"
-#include "unpacker/unpacker_resources.h"
+#include "self_updater/self_updater_resources.h"
 
 #include "comm/messages.h"
-#include "launcher/self_update.h"
 #include "launcher/version.h"
 #include "rapidjson/document.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/prettywriter.h"
+
 #include "shared/github.h"
+#include "shared/launcher_update_checker.h"
 #include "shared/logger.h"
 
-namespace Launcher {
+namespace Shared {
 	static Github::DownloadAsStringResult FetchReleases(rapidjson::Document& answer);
 
 	static const char* ReleasesURL = "https://api.github.com/repos/TeamREPENTOGON/Launcher/releases";
@@ -35,7 +35,7 @@ namespace Launcher {
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
 		bool force, std::string& version, std::string& url);
 
-	bool SelfUpdater::IsSelfUpdateAvailable(bool allowDrafts, bool force, 
+	bool LauncherUpdateChecker::IsSelfUpdateAvailable(bool allowDrafts, bool force,
 		std::string& version, std::string& url, Github::DownloadAsStringResult* fetchReleasesResult) {
 		Github::DownloadAsStringResult downloadResult = FetchReleases(_releasesInfo);
 		if (fetchReleasesResult)
@@ -73,7 +73,7 @@ namespace Launcher {
 		return false;
 	}
 
-	SelfUpdateErrorCode SelfUpdater::SelectReleaseTarget(bool allowPreRelease, bool force) {
+	SelfUpdateErrorCode LauncherUpdateChecker::SelectReleaseTarget(bool allowPreRelease, bool force) {
 		SelfUpdateErrorCode result;
 		rapidjson::Document releases;
 

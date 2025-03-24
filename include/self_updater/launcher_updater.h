@@ -92,7 +92,7 @@ namespace Updater {
 	public:
 		// Nop.
 		LauncherUpdater() { }
-		LauncherUpdater(const char* from, const char* to, const char* url);
+		LauncherUpdater(const char* url);
 
 		LauncherUpdater(LauncherUpdater const&) = delete;
 		LauncherUpdater(LauncherUpdater&&) = delete;
@@ -131,8 +131,6 @@ namespace Updater {
 
 	private:
 		std::string _lockFileName;
-		std::string _fromVersion;
-		std::string _toVersion;
 		std::string _url;
 		std::string _hashUrl, _zipUrl;
 

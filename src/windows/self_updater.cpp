@@ -1,14 +1,15 @@
 #include <sstream>
 
 #include "launcher/version.h"
+#include "launcher/launcher_self_update.h"
 #include "launcher/windows/self_updater.h"
-#include "launcher/self_updater/launcher_update_manager.h"
+#include "shared/launcher_update_checker.h"
 
 #include "wx/wx.h"
 
 SelfUpdaterWindow::SelfUpdaterWindow() : wxFrame(NULL, wxID_ANY, "REPENTOGON Launcher Self-Updater"),
 	_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1),
-		wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)), _updateManager(&_logWindow) {
+		wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)) {
 	Initialize();
 }
 
@@ -27,52 +28,39 @@ void SelfUpdaterWindow::Initialize() {
 }
 
 bool SelfUpdaterWindow::HandleSelfUpdate() {
-	using lu = Updater::LauncherUpdateManager;
-	bool result = false;
-
 	std::string version;
 	std::string url;
 
-	lu::SelfUpdateCheckResult checkResult = _updateManager.CheckSelfUpdateAvailability(false, version, url);
-	switch (checkResult) {
-	case lu::SELF_UPDATE_CHECK_UP_TO_DATE:
-		_logWindow.Log("Launcher is up-to-date\n");
-		result = true;
-		break;
-
-	case lu::SELF_UPDATE_CHECK_ERR_GENERIC: {
-		wxMessageDialog dialog(this, "An error was encountered while checking for the availability of updates. Check the log file for more details.",
-			"Error", wxOK | wxICON_ERROR);
-		dialog.ShowModal();
-		result = false;
-		break;
-	}
-
-	case lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE:
+	_logWindow.Log("Checking for availability of launcher updates...");
+	Github::DownloadAsStringResult downloadReleasesResult;
+	if (Shared::LauncherUpdateChecker().IsSelfUpdateAvailable(/*allowPreReleases=*/false, false, version, url, &downloadReleasesResult)) {
+		_logWindow.Log("New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
+		_logWindow.Log("Prompting user to ask if they want to update...");
 		if (PromptSelfUpdate(version, url)) {
-			result = DoSelfUpdate(version, url);
-			if (!result) {
+			_logWindow.Log("Update approved. Starting updater...");
+			if (Launcher::StartUpdater(url)) {
+				return true;
+			} else {
+				_logWindow.Log("Failed to start the updater");
 				wxMessageDialog dialog(this, "An error was encountered while trying to update the launcher. Check the log file for more details.",
 					"Error", wxOK | wxICON_ERROR);
 				dialog.ShowModal();
 			}
 		} else {
-			_logWindow.Log("Launcher updated rejected by user\n");
-			result = true;
+			_logWindow.Log("Launcher updated rejected by user");
 		}
-		break;
-
-	default: {
+	} else if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
 		std::ostringstream msg;
-		msg << "Unknown error code " << checkResult << " received when checking for availability of self updates, please report this a bug.";
+		msg << "Encountered error when checking for availability of self updates: " << Github::DownloadAsStringResultToLogString(downloadReleasesResult);
+		_logWindow.Log(msg.str().c_str());
+		msg << "\nCheck the log file for more details.";
 		wxMessageDialog dialog(this, msg.str(), "Error", wxOK | wxICON_ERROR);
 		dialog.ShowModal();
-		result = false;
-		break;
-	}
+	} else {
+		_logWindow.Log("Launcher is up to date");
 	}
 
-	return result;
+	return false;
 }
 
 bool SelfUpdaterWindow::PromptSelfUpdate(std::string const& version, std::string const& url) {
@@ -84,8 +72,4 @@ bool SelfUpdaterWindow::PromptSelfUpdate(std::string const& version, std::string
 	wxMessageDialog modal(this, s.str(), "Update Repentogon's Launcher ?", wxYES_NO);
 	int result = modal.ShowModal();
 	return result == wxID_YES || result == wxID_OK;
-}
-
-bool SelfUpdaterWindow::DoSelfUpdate(std::string const& version, std::string const& url) {
-	return _updateManager.DoUpdate(Launcher::version, version.c_str(), url.c_str());
 }

@@ -102,4 +102,7 @@ namespace Github {
 	 */
 	void InitCurlSession(CURL* curl, const char* url,
 		AbstractCurlResponseHandler* handler);
+
+	/* Returns a human readable description of a DownloadAsStringResult for use in logging. */
+	std::string DownloadAsStringResultToLogString(DownloadAsStringResult result);
 }

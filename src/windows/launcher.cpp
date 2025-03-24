@@ -23,17 +23,16 @@
 #include "launcher/installation.h"
 #include "launcher/isaac.h"
 #include "launcher/log_helpers.h"
+#include "launcher/launcher_self_update.h"
 #include "launcher/windows/launcher.h"
 #include "launcher/repentogon_installer.h"
-#include "launcher/self_update.h"
 #include "launcher/version.h"
 #include "shared/compat.h"
 #include "shared/github.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
 #include "shared/monitor.h"
-#include "unpacker/unpacker_resources.h"
-#include "launcher/self_updater/launcher_updater.h"
+#include "shared/launcher_update_checker.h"
 
 #include "zip.h"
 #include "zipint.h"
@@ -689,6 +688,23 @@ namespace Launcher {
 		}
 	}
 
+	void MainFrame::ForceLauncherUpdate(bool allowPreReleases) {
+		_logWindow.Log("Performing self-update (forcibly triggered)");
+		Shared::SelfUpdateErrorCode result = Shared::LauncherUpdateChecker().SelectReleaseTarget(allowPreReleases, true);
+		if (result.base != Shared::SELF_UPDATE_CANDIDATE) {
+			_logWindow.LogError("Error %d while selecting target release\n", result.base);
+			return;
+		}
+
+		Shared::CandidateVersion const& candidate = std::get<Shared::CandidateVersion>(result.detail);
+		if (Launcher::StartUpdater(candidate.url.c_str())) {
+			_logWindow.Log("Self-update initiated. Closing launcher...\n");
+			Close();
+		} else {
+			_logWindow.LogError("Failed to launch self-updater executable\n");
+		}
+	}
+
 	std::string MainFrame::PromptIsaacInstallation() {
 		wxString message("No Isaac installation found, please select Isaac executable to run");
 		// wxDirDialog dialog(this, message, wxEmptyString, wxDD_DIR_MUST_EXIST, wxDefaultPosition, wxDefaultSize, "Select Isaac folder");
@@ -740,11 +756,11 @@ namespace Launcher {
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE:
-			Updater::LauncherUpdateManager(&_logWindow).ForceSelfUpdate(true);
+			ForceLauncherUpdate(true);
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE:
-			Updater::LauncherUpdateManager(&_logWindow).ForceSelfUpdate(false);
+			ForceLauncherUpdate(false);
 			break;
 
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE:

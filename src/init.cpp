@@ -5,7 +5,6 @@
 #include "shared/logger.h"
 #include "shared/loggable_gui.h"
 #include "shared/github_executor.h"
-#include "launcher/self_updater/launcher_update_manager.h"
 #include "launcher/windows/setup_wizard.h"
 
 static LauncherConfiguration* __configuration;
@@ -18,10 +17,14 @@ bool Launcher::App::OnInit() {
 	sGithubExecutor->Start();
 
 	SelfUpdaterWindow* updater = new SelfUpdaterWindow();
-	// updater->Show();
-	updater->HandleSelfUpdate();
+	const bool selfUpdatedStarted = updater->HandleSelfUpdate();
 	updater->Hide();
 	updater->Destroy();
+	if (selfUpdatedStarted) {
+		Logger::Info("Self-update initiated. Closing...\n");
+		Exit();
+		return true;
+	}
 
 	__configuration = new LauncherConfiguration();
 	bool configurationOk = __configuration->Load(nullptr);
