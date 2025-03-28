@@ -8,9 +8,9 @@ class SelfUpdaterWindow : public wxFrame {
 public:
     SelfUpdaterWindow();
 
-    /* Checks for an available update.If one is found, prompts the user to ask if they want to update.
-    * Returns true if the updater exe was successfully launched. In this case, the launcher should shut down asap.
-    */ 
+    /* Checks for an available update. If one is found, prompts the user to ask if they want to update.
+     * Returns true if the updater exe was successfully launched. In this case, the launcher should shut down asap.
+     */ 
     bool HandleSelfUpdate();
 
 private:
