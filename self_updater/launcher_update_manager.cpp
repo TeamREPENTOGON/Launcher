@@ -5,7 +5,6 @@
 
 #include "shared/externals.h"
 #include "shared/github.h"
-#include "shared/logger.h"
 #include "self_updater/launcher_update_manager.h"
 #include "launcher/version.h"
 

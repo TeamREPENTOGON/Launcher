@@ -10,6 +10,8 @@
 #include "shared/curl/abstract_response_handler.h"
 
 namespace Github {
+	static char _downloadAsStringResultToLogStringBuffer[128];
+
 	/* Result of fetching updates. */
 	enum DownloadAsStringResult {
 		/* Fetched successfully. */
@@ -104,5 +106,5 @@ namespace Github {
 		AbstractCurlResponseHandler* handler);
 
 	/* Returns a human readable description of a DownloadAsStringResult for use in logging. */
-	std::string DownloadAsStringResultToLogString(DownloadAsStringResult result);
+	const char* DownloadAsStringResultToLogString(DownloadAsStringResult result);
 }

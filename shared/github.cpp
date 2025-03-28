@@ -241,7 +241,7 @@ namespace Github {
 		return notification;
 	}
 
-	std::string DownloadAsStringResultToLogString(const Github::DownloadAsStringResult result) {
+	const char* DownloadAsStringResultToLogString(const Github::DownloadAsStringResult result) {
 		switch (result) {
 		case Github::DOWNLOAD_AS_STRING_OK:
 			return "Successfully downloaded";
@@ -259,9 +259,8 @@ namespace Github {
 			return "JSON answer contains no \"name\" field";
 
 		default:
-			std::ostringstream str;
-			str << "Unexpected error " << result << " : Please report this as a bug";
-			return str.str();
+			sprintf(_downloadAsStringResultToLogStringBuffer, "Unexpected error %d: Please report this as a bug", result);
+			return _downloadAsStringResultToLogStringBuffer;
 		}
 	}
 }
