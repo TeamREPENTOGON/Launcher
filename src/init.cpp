@@ -1,11 +1,11 @@
-#include "shared/externals.h"
 #include "launcher/installation.h"
+#include "launcher/launcher_self_update.h"
 #include "launcher/windows/launcher.h"
-#include "launcher/windows/self_updater.h"
+#include "launcher/windows/setup_wizard.h"
+#include "shared/externals.h"
+#include "shared/github_executor.h"
 #include "shared/logger.h"
 #include "shared/loggable_gui.h"
-#include "shared/github_executor.h"
-#include "launcher/windows/setup_wizard.h"
 
 static LauncherConfiguration* __configuration;
 static Launcher::Installation* __installation;
@@ -14,17 +14,12 @@ static NopLogGUI __nopLogGUI;
 bool Launcher::App::OnInit() {
 	Logger::Init("launcher.log", "w");
 	Externals::Init();
-	sGithubExecutor->Start();
 
-	SelfUpdaterWindow* updater = new SelfUpdaterWindow();
-	const bool selfUpdatedStarted = updater->HandleSelfUpdate();
-	updater->Hide();
-	updater->Destroy();
-	if (selfUpdatedStarted) {
-		Logger::Info("Self-update initiated. Closing...\n");
-		Exit();
-		return true;
-	}
+	// Check for an available self-update.
+	// If one is initiated, the launcher should get terminated by the updater.
+	Launcher::CheckForSelfUpdate(false);
+
+	sGithubExecutor->Start();
 
 	__configuration = new LauncherConfiguration();
 	bool configurationOk = __configuration->Load(nullptr);
