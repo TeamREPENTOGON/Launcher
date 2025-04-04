@@ -688,18 +688,10 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::ForceLauncherUpdate(bool allowPreReleases) {
-		_logWindow.Log("Performing self-update (forcibly triggered)");
-		Shared::SelfUpdateErrorCode result = Shared::LauncherUpdateChecker().SelectReleaseTarget(allowPreReleases, true);
-		if (result.base != Shared::SELF_UPDATE_CANDIDATE) {
-			_logWindow.LogError("Error %d while selecting target release\n", result.base);
-			return;
-		}
-
-		Shared::CandidateVersion const& candidate = std::get<Shared::CandidateVersion>(result.detail);
-		if (Launcher::StartUpdater(candidate.url.c_str())) {
-			_logWindow.Log("Self-update initiated. Closing launcher...\n");
-			Close();
+	void MainFrame::ForceLauncherUpdate(bool allowUnstable) {
+		_logWindow.Log("Performing self-update (forcibly triggered)...");
+		if (Launcher::CheckForSelfUpdate(allowUnstable)) {
+			_logWindow.Log("No update available.");
 		} else {
 			_logWindow.LogError("Failed to launch self-updater executable\n");
 		}

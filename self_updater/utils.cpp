@@ -3,11 +3,12 @@
 #include "self_updater/utils.h"
 
 #include <UserEnv.h>
+#include <stdexcept>
 
 namespace Updater::Utils {
 	static const char* LockFileBasePath = "Documents\\My Games\\Binding of Isaac Repentance";
 	static const char* RepentogonSubFolder = "Repentogon";
-	static const char* LockFileName = "unpacker.lock";
+	static const char* LockFileName = "repentogon_launcher_updater.lock";
 
 	static char* GetUserProfileDir();
 	static bool FileExists(const char* path);
@@ -50,8 +51,12 @@ namespace Updater::Utils {
 		return HasFlag(argc, argv, Updater::UnstableArg);
 	}
 
-	char* GetUrl(int argc, char** argv) {
-		return GetParamValue(argc, argv, Updater::UrlArg);
+	bool HasLauncherProcessIdArg(int argc, char** argv) {
+		return HasFlag(argc, argv, Updater::LauncherProcessIdArg);
+	}
+
+	char* GetLauncherProcessIdArg(int argc, char** argv) {
+		return GetParamValue(argc, argv, Updater::LauncherProcessIdArg);
 	}
 
 	void ReplaceQuotes(char* str, size_t* len) {

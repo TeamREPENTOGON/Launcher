@@ -61,7 +61,7 @@ add_custom_command (TARGET REPENTOGONLauncher POST_BUILD COMMAND ${CMAKE_COMMAND
 
 file (GLOB_RECURSE UPDATER_FILES "include/self_updater/*.h" self_updater/*.cpp "include/launcher/version.h" src/version.cpp ${SHARED_FILES})
 add_executable (REPENTOGONLauncherUpdater WIN32 ${UPDATER_FILES})
-target_link_libraries (REPENTOGONLauncherUpdater libcurl_static zip zlibstatic userenv ktmw32)
+target_link_libraries (REPENTOGONLauncherUpdater libcurl_static zip zlibstatic userenv ktmw32 comctl32)
 target_include_directories (REPENTOGONLauncherUpdater PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
