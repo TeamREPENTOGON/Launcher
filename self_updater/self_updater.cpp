@@ -3,12 +3,14 @@
 #include <filesystem>
 #include <Commctrl.h>
 #include <thread>
+#include <memory>
 
 #include "comm/messages.h"
 #include "self_updater/self_updater.h"
 #include "self_updater/logger.h"
 #include "self_updater/utils.h"
 #include "self_updater/launcher_update_manager.h"
+#include "self_updater/unique_window.h"
 #include "self_updater/unpacker.h"
 #include "launcher/version.h"
 
@@ -34,58 +36,68 @@ namespace Updater {
 	static std::atomic<UpdaterState> _currentState = UPDATER_STARTUP;
 }
 
-HANDLE Updater::TryOpenLauncherProcessHandle(int argc, char** argv) {
-	if (!Utils::HasLauncherProcessIdArg(argc, argv)) {
-		// Arg not provided.
-		return NULL;
+Updater::UpdaterState Updater::GetCurrentUpdaterState() {
+	return _currentState.load(std::memory_order_acquire);
+}
+
+void Updater::SetCurrentUpdaterState(Updater::UpdaterState newState) {
+	_currentState.store(newState, std::memory_order_release);
+}
+
+bool Updater::HandleMatchesLauncherExe(HANDLE handle) {
+	// Query the name/filepath of the process and verify that it corresponds to the launcher exe.
+	char buffer[MAX_PATH];
+	DWORD bufferSize = MAX_PATH;
+	BOOL getProcessNameSuccess = QueryFullProcessImageNameA(handle, 0, buffer, &bufferSize);
+	if (!getProcessNameSuccess) {
+		Logger::Error("Error while querying the name of the provided process ID (%d)\n", GetLastError());
+		return false;
 	}
 
+	Logger::Info("Comparing path of provided process ID (%s) to the launcher exe (%s)\n", buffer, LauncherExePath);
+
+	try {
+		return std::filesystem::equivalent(buffer, LauncherExePath);
+	}
+	catch (const std::filesystem::filesystem_error& ex) {
+		// Most likely one or the other does not exist.
+		Logger::Warn("Error when checking filepath equivalence of `%s` and `%s`: %s", buffer, LauncherExePath, ex.what());
+	}
+	return false;
+}
+
+HANDLE Updater::TryOpenLauncherProcessHandle(int argc, char** argv) {
 	char* launcherProcessIdParam = Utils::GetLauncherProcessIdArg(argc, argv);
 	if (!launcherProcessIdParam) {
-		Logger::Error("%s arg provded with no value!", LauncherProcessIdArg);
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 
-	DWORD launcherProcessId = 0;
+	DWORD launcherProcessId = NULL;
 	try {
 		launcherProcessId = std::stoul(launcherProcessIdParam);
 	} catch (const std::exception& ex) {
 		Logger::Error("Failed to parse launcher process ID param from the command line (%s): %s", launcherProcessIdParam, ex.what());
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 
 	HANDLE launcherHandle = OpenProcess(PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, launcherProcessId);
 	if (launcherHandle == NULL) {
 		// Launcher may have closed already.
 		Logger::Warn("Error while trying to open process for provided process ID (%d)\n", GetLastError());
-		return NULL;
+		return INVALID_HANDLE_VALUE;
 	}
 
-	// Query the name/filepath of the process and verify that it corresponds to the launcher exe.
-	char buffer[MAX_PATH];
-	DWORD bufferSize = MAX_PATH;
-	BOOL getProcessNameSuccess = QueryFullProcessImageNameA(launcherHandle, 0, buffer, &bufferSize);
-	if (!getProcessNameSuccess) {
-		Logger::Error("Error while querying the name of the provided process ID (%d)\n", GetLastError());
-		return NULL;
+	if (!HandleMatchesLauncherExe(launcherHandle)) {
+		// This is not the launcher. Assume that the launcher already closed, and the pid may have been re-used.
+		Logger::Warn("Provided process ID is not the launcher exe. Ignoring it.\n");
+		CloseHandle(launcherHandle);
+		return INVALID_HANDLE_VALUE;
 	}
 
-	try {
-		if (std::filesystem::equivalent(buffer, LauncherExePath)) {
-			return launcherHandle;
-		}
-	} catch (const std::filesystem::filesystem_error& ex) {
-		// Most likely one or the other does not exist.
-		Logger::Warn("Error when checking filepath equivalence of `%s` and `%s`: %s", buffer, LauncherExePath, ex.what());
-	}
-
-	// This is not the launcher. Assume that the launcher already closed, and the pid may have been re-used.
-	Logger::Warn("Provided process ID is not the launcher exe (found process %s)\n", buffer);
-	CloseHandle(launcherHandle);
-	return NULL;
+	return launcherHandle;
 }
 
-HWND Updater::CreateProgressBarWindow() {
+std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow() {
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 
 	WNDCLASSEX windowClass = {};
@@ -100,83 +112,84 @@ HWND Updater::CreateProgressBarWindow() {
 
 		if (!RegisterClassExA(&windowClass)) {
 			Logger::Error("Error registering progress bar window class (%d)\n", GetLastError());
-			return NULL;
+			return nullptr;
 		}
 	}
 
 	// Create main window
-	HWND window = CreateWindowExA(0, windowClass.lpszClassName, Updater::UpdaterProcessName, WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU, 0, 0, 450, 95, NULL, NULL, windowClass.hInstance, NULL);
-	if (!window) {
+	auto window = std::make_unique<UniqueWindow>(windowClass.lpszClassName, Updater::UpdaterProcessName, WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU, 0, 0, 450, 95, windowClass.hInstance);
+	HWND windowHandle = window->GetHandle();
+	if (windowHandle == NULL) {
 		Logger::Error("Error creating progress bar window (%d)\n", GetLastError());
-		return NULL;
+		return nullptr;
 	}
 
 	// Move window to center of screen
 	RECT rect;
-	if (!GetWindowRect(window, &rect)) {
+	if (!GetWindowRect(windowHandle, &rect)) {
 		Logger::Error("Error getting rect of progress bar window (%d)\n", GetLastError());
-		DestroyWindow(window);
-		return NULL;
+		return nullptr;
 	}
 	const int xpos = (GetSystemMetrics(SM_CXSCREEN) - rect.right) / 2;
 	const int ypos = (GetSystemMetrics(SM_CYSCREEN) - rect.bottom) / 2;
-	if (!SetWindowPos(window, 0, xpos, ypos, 0, 0, SWP_NOSIZE | SWP_NOZORDER)) {
+	if (!SetWindowPos(windowHandle, 0, xpos, ypos, 0, 0, SWP_NOSIZE | SWP_NOZORDER)) {
 		Logger::Error("Error setting position of progress bar window (%d)\n", GetLastError());
-		DestroyWindow(window);
-		return NULL;
+		return nullptr;
 	}
 
 	// Add progress bar to window
-	HWND progressBar = CreateWindowExA(0, PROGRESS_CLASS, "", WS_CHILD | WS_VISIBLE | PBS_MARQUEE, 15, 15, 400, 25, window, NULL, windowClass.hInstance, NULL);
+	HWND progressBar = CreateWindowExA(0, PROGRESS_CLASS, "", WS_CHILD | WS_VISIBLE | PBS_MARQUEE, 15, 15, 400, 25, windowHandle, NULL, windowClass.hInstance, NULL);
 	if (progressBar == NULL) {
 		Logger::Error("Error initializing progress bar (%d)\n", GetLastError());
-		DestroyWindow(window);
-		return NULL;
+		return nullptr;
 	}
 	SendMessageA(progressBar, PBM_SETMARQUEE, 1, NULL);
 
 	// Finish window init
-	ShowWindow(window, SW_SHOWDEFAULT);
-	if (!UpdateWindow(window)) {
+	ShowWindow(windowHandle, SW_SHOWDEFAULT);
+	if (!UpdateWindow(windowHandle)) {
 		Logger::Error("Error finalizing progress bar window (%d)\n", GetLastError());
-		DestroyWindow(window);
-		return NULL;
+		return nullptr;
 	}
 
 	return window;
 }
 
 void Updater::ProgressBarThread() {
-	HWND progressBarWindow = NULL;
+	std::unique_ptr<Updater::UniqueWindow> progressBarWindow = nullptr;
 
 	UpdaterState state = UPDATER_STARTUP;
 
 	MSG msg = {};
 	BOOL bRet = 0;
 	
-	while (msg.message != WM_QUIT) {
-		if (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
+	while (true) {
+		while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
 			DispatchMessageA(&msg);
-		} else if (_currentState != state) {
-			state = _currentState;
+			if (msg.message == WM_QUIT) {
+				break;
+			}
+		}
+
+		const UpdaterState currentState = GetCurrentUpdaterState();
+		if (currentState != state) {
+			state = currentState;
 
 			if (UpdaterStateProgressBarLabels.find(state) != UpdaterStateProgressBarLabels.end()) {
-				if (progressBarWindow == NULL) {
+				if (!progressBarWindow) {
 					progressBarWindow = Updater::CreateProgressBarWindow();
-					if (progressBarWindow == NULL) {
-						return;
+					if (!progressBarWindow) {
+						Logger::Error("Failed to create progress bar window\n");
+						break;
 					}
 				}
-				if (!SetWindowTextA(progressBarWindow, UpdaterStateProgressBarLabels.at(state))) {
+				if (!SetWindowTextA(progressBarWindow->GetHandle(), UpdaterStateProgressBarLabels.at(state))) {
 					Logger::Error("Error trying to set text of progress bar window (%d)\n", GetLastError());
-					return;
+					break;
 				}
-			} else if (progressBarWindow != NULL) {
-				if (!DestroyWindow(progressBarWindow)) {
-					Logger::Error("Error while attempting to destroy the progress bar window (%d)\n", GetLastError());
-				}
-				progressBarWindow = NULL;
+			} else if (progressBarWindow) {
+				progressBarWindow = nullptr;
 			}
 		}
 	}
@@ -244,7 +257,7 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 	// Start up a progress bar window on a separate thread so that we can show some not-frozen UI to the user.
 	std::thread progressBarThread(Updater::ProgressBarThread);
 
-	Updater::_currentState = Updater::UPDATER_CHECKING_FOR_UPDATE;
+	Updater::SetCurrentUpdaterState(Updater::UPDATER_CHECKING_FOR_UPDATE);
 
 	// Check for available updates.
 	// TODO: Properly hook up logging from LauncherUpdateManager
@@ -261,29 +274,26 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 	lu::SelfUpdateCheckResult checkResult = updateManager.CheckSelfUpdateAvailability(allowUnstable, version, url);
 
 	switch (checkResult) {
-	case lu::SELF_UPDATE_CHECK_UP_TO_DATE: {
+	case lu::SELF_UPDATE_CHECK_UP_TO_DATE:
 		Logger::Info("launcher is already up-to-date.\n");
 		Updater::StartLauncher();
 		return 0;
-	}
 
-	case lu::SELF_UPDATE_CHECK_ERR_GENERIC: {
+	case lu::SELF_UPDATE_CHECK_ERR_GENERIC:
 		MessageBoxA(NULL, "An error was encountered while checking for the availability of updates. Check the log file for more details.\n", Updater::UpdaterProcessName, MB_ICONERROR);
 		Logger::Fatal("Error while checking for updates.\n");
 		return -1;
-	}
 
 	case lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE:
 		Logger::Info("Found available update version: %s (from %s)\n", version.c_str(), url.c_str());
 		break;
 
-	default: {
+	default:
 		Logger::Fatal("Recieved unexpected error code %d while checking for availability of self updates. Please report this as a bug.\n", checkResult);
 		return -1;
 	}
-	}
 
-	Updater::_currentState = Updater::UPDATER_PROMPTING_USER;
+	Updater::SetCurrentUpdaterState(Updater::UPDATER_PROMPTING_USER);
 
 	// An appropriate update is available. Prompt the user about it.
 	const std::string updatePrompt = (std::ostringstream() << "An update is available for the launcher.\n" <<
@@ -296,10 +306,10 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 		return 0;
 	}
 
-	Updater::_currentState = Updater::UPDATER_DOWNLOADING_UPDATE;
+	Updater::SetCurrentUpdaterState(Updater::UPDATER_DOWNLOADING_UPDATE);
 
 	// If we opened a launcher process handle, terminate it now.
-	if (launcherHandle != NULL) {
+	if (launcherHandle != INVALID_HANDLE_VALUE) {
 		Logger::Info("Terminating launcher...\n");
 		if (TerminateProcess(launcherHandle, 0)) {
 			WaitForSingleObject(launcherHandle, INFINITE);
@@ -313,19 +323,20 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 	Logger::Info("Starting update download from %s\n", url.c_str());
 
 	if (!updateManager.DownloadAndExtractUpdate(url.c_str())) {
-		Updater::_currentState = Updater::UPDATER_FAILED;
+		Updater::SetCurrentUpdaterState(Updater::UPDATER_FAILED);
 		MessageBoxA(NULL, "Failed to download the update for the launcher. Check the log file for more details.\n", Updater::UpdaterProcessName, MB_ICONERROR);
 		Logger::Fatal("Error trying to download update from URL: %s\n", url.c_str());
 		return -1;
 	}
 
-	Updater::_currentState = Updater::UPDATER_INSTALLING_UPDATE;
+	Updater::SetCurrentUpdaterState(Updater::UPDATER_INSTALLING_UPDATE);
 
 	// Check if the updater exe is still locked. If so, prompt the user about it.
 	// The exe file can remain locked very briefly after terminating the launcher, so we check this after the download.
 	if (std::filesystem::exists(Updater::LauncherExePath)) {
+		bool updaterExeMaybeLocked = true;
 		int attempts = 0;
-		while (true) {
+		while (updaterExeMaybeLocked) {
 			attempts++;
 			HANDLE fh = CreateFileA(Updater::LauncherExePath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
 			if (fh == INVALID_HANDLE_VALUE) {
@@ -344,6 +355,7 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 				Logger::Fatal("The launcher is currently running, and the user chose to cancel.\n");
 				return -1;
 			} else {
+				updaterExeMaybeLocked = false;
 				CloseHandle(fh);
 				break;
 			}
@@ -351,21 +363,21 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 	}
 
 	if (!Unpacker::ExtractArchive(Comm::UnpackedArchiveName)) {
-		Updater::_currentState = Updater::UPDATER_FAILED;
+		Updater::SetCurrentUpdaterState(Updater::UPDATER_FAILED);
 		MessageBoxA(NULL, "Unable to unpack the update, check log file\n", Updater::UpdaterProcessName, MB_ICONERROR);
 		Logger::Fatal("Error while extracting archive\n");
 		return -1;
 	}
 
 	if (!DeleteFileA(Comm::UnpackedArchiveName)) {
-		Updater::_currentState = Updater::UPDATER_FAILED;
+		Updater::SetCurrentUpdaterState(Updater::UPDATER_FAILED);
 		MessageBoxA(NULL, "Unable to delete the archive containing the update.\n"
 			"Delete the archive (launcher_update.bin) then you can start the launcher\n", Updater::UpdaterProcessName, MB_ICONERROR);
 		Logger::Fatal("Error while deleting archive (%d)\n", GetLastError());
 		return -1;
 	}
 
-	Updater::_currentState = Updater::UPDATER_STARTING_LAUNCHER;
+	Updater::SetCurrentUpdaterState(Updater::UPDATER_STARTING_LAUNCHER);
 
 	Logger::Info("Update successful. Starting launcher...\n");
 	Updater::StartLauncher();

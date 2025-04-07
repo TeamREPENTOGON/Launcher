@@ -42,7 +42,6 @@ namespace Updater::Utils {
 	LockUpdaterResult LockUpdater(HANDLE* result);
 	bool IsForced(int argc, char** argv);
 	bool AllowUnstable(int argc, char** argv);
-	bool HasLauncherProcessIdArg(int argc, char** argv);
 	char* GetLauncherProcessIdArg(int argc, char** argv);
 	bool GetLockFilePath(char** path);
 }

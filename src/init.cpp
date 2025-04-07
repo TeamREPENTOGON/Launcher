@@ -17,7 +17,9 @@ bool Launcher::App::OnInit() {
 
 	// Check for an available self-update.
 	// If one is initiated, the launcher should get terminated by the updater.
-	Launcher::CheckForSelfUpdate(false);
+	if (!Launcher::CheckForSelfUpdate(false)) {
+		MessageBoxA(NULL, "Failed check for self-update. Check the log file for more details.\n", "REPENTOGON Launcher", MB_ICONERROR);
+	}
 
 	sGithubExecutor->Start();
 

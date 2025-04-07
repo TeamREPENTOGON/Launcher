@@ -11,7 +11,11 @@ namespace Launcher {
 		Logger::Info("Launching self-updater to check for launcher updates...\n");
 
 		char cli[256];
-		sprintf(cli, "%s%s --launcherpid %d", SelfUpdaterExePath, allowUnstable ? " --unstable" : "", GetCurrentProcessId());
+		int len = snprintf(cli, sizeof(cli), "%s%s --launcherpid %d", SelfUpdaterExePath, allowUnstable ? " --unstable" : "", GetCurrentProcessId());
+		if (len < 0 || len >= sizeof(cli)) {
+			Logger::Error("Failed to start self-updater process: Command-line arguments exceeded buffer size %d\n", sizeof(cli));
+			return false;
+		}
 
 		PROCESS_INFORMATION info;
 		memset(&info, 0, sizeof(info));
@@ -21,7 +25,7 @@ namespace Launcher {
 
 		BOOL ok = CreateProcessA(SelfUpdaterExePath, cli, NULL, NULL, false, 0, NULL, NULL, &startupInfo, &info);
 		if (!ok) {
-			Logger::Info("Failed to start self-updater process (error code %d)\n", GetLastError());
+			Logger::Error("Failed to start self-updater process (error code %d)\n", GetLastError());
 			return false;
 		}
 
