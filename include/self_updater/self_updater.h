@@ -4,6 +4,9 @@
 #include <WinBase.h>
 #include <unordered_map>
 #include <atomic>
+#include <memory>
+
+#include "self_updater/unique_window.h"
 
 namespace Updater {
 	/* Name of the CLI flag that causes the lock file to be ignored. */
@@ -31,13 +34,23 @@ namespace Updater {
 	// Set by the main thread and read by the progress bar thread.
 	extern std::atomic<UpdaterState> _currentState;
 
+	// Loads the current value of `_currentState`.
+	UpdaterState GetCurrentUpdaterState();
+
+	// Stores a new value into `_currentState`.
+	void SetCurrentUpdaterState(UpdaterState newState);
+
+	// Returns true if the provided handle seems to correspond to the launcher exe.
+	bool HandleMatchesLauncherExe(HANDLE handle);
+
 	// Open a handle for the active launcher process and return it, if a process ID was provided on the command line by the launcher itself.
-	// Set to NULL if not provided or no corresponding process could be found, in which case we'll assume the launcher is not running.
+	// Returns INVALID_HANDLE_VALUE if not provided or no corresponding process could be found, in which case we'll assume the launcher is not running.
 	// (If it is actually running, we will notice the lock in the launcher exe later and deal with it then.)
 	HANDLE TryOpenLauncherProcessHandle(int argc, char** argv);
 
-	// Initializes the window for the progress bar and returns the handle.
-	HWND CreateProgressBarWindow();
+	// Initializes the window for the progress bar and returns the handle within a UniqueWindow wrapper.
+	// Returns nullptr if the window could not be created.
+	std::unique_ptr<Updater::UniqueWindow> CreateProgressBarWindow();
 
 	// A progress bar window is created/run on a separate thread so that it doesn't freeze during the update.
 	// The handle of the progress bar window is sent back to the main thread via the promise.

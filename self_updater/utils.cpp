@@ -51,10 +51,6 @@ namespace Updater::Utils {
 		return HasFlag(argc, argv, Updater::UnstableArg);
 	}
 
-	bool HasLauncherProcessIdArg(int argc, char** argv) {
-		return HasFlag(argc, argv, Updater::LauncherProcessIdArg);
-	}
-
 	char* GetLauncherProcessIdArg(int argc, char** argv) {
 		return GetParamValue(argc, argv, Updater::LauncherProcessIdArg);
 	}
