@@ -26,6 +26,12 @@ namespace Updater {
 	static const char* LauncherExePath = "./REPENTOGONLauncher.exe";
 	static const char* UpdaterProcessName = "REPENTOGON Launcher Updater";
 
+	// During update installation, the existing updater exe is renamed to make room for the new one.
+	// We can't delete our own exe (since it is obviously running) but renaming it is allowed.
+	// The old renamed exe will be deleted the next time the updater runs.
+	static const char* UpdaterExeFilename = "REPENTOGONLauncherUpdater.exe";
+	static const char* RenamedUpdaterExeFilename = "REPENTOGONLauncherUpdater.exe.bak";
+
 	static const std::unordered_map<UpdaterState, const char*> UpdaterStateProgressBarLabels = {
 		{ UPDATER_CHECKING_FOR_UPDATE, "REPENTOGON Launcher Updater: Checking for update..." },
 		{ UPDATER_DOWNLOADING_UPDATE, "REPENTOGON Launcher Updater: Downloading update..." },
@@ -293,6 +299,33 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 		return -1;
 	}
 
+	// Check for a renamed updater exe from a previous update and try to delete it if found.
+	// Since we have the lockfile to prevent multiple instances of the updater running at the same time,
+	// we shouldn't ever fail to delete it, but you never know...
+	if (std::filesystem::exists(Updater::RenamedUpdaterExeFilename)) {
+		int attempts = 0;
+		while (std::filesystem::exists(Updater::RenamedUpdaterExeFilename) && !DeleteFileA(Updater::RenamedUpdaterExeFilename)) {
+			attempts++;
+			if (attempts == 1) {
+				Logger::Error("Error trying to delete %s from previous update (%d)\n", Updater::RenamedUpdaterExeFilename, GetLastError());
+			}
+			if (attempts <= 5) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(200));
+				continue;
+			}
+			Updater::SetCurrentUpdaterState(Updater::UPDATER_PROMPTING_USER);
+			int response = MessageBoxA(NULL, "Failed to delete REPENTOGONLauncherUpdater.exe.bak file from prior update.\n"
+				"The update was most likely successful, but please report this as a bug.\n"
+				"Select \"cancel\" to allow the Launcher to start.\n", Updater::UpdaterProcessName, MB_ICONINFORMATION | MB_RETRYCANCEL);
+			if (response == IDRETRY || response == IDOK || response == IDTRYAGAIN) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(200));
+				continue;
+			}
+			Logger::Fatal("Failed to delete %s from previous update, and the user chose to cancel.\n", Updater::RenamedUpdaterExeFilename);
+			return -1;
+		}
+	}
+
 	Updater::SetCurrentUpdaterState(Updater::UPDATER_PROMPTING_USER);
 
 	// An appropriate update is available. Prompt the user about it.
@@ -360,6 +393,13 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 				break;
 			}
 		}
+	}
+
+	// Rename the existing updater exe so that we can write the new one.
+	// Make a copy too just in case an error occurs, we wouldn't want to leave the user with no updater exe.
+	if (std::filesystem::exists(Updater::UpdaterExeFilename)) {
+		std::filesystem::rename(Updater::UpdaterExeFilename, Updater::RenamedUpdaterExeFilename);
+		std::filesystem::copy(Updater::RenamedUpdaterExeFilename, Updater::UpdaterExeFilename);
 	}
 
 	if (!Unpacker::ExtractArchive(Comm::UnpackedArchiveName)) {
