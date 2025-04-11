@@ -5,6 +5,7 @@
 #include "shared/filesystem.h"
 #include "shared/logger.h"
 
+#include "launcher/configuration.h"
 #include "launcher/launcher_configuration.h"
 
 static constexpr const char* launcherConfigFile = "repentogon_launcher.ini";
@@ -109,4 +110,37 @@ std::string LauncherConfiguration::GetIsaacExecutablePath() {
 	return _configurationFile->Get(Launcher::Configuration::GeneralSection,
 		Launcher::Configuration::IsaacExecutableKey,
 		Launcher::Configuration::EmptyPath);
+}
+
+bool LauncherConfiguration::HasAutomaticUpdates() const {
+	if (_dirtyAutomaticUpdates) {
+		return _overrideAutomaticUpdates;
+	}
+
+	auto [section, key, def] = Launcher::Configuration::HasAutomaticUpdates();
+	return _configurationFile->GetBoolean(section, key, def);
+}
+
+bool LauncherConfiguration::HasUnstableUpdates() const {
+	if (_dirtyUnstableUpdates) {
+		return _overrideUnstableUpdates;
+	}
+
+	auto [section, key, def] = Launcher::Configuration::HasUnstableUpdates();
+	return _configurationFile->GetBoolean(section, key, def);
+}
+
+void LauncherConfiguration::OverrideAutomaticUpdates(bool value) {
+	_dirtyAutomaticUpdates = true;
+	_overrideAutomaticUpdates = value;
+}
+
+void LauncherConfiguration::OverrideUnstableUpdates(bool value) {
+	_dirtyUnstableUpdates = true;
+	_overrideUnstableUpdates = value;
+}
+
+void LauncherConfiguration::Invalidate() {
+	_dirtyAutomaticUpdates = _dirtyUnstableUpdates = false;
+	_isLoaded = Process(nullptr);
 }

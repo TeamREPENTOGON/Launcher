@@ -11,6 +11,10 @@
 namespace Launcher {
 	class Installation {
 	public:
+		static constexpr int IsaacInstallationValid = 1 << 0,
+			RepentogonInstallationValid = 1 << 1,
+			BothInstallationsValid = IsaacInstallationValid | RepentogonInstallationValid;
+
 		Installation(ILoggableGUI* gui, LauncherConfiguration* launcherConfiguration);
 
 		std::optional<std::string> LocateIsaac();
@@ -34,7 +38,7 @@ namespace Launcher {
 			_gui = gui;
 		}
 
-		bool SetIsaacExecutable(std::string const& file);
+		int SetIsaacExecutable(std::string const& file);
 
 	private:
 		ILoggableGUI* _gui = nullptr;

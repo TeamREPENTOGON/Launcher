@@ -31,6 +31,46 @@ namespace Keys {
 	const std::string unstableUpdates("UnstableUpdates");
 }
 
+namespace Launcher::Configuration {
+	ConfigurationTuple<bool> HasConsole() {
+		return { Sections::repentogon, Keys::console, Defaults::console };
+	}
+
+	ConfigurationTuple<int> LevelStage() {
+		return { Sections::vanilla, Keys::levelStage, Defaults::levelStage };
+	}
+
+	ConfigurationTuple<bool> HasLuaDebug() {
+		return { Sections::vanilla, Keys::luaDebug, Defaults::luaDebug };
+	}
+
+	ConfigurationTuple<int> StageType() {
+		return { Sections::vanilla, Keys::stageType, Defaults::stageType};
+	}
+
+	ConfigurationTuple<int> LuaHeapSize() {
+		return { Sections::vanilla, Keys::luaHeapSize, Defaults::luaHeapSize };
+	}
+
+	ConfigurationTuple<bool> HasAutomaticUpdates() {
+		return { Sections::repentogon, Keys::update, Defaults::update };
+	}
+
+	ConfigurationTuple<bool> HasUnstableUpdates() {
+		return { Sections::repentogon, Keys::unstableUpdates, Defaults::unstableUpdates };
+	}
+}
+
+bool ReadBoolean(INIReader& reader, Launcher::Configuration::ConfigurationTuple<bool>(*fn)()) {
+	auto [section, key, def] = fn();
+	return reader.GetBoolean(section, key, def);
+}
+
+int ReadInteger(INIReader& reader, Launcher::Configuration::ConfigurationTuple<int>(*fn)()) {
+	auto [section, key, def] = fn();
+	return reader.GetInteger(section, key, def);
+}
+
 void Launcher::IsaacOptions::InitializeDefaults(ILoggableGUI* gui, bool allowUpdates, bool allowUnstableUpdates, bool validRepentogon) {
 	console = Defaults::console;
 	levelStage = Defaults::levelStage;
@@ -43,14 +83,16 @@ void Launcher::IsaacOptions::InitializeDefaults(ILoggableGUI* gui, bool allowUpd
 }
 
 void Launcher::IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& reader, bool validRepentogon) {
-	console = reader.GetBoolean(Sections::repentogon, Keys::console, Defaults::console);
-	levelStage = reader.GetInteger(Sections::vanilla, Keys::levelStage, Defaults::levelStage);
-	luaDebug = reader.GetBoolean(Sections::vanilla, Keys::luaDebug, Defaults::luaDebug);
-	luaHeapSize = reader.GetInteger(Sections::vanilla, Keys::luaHeapSize, Defaults::luaHeapSize);
-	stageType = reader.GetInteger(Sections::vanilla, Keys::stageType, Defaults::stageType);
+	namespace c = Configuration;
+
+	console = ReadBoolean(reader, c::HasConsole);
+	levelStage = ReadInteger(reader, c::LevelStage);
+	luaDebug = ReadBoolean(reader, c::HasLuaDebug);
+	luaHeapSize = ReadInteger(reader, c::LuaHeapSize);
+	stageType = ReadInteger(reader, c::StageType);
 	mode = (LaunchMode)reader.GetInteger(Sections::shared, Keys::launchMode, LAUNCH_MODE_REPENTOGON);
-	update = reader.GetBoolean(Sections::repentogon, Keys::update, Defaults::update);
-	unstableUpdates = reader.GetBoolean(Sections::repentogon, Keys::unstableUpdates, Defaults::unstableUpdates);
+	update = ReadBoolean(reader, c::HasAutomaticUpdates);
+	unstableUpdates = ReadBoolean(reader, c::HasUnstableUpdates);
 
 	if (mode != LAUNCH_MODE_REPENTOGON && mode != LAUNCH_MODE_VANILLA) {
 		gui->LogWarn("Invalid value %d for %s field in repentogon_launcher.ini. Overriding with default", mode, Keys::launchMode);
@@ -104,7 +146,7 @@ void Launcher::IsaacOptions::InitializeFromConfig(ILoggableGUI* gui, INIReader& 
 	}
 }
 
-void Launcher::IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::Installation const& installation) {
+void Launcher::IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::Installation& installation) {
 	LauncherConfiguration* configuration = installation.GetLauncherConfiguration();
 	std::string filename = configuration->GetConfigurationPath();
 	if (filename.empty()) {
@@ -138,4 +180,6 @@ void Launcher::IsaacOptions::WriteConfiguration(ILoggableGUI* gui, Launcher::Ins
 	fprintf(f, "%s = %d\n", Keys::launchMode.c_str(), mode);
 
 	fclose(f);
+
+	installation.GetLauncherConfiguration()->Invalidate();
 }

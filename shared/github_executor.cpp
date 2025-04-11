@@ -20,6 +20,11 @@ GithubExecutor& GithubExecutor::Instance() {
     return executor;
 }
 
+GithubExecutor::~GithubExecutor() {
+    Stop();
+    _thread.join();
+}
+
 GithubExecutor::GithubExecutor() {
     _stop.store(false, std::memory_order_release);
 }

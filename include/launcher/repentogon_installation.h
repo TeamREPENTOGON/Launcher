@@ -66,6 +66,10 @@ enum RepentogonInstallationStatus {
 	 REPENTOGON_INSTALLATION_STATUS_MODERN
 };
 
+namespace Launcher {
+	class Installation;
+}
+
 class RepentogonInstallation {
 public:
     RepentogonInstallation(ILoggableGUI* gui);
@@ -123,7 +127,10 @@ public:
 
 	static bool IsIsaacVersionCompatible(const char* version);
 
+	friend class Launcher::Installation;
 private:
+	void Invalidate();
+
 	/* Load a library that has an entry in the _dllStates array.
      *
 	 * Returns the result of loading the library. If the load is successful,

@@ -16,12 +16,14 @@
 enum {
     LAUNCHER_WIZARD_CONTROL_WIZARD,
     LAUNCHER_WIZARD_CONTROL_ISAAC_SETUP_BUTTON,
+    LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX
 };
 
 wxBEGIN_EVENT_TABLE(LauncherWizard, wxWizard)
 EVT_WIZARD_PAGE_CHANGED(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::OnPageChanged)
 EVT_BUTTON(LAUNCHER_WIZARD_CONTROL_ISAAC_SETUP_BUTTON, LauncherWizard::OnIsaacExecutableSelected)
 EVT_WIZARD_BEFORE_PAGE_CHANGED(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::BeforePageChanged)
+EVT_CHECKBOX(LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX, LauncherWizard::OnUnstableUpdatesCheckBoxClicked)
 wxEND_EVENT_TABLE()
 
 LauncherWizard::LauncherWizard(Launcher::Installation* installation) : 
@@ -32,13 +34,16 @@ LauncherWizard::LauncherWizard(Launcher::Installation* installation) :
 }
 
 bool LauncherWizard::Run() {
-    return RunWizard(_introductionPage);
+    return RunWizard(_introductionPage ? _introductionPage : _isaacSetupPage);
 }
 
-void LauncherWizard::AddPages() {
+void LauncherWizard::AddPages(bool skipIntroduction) {
     SetPageSize(wxSize(640, 480));
 
-    AddIntroductionPage();
+    if (!skipIntroduction) {
+        AddIntroductionPage();
+    }
+
     AddIsaacSetupPage();
     AddRepentogonSetupPage();
     AddRepentogonInstallationPage();
@@ -49,11 +54,19 @@ void LauncherWizard::AddPages() {
      * "Next" button instead of "Finish". The tricky pages manage that by
      * themselves.
      */
-    _introductionPage->Chain(_isaacSetupPage)
-        .Chain(_repentogonSetupPage)
+    if (!skipIntroduction) {
+        _introductionPage->Chain(_isaacSetupPage);
+    }
+    _isaacSetupPage->Chain(_repentogonSetupPage)
         .Chain(_repentogonInstallationPage)
         .Chain(_completionPage);
-    GetPageAreaSizer()->Add(_introductionPage);
+
+    if (!skipIntroduction) {
+        GetPageAreaSizer()->Add(_introductionPage);
+    } else {
+        GetPageAreaSizer()->Add(_isaacSetupPage);
+    }
+
     // GetPageAreaSizer()->Fit(this);
 }
 
@@ -163,20 +176,9 @@ void LauncherWizard::AddRepentogonSetupPage() {
         "Press Next once you are done.");
 
     wxStaticText* installationText = new wxStaticText(page, wxID_ANY, wxEmptyString);
-    RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
-    if (repentogon.IsValid(false)) {
-        installationText->SetLabel("The launcher detected a valid installation of Repentogon in the specified Isaac folder."
-            " If your choices on this page would require an update of your Repentogon installation, clicking Next will trigger this update");
-    } else if (repentogon.IsLegacy()) {
-        installationText->SetLabel("The launcher detected a legacy (base Repentance) installation of Repentogon in the specified Isaac folder."
-            " A full installation of Repentogon will be performed, and the launcher will remove legacy Repentogon files.");
-    } else {
-        installationText->SetLabel("The launcher found no valid installation of Repentogon in the specified Isaac folder."
-            " A full installation of Repentogon will be performed.");
-    }
-
     wxCheckBox* automaticUpdates = new wxCheckBox(page, wxID_ANY, "Automatic updates (recommended)");
-    wxCheckBox* unstableUpdates = new wxCheckBox(page, wxID_ANY, "Unstable releases (not recommended)");
+    wxCheckBox* unstableUpdates = new wxCheckBox(page, LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX,
+        "Unstable releases (not recommended)");
 
     wxSizer* automaticUpdatesSizer = new wxBoxSizer(wxHORIZONTAL);
     automaticUpdatesSizer->Add(automaticUpdates);
@@ -196,19 +198,48 @@ void LauncherWizard::AddRepentogonSetupPage() {
     unstableUpdatesBitmap->SetToolTip(unstableUpdatesTooltip);
     unstableUpdatesSizer->Add(unstableUpdatesBitmap);
 
+    wxStaticText* warningText = new wxStaticText(page, wxID_ANY, "");
+    warningText->SetForegroundColour(*wxRED);
+
     sizer->Add(topText, flags);
     sizer->Add(installationText, flags);
     sizer->Add(automaticUpdatesSizer, flags);
     sizer->Add(unstableUpdatesSizer, flags);
+    sizer->Add(warningText, flags);
 
     _repentogonSetup._installationState = installationText;
     _repentogonSetup._autoUpdates = automaticUpdates;
     _repentogonSetup._unstableUpdates = unstableUpdates;
     _repentogonSetup._topText = topText;
 
+    ConfigureRepentogonSetupPage();
+
     page->SetSizerAndFit(sizer);
     //page->SetSizer(sizer);
     _repentogonSetupPage = page;
+}
+
+void LauncherWizard::ConfigureRepentogonSetupPage() {
+    wxStaticText* installationText = _repentogonSetup._installationState;
+    RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
+    if (repentogon.IsValid(false)) {
+        std::ostringstream stream;
+        stream << "Found a valid installation of Repentogon (version " << repentogon.GetRepentogonVersion() << ")";
+        installationText->SetLabel(stream.str());
+    } else if (repentogon.IsLegacy()) {
+        std::ostringstream stream;
+        stream << "Found a legacy installation of Repentogon (version " << repentogon.GetRepentogonVersion() << "). ";
+        stream << "An update will be performed.";
+        installationText->SetLabel(stream.str());
+    } else {
+        installationText->SetLabel("No valid installation of Repentogon found. An installation will be performed.");
+    }
+
+    LauncherConfiguration const* configuration = _installation->GetLauncherConfiguration();
+    if (configuration && configuration->Loaded()) {
+        _repentogonSetup._autoUpdates->SetValue(configuration->HasAutomaticUpdates());
+        _repentogonSetup._unstableUpdates->SetValue(configuration->HasUnstableUpdates());
+    }
 }
 
 void LauncherWizard::AddRepentogonInstallationPage() {
@@ -241,7 +272,9 @@ void LauncherWizard::OnPageChanged(wxWizardEvent& event) {
     source->Layout();
     if (source == _isaacSetupPage) {
         UpdateIsaacSetupNextButton();
-    } else if (source == _repentogonInstallationPage) {
+    } else if (source == _repentogonSetupPage) {
+        ConfigureRepentogonSetupPage();
+    }  else if (source == _repentogonInstallationPage) {
         UpdateRepentogonInstallationNavigationButtons();
         if (!_repentogonInstallationDone) {
             StartRepentogonInstallation();
@@ -278,7 +311,7 @@ void LauncherWizard::StartRepentogonInstallation() {
 
 void LauncherWizard::RepentogonInstallationThread() {
     Launcher::RepentogonInstaller installer(_installation);
-    auto [future, monitor] = installer.InstallLatestRepentogon(true, _repentogonSetup._unstableUpdates->GetValue());
+    auto [future, monitor] = installer.InstallLatestRepentogon(false, _repentogonSetup._unstableUpdates->GetValue());
     bool shouldContinue = true;
     NotificationVisitor visitor(_repentogonInstallation._logText);
     while (shouldContinue && !Launcher::CancelRequested()) {
@@ -292,6 +325,7 @@ void LauncherWizard::RepentogonInstallationThread() {
         shouldContinue = false;
     }
     
+    _repentogonInstallation._logText->AppendText("Repentogon installation finished\n");
     future.get();
    _repentogonInstallationDone = true;
    UpdateRepentogonInstallationNavigationButtons();
@@ -362,7 +396,7 @@ void LauncherWizard::PromptIsaacExecutable() {
 }
 
 void LauncherWizard::BeforePageChanged(wxWizardEvent& event) {
-    if (event.GetPage() == _isaacSetupPage && event.GetDirection() && !_compatibleWithRepentogon) {
+    if (event.GetPage() == _isaacSetupPage && event.GetDirection()) {
         bool shouldContinue = CheckRepentogonCompatibilityOnPageChange();
         if (!shouldContinue) {
             event.Veto();
@@ -372,10 +406,26 @@ void LauncherWizard::BeforePageChanged(wxWizardEvent& event) {
 }
 
 bool LauncherWizard::CheckRepentogonCompatibilityOnPageChange() {
+    if (_compatibleWithRepentogon) {
+        return true;
+    }
+
     wxMessageDialog dialog(this, "This version of Isaac is not compatible with Repentogon.\n"
         "Do you still want to proceed with the configuration and installation of Repentogon ?", 
         "Incompatibility with Repentogon",
         wxYES_NO);
     int result = dialog.ShowModal();
     return result == wxID_YES;
+}
+
+void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
+    RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
+    if (repentogon.IsValid(false)) {
+        _dirtyUnstableUpdates = !_dirtyUnstableUpdates;
+        if (_dirtyUnstableUpdates) {
+            _repentogonSetup._updateWarning->SetLabel("This change in options may require a Repentogon update");
+        } else {
+            _repentogonSetup._updateWarning->SetLabel("");
+        }
+    }
 }

@@ -40,6 +40,7 @@ namespace Launcher {
 
 	bool Installation::CheckRepentogonInstallation() {
 		if (!_isaacInstallation.IsValid()) {
+			_repentogonInstallation.Invalidate();
 			return false;
 		}
 
@@ -53,13 +54,17 @@ namespace Launcher {
 		return std::make_tuple(isaacPath, repentogonOk);
 	}
 
-	bool Installation::SetIsaacExecutable(std::string const& file) {
+	int Installation::SetIsaacExecutable(std::string const& file) {
 		bool ok = _isaacInstallation.Validate(file);
 		if (ok) {
-			CheckRepentogonInstallation();
+			if (CheckRepentogonInstallation()) {
+				return BothInstallationsValid;
+			}
+
+			return IsaacInstallationValid;
 		}
 
-		return ok;
+		return ok ? IsaacInstallationValid : 0;
 	}
 
 	/* void Installation::WriteLauncherConfigurationFile() {

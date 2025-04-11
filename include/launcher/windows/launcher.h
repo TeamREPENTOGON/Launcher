@@ -14,6 +14,7 @@
 #include "launcher/installation.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/widgets/text_ctrl_log_widget.h"
+#include "launcher/windows/repentogon_installer.h"
 #include "rapidjson/document.h"
 #include "shared/loggable_gui.h"
 
@@ -32,11 +33,15 @@ namespace Launcher {
 		WINDOW_BUTTON_ADVANCED_OPTIONS
 	};
 
+	class MainFrame;
+
 	class App : public wxApp {
 	public:
 		bool OnInit() override;
 		int OnExit() override;
-		void ParseCommandLine();
+		bool RunWizard(bool* installedRepentogon);
+		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(bool forceUpdate);
+		MainFrame* CreateMainWindow();
 	};
 
 	class AdvancedOptionsWindow;
@@ -84,7 +89,7 @@ namespace Launcher {
 
 		/* Event handlers. */
 		void OnIsaacSelectClick(wxCommandEvent& event);
-		void OnSelectRepentogonFolderClick(wxCommandEvent& event);
+		// void OnSelectRepentogonFolderClick(wxCommandEvent& event);
 		void OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl, 
 			const char* emptyText);
 		void OnLevelSelect(wxCommandEvent& event);
@@ -120,9 +125,7 @@ namespace Launcher {
 		bool SanityCheckLauncherUpdate();
 		void SanitizeLauncherUpdate();
 
-		bool InitializeIsaacExecutablePath();
-		bool HandleIsaacExecutableSelection(std::string const& path);
-		void OneTimeInitRepentogon();
+		bool SelectIsaacExecutablePath();
 
 		void EnableInterface(bool enable);
 

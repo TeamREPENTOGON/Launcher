@@ -39,6 +39,13 @@ public:
 	}
 
 	std::string GetIsaacExecutablePath();
+	bool HasAutomaticUpdates() const;
+	bool HasUnstableUpdates() const;
+
+	void OverrideAutomaticUpdates(bool value);
+	void OverrideUnstableUpdates(bool value);
+
+	void Invalidate();
 
 private:
 	bool Search(LauncherConfigurationLoad* result);
@@ -52,4 +59,10 @@ private:
 	int _configFileParseErrorLine = 0;
 	std::unique_ptr<INIReader> _configurationFile;
 	bool _isLoaded = false;
+
+	bool _dirtyAutomaticUpdates = false;
+	bool _dirtyUnstableUpdates = false;
+
+	bool _overrideAutomaticUpdates = false;
+	bool _overrideUnstableUpdates = false;
 };

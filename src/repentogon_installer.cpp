@@ -22,7 +22,7 @@ namespace Launcher {
 
 	RepentogonInstaller::RepentogonInstaller(Installation* installation) : _installation(installation) {
 		RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
-		if (repentogon.IsValid(false)) {
+		if (repentogon.IsValid(true)) {
 			_zhlVersion = repentogon.GetZHLVersion();
 			_loaderVersion = repentogon.GetZHLLoaderVersion();
 			_repentogonVersion = repentogon.GetRepentogonVersion();

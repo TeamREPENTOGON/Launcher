@@ -10,6 +10,8 @@ class GithubExecutor {
 public:
     static GithubExecutor& Instance();
 
+    ~GithubExecutor();
+
     void Start();
     void Stop();
 

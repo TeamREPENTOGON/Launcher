@@ -17,12 +17,17 @@ class LauncherWizard : public wxWizard {
 public:
     LauncherWizard(Launcher::Installation* installation);
 
-    void AddPages();
+    void AddPages(bool skipIntroduction);
     bool Run();
 
     void OnPageChanged(wxWizardEvent& event);
     void BeforePageChanged(wxWizardEvent& event);
     void OnIsaacExecutableSelected(wxCommandEvent& event);
+    void OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event);
+
+    inline bool WasRepentogonInstalled() const {
+        return _repentogonInstallationDone;
+    }
 
 private:
     void AddIntroductionPage();
@@ -30,6 +35,14 @@ private:
     void AddRepentogonSetupPage();
     void AddRepentogonInstallationPage();
     void AddCompletionPage();
+
+    /* Configures the widgets on the Repentogon setup page based on the
+     * the current Isaac installation and available launcher configuration.
+     * This function refreshes the values of widgets on the fly.
+     * 
+     * All widgets need to have been created and initialized.
+     */
+    void ConfigureRepentogonSetupPage();
 
     void UpdateIsaacSetupNextButton();
     void UpdateIsaacPath(std::string const& path);
@@ -78,6 +91,7 @@ private:
         wxStaticText* _installationState = nullptr;
         wxCheckBox* _unstableUpdates = nullptr;
         wxCheckBox* _autoUpdates = nullptr;
+        wxStaticText* _updateWarning = nullptr;
     } _repentogonSetup;
 
     struct {
@@ -88,6 +102,7 @@ private:
     bool _isaacFound = false;
     bool _compatibleWithRepentogon = false;
     bool _repentogonInstallationDone = false;
+    bool _dirtyUnstableUpdates = false;
     wxIcon _questionMark;
     wxBitmap _questionMarkBitmap;
 

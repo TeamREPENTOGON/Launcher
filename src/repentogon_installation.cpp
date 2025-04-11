@@ -228,3 +228,7 @@ HMODULE RepentogonInstallation::LoadLib(const char* name, LoadableDlls dll) {
 bool RepentogonInstallation::IsIsaacVersionCompatible(const char* version) {
 	return !strcmp(version, "v1.9.7.10.J212");
 }
+
+void RepentogonInstallation::Invalidate() {
+	_installationState = REPENTOGON_INSTALLATION_STATUS_NONE;
+}
