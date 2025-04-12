@@ -15,8 +15,8 @@
 namespace Github {
 	static std::atomic<uint32_t> __gitDownloadCounter = 0;
 
-	static void MonitorNotifyOnDataReceived(Threading::Monitor<GithubDownloadNotification>* monitor, uint32_t id, bool first,
-		void* data, size_t n, size_t count);
+	static void MonitorNotifyOnDataReceived(Threading::Monitor<GithubDownloadNotification>* monitor,
+		const char* name, uint32_t id, bool first, void* data, size_t n, size_t count);
 
 	static GithubDownloadNotification CreateNotification(GithubDownloadNotificationType type);
 	static GithubDownloadNotification CreateInitCurlNotification(const char* url, bool done);
@@ -24,7 +24,7 @@ namespace Github {
 	static GithubDownloadNotification CreateDoneNotification(const char* url);
 	static GithubDownloadNotification CreateParseResponseNotification(const char* url, bool done);
 
-	DownloadAsStringResult DownloadAsString(const char* url, std::string& response,
+	DownloadAsStringResult DownloadAsString(const char* url, const char* name, std::string& response,
 		DownloadMonitor* monitor) {
 		CURL* curl;
 		CURLcode curlResult;
@@ -33,7 +33,7 @@ namespace Github {
 		uint32_t id = __gitDownloadCounter.fetch_add(1, std::memory_order_acq_rel) + 1;
 
 		if (monitor) {
-			data.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor, id));
+			data.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor, name, id));
 			monitor->Push(CreateInitCurlNotification(url, false));
 		}
 
@@ -71,7 +71,7 @@ namespace Github {
 		rapidjson::Document& response,
 		DownloadMonitor* monitor) {
 		std::string stringResponse;
-		DownloadAsStringResult result = DownloadAsString(url, stringResponse, monitor);
+		DownloadAsStringResult result = DownloadAsString(url, "release info", stringResponse, monitor);
 		if (result != DOWNLOAD_AS_STRING_OK) {
 			return result;
 		}
@@ -127,7 +127,7 @@ namespace Github {
 
 		uint32_t id = ++__gitDownloadCounter;
 		if (monitor) {
-			response.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor, id));
+			response.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor, file, id));
 			monitor->Push(CreateInitCurlNotification(url, false));
 		}
 
@@ -198,9 +198,10 @@ namespace Github {
 		curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30);
 	}
 
-	void MonitorNotifyOnDataReceived(Threading::Monitor<GithubDownloadNotification>* monitor, uint32_t id, bool first,
-		void* data, size_t n, size_t count) {
+	void MonitorNotifyOnDataReceived(Threading::Monitor<GithubDownloadNotification>* monitor, const char* name,
+		uint32_t id, bool first, void* data, size_t n, size_t count) {
 		GithubDownloadNotification notification;
+		notification.name = name;
 		notification.type = GH_NOTIFICATION_DATA_RECEIVED;
 		notification.data = n * count;
 		notification.id = id;

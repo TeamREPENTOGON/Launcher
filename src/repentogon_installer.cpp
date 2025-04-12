@@ -504,7 +504,8 @@ namespace Launcher {
 			return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
 		} else {
 			std::string allReleases;
-			Github::DownloadAsStringResult allReleasesResult = Github::DownloadAsString(RepentogonReleasesURL, allReleases, nullptr);
+			Github::DownloadAsStringResult allReleasesResult = Github::DownloadAsString(RepentogonReleasesURL, 
+				"repentogon releases information", allReleases, nullptr);
 			if (allReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
 				Logger::Error("Unable to download list of all Repentogon releases: %d\n", allReleasesResult);
 				Github::DownloadMonitor monitor;

@@ -62,6 +62,7 @@ namespace Github {
 	struct GithubDownloadNotification {
 		GithubDownloadNotificationType type;
 		std::variant<std::string, size_t> data;
+		std::string name;
 		uint32_t id;
 	};
 
@@ -78,11 +79,13 @@ namespace Github {
 
 	/* Fetch the content at url and store it in response. 
 	 * 
+	 * @a name is a symbolic name used for logging purposes.
+	 * 
 	 * This function cannot return the DOWNLOAD_AS_STRING_NO_NAME or 
 	 * DOWNLOAD_AS_STRING_INVALID_JSON error codes.
 	 */
 	DownloadAsStringResult DownloadAsString(const char* url,
-		std::string& response, DownloadMonitor* monitor);
+		const char* name, std::string& response, DownloadMonitor* monitor);
 
 	/* Fetch the content at url, assuming it to describe a release, and store it
 	 * in response. 

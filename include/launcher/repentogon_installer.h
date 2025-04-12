@@ -242,7 +242,7 @@ namespace Launcher {
 						break;
 
 					case Github::GH_NOTIFICATION_DATA_RECEIVED:
-						PushFileDownloadNotification("Repentogon archive", std::get<size_t>(message->data), message->id);
+						PushFileDownloadNotification(std::move(message->name), std::get<size_t>(message->data), message->id);
 						break;
 
 					case Github::GH_NOTIFICATION_PARSE_RESPONSE:

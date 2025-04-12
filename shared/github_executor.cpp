@@ -3,7 +3,7 @@
 class GithubRequestVisitor {
 public:
     void operator()(GithubExecutor::DownloadAsStringRequest& request) {
-        request.result.set_value(Github::DownloadAsString(request.url, *request.response, request.monitor));
+        request.result.set_value(Github::DownloadAsString(request.url, request.name.c_str(), *request.response, request.monitor));
     }
 
     void operator()(GithubExecutor::DownloadFileRequest& request) {
@@ -48,9 +48,10 @@ void GithubExecutor::Stop() {
 }
 
 std::future<Github::DownloadAsStringResult> GithubExecutor::AddDownloadAsStringRequest(const char* url,
-    std::string& response, Github::DownloadMonitor* monitor) {
+    std::string&& name, std::string& response, Github::DownloadMonitor* monitor) {
     DownloadAsStringRequest request;
     request.url = url;
+    request.name = std::move(name);
     request.response = &response;
     request.monitor = monitor;
 

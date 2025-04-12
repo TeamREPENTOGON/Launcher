@@ -40,7 +40,7 @@ namespace Updater {
 	bool LauncherUpdater::DownloadUpdate(LauncherUpdateData* data) {
 		PopulateUpdateData(data);
 
-		data->_hashDownloadResult = Github::DownloadAsString(data->_hashUrl.c_str(), data->_hash, &data->_hashMonitor);
+		data->_hashDownloadResult = Github::DownloadAsString(data->_hashUrl.c_str(), "launcher update hash", data->_hash, &data->_hashMonitor);
 		data->_zipDownloadResult = Github::DownloadFile(data->_zipFileName.c_str(), data->_zipUrl.c_str(), &data->_zipMonitor);
 
 		return data->_hashDownloadResult == Github::DOWNLOAD_AS_STRING_OK &&

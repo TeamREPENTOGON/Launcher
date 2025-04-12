@@ -16,7 +16,7 @@ public:
     void Stop();
 
     std::future<Github::DownloadAsStringResult> AddDownloadAsStringRequest(const char* url,
-        std::string& response, Github::DownloadMonitor* monitor);
+        std::string&& name, std::string& response, Github::DownloadMonitor* monitor);
 
     std::future<Github::DownloadFileResult> AddDownloadFileRequest(const char* file,
         const char* url, Github::DownloadMonitor* monitor);
@@ -29,6 +29,7 @@ private:
 
     struct DownloadAsStringRequest {
         const char* url;
+        std::string name;
         std::string* response;
         Github::DownloadMonitor* monitor;
         std::promise<Github::DownloadAsStringResult> result;

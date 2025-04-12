@@ -19,7 +19,7 @@ namespace Shared {
 		Threading::Monitor<Github::GithubDownloadNotification> monitor;
 		std::string releaseString;
 		// return Github::FetchReleaseInfo(ReleasesURL, answer, &monitor);
-		Github::DownloadAsStringResult result = Github::DownloadAsString(ReleasesURL, releaseString, nullptr);
+		Github::DownloadAsStringResult result = Github::DownloadAsString(ReleasesURL, "launcher releases information", releaseString, nullptr);
 		if (result != Github::DOWNLOAD_AS_STRING_OK) {
 			return result;
 		}
