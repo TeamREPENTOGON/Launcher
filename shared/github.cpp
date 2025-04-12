@@ -30,7 +30,7 @@ namespace Github {
 		CURLcode curlResult;
 
 		CurlStringResponse data;
-		uint32_t id = ++__gitDownloadCounter;
+		uint32_t id = __gitDownloadCounter.fetch_add(1, std::memory_order_acq_rel) + 1;
 
 		if (monitor) {
 			data.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor, id));
@@ -39,7 +39,7 @@ namespace Github {
 
 		curl = curl_easy_init();
 		if (!curl) {
-			Logger::Error("CheckUpdates: error while initializing cURL session for %s\n", url);
+			Logger::Error("DownloadAsString: error while initializing cURL session for %s\n", url);
 			return DOWNLOAD_AS_STRING_BAD_CURL;
 		}
 
@@ -53,7 +53,7 @@ namespace Github {
 
 		curlResult = curl_easy_perform(curl);
 		if (curlResult != CURLE_OK) {
-			Logger::Error("CheckUpdates: %s: error while performing HTTP request to retrieve version information: "
+			Logger::Error("DownloadAsString: %s: error while performing HTTP request: "
 				"cURL error: %s", url, curl_easy_strerror(curlResult));
 			return DOWNLOAD_AS_STRING_BAD_REQUEST;
 		}
@@ -85,13 +85,13 @@ namespace Github {
 			monitor->Push(CreateParseResponseNotification(url, true));
 
 		if (response.HasParseError()) {
-			Logger::Error("CheckUpdates: %s: error while parsing HTTP response. rapidjson error code %d", url,
+			Logger::Error("FetchReleaseInfo: %s: error while parsing HTTP response. rapidjson error code %d", url,
 				response.GetParseError());
 			return Github::DOWNLOAD_AS_STRING_INVALID_JSON;
 		}
 
 		if (!response.HasMember("name")) {
-			Logger::Error("CheckUpdates: %s: malformed HTTP response: no field called \"name\"", url);
+			Logger::Error("FetchReleaseInfo: %s: malformed HTTP response: no field called \"name\"", url);
 			return Github::DOWNLOAD_AS_STRING_NO_NAME;
 		}
 
