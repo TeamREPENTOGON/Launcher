@@ -1,3 +1,4 @@
+#include "launcher/cli.h"
 #include "launcher/cancel.h"
 #include "launcher/windows/launcher.h"
 #include "launcher/log_helpers.h"
