@@ -1,4 +1,5 @@
 #include "launcher/cancel.h"
+#include "launcher/windows/launcher.h"
 #include "launcher/log_helpers.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/windows/setup_wizard.h"
@@ -26,7 +27,7 @@ EVT_WIZARD_BEFORE_PAGE_CHANGED(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::B
 EVT_CHECKBOX(LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX, LauncherWizard::OnUnstableUpdatesCheckBoxClicked)
 wxEND_EVENT_TABLE()
 
-LauncherWizard::LauncherWizard(Launcher::Installation* installation) : 
+LauncherWizard::LauncherWizard(Launcher::Installation* installation) :
     _installation(installation), _questionMark(L"wxICON_QUESTION", wxBITMAP_TYPE_ICO_RESOURCE),
     wxWizard(NULL, LAUNCHER_WIZARD_CONTROL_WIZARD, "REPENTOGON Launcher Setup") {
     _questionMarkBitmap.CopyFromIcon(_questionMark);
@@ -110,7 +111,7 @@ void LauncherWizard::AddIsaacSetupPage() {
     }
 
     wxButton* button = new wxButton(page, LAUNCHER_WIZARD_CONTROL_ISAAC_SETUP_BUTTON, "Select executable...");
-    
+
     wxSizerFlags selectionFlags = wxSizerFlags().Expand();
     selectionSizer->Add(selectedExecutableControl, selectionFlags.Proportion(1));
     selectionSizer->Add(button);
@@ -183,7 +184,7 @@ void LauncherWizard::AddRepentogonSetupPage() {
     wxSizer* automaticUpdatesSizer = new wxBoxSizer(wxHORIZONTAL);
     automaticUpdatesSizer->Add(automaticUpdates);
     wxStaticBitmap* automaticUpdatesBitmap = new wxStaticBitmap(page, wxID_ANY, _questionMarkBitmap);
-    wxToolTip* automaticUpdatesTooltip = new wxToolTip("Request the launcher to check, on startup, if a Repentogon update " 
+    wxToolTip* automaticUpdatesTooltip = new wxToolTip("Request the launcher to check, on startup, if a Repentogon update "
         "is available and prompt your for update.\n\n"
         "If not selected, you can manage Repentogon by yourself or manually request an update.");
     automaticUpdatesBitmap->SetToolTip(automaticUpdatesTooltip);
@@ -313,7 +314,7 @@ void LauncherWizard::RepentogonInstallationThread() {
     Launcher::RepentogonInstaller installer(_installation);
     auto [future, monitor] = installer.InstallLatestRepentogon(false, _repentogonSetup._unstableUpdates->GetValue());
     bool shouldContinue = true;
-    NotificationVisitor visitor(_repentogonInstallation._logText);
+    NotificationVisitor visitor(_repentogonInstallation._logText, sCLI->RepentogonInstallerRefreshRate());
     while (shouldContinue && !Launcher::CancelRequested()) {
         while (future.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
             wxASSERT(shouldContinue);
@@ -324,7 +325,7 @@ void LauncherWizard::RepentogonInstallationThread() {
 
         shouldContinue = false;
     }
-    
+
     _repentogonInstallation._logText->AppendText("Repentogon installation finished\n");
     future.get();
    _repentogonInstallationDone = true;
@@ -411,7 +412,7 @@ bool LauncherWizard::CheckRepentogonCompatibilityOnPageChange() {
     }
 
     wxMessageDialog dialog(this, "This version of Isaac is not compatible with Repentogon.\n"
-        "Do you still want to proceed with the configuration and installation of Repentogon ?", 
+        "Do you still want to proceed with the configuration and installation of Repentogon ?",
         "Incompatibility with Repentogon",
         wxYES_NO);
     int result = dialog.ShowModal();

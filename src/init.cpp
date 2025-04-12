@@ -41,16 +41,17 @@ bool Launcher::App::OnInit() {
 	Logger::Init("launcher.log", "w");
 	Externals::Init();
 
-	// Check for an available self-update.
-	// If one is initiated, the launcher should get terminated by the updater.
-	if (!Launcher::CheckForSelfUpdate(false)) {
-		MessageBoxA(NULL, "Failed check for self-update. Check the log file for more details.\n", "REPENTOGON Launcher", MB_ICONERROR);
+	sGithubExecutor->Start();
+	if (sCLI->Parse(argc, argv) > 0) {
+		Logger::Error("Syntax error while parsing command line\n");
 	}
 
-	sGithubExecutor->Start();
-	CLIParser cli;
-	if (cli.Parse(argc, argv) > 0) {
-		Logger::Error("Syntax error while parsing command line\n");
+	if (!sCLI->SkipSelfUpdate()) {
+		// Check for an available self-update.
+		// If one is initiated, the launcher should get terminated by the updater.
+		if (!Launcher::CheckForSelfUpdate(false)) {
+			MessageBoxA(NULL, "Failed check for self-update. Check the log file for more details.\n", "REPENTOGON Launcher", MB_ICONERROR);
+		}
 	}
 
 	bool configurationOk = __configuration.Load(nullptr);
@@ -60,7 +61,7 @@ bool Launcher::App::OnInit() {
 
 	bool wizardOk = false, wizardRan = false;
 	bool wizardInstalledRepentogon = false;
-	if (cli.ForceWizard() || !configurationOk || !__installation->GetIsaacInstallation().IsValid()) {
+	if (sCLI->ForceWizard() || !configurationOk || !__installation->GetIsaacInstallation().IsValid()) {
 		wizardOk = RunWizard(&wizardInstalledRepentogon);
 		wizardRan = true;
 	}
@@ -71,15 +72,15 @@ bool Launcher::App::OnInit() {
 	}
 
 	RepentogonInstallerFrame* installerFrame = nullptr;
-	/* Install Repentogon in the following cases: 
+	/* Install Repentogon in the following cases:
 	 *	a) The user requested a forced update
 	 *  b) The wizard did not run and the user requested automatic updates in the configuration
 	 *  c) The wizard ran and exited without performing an installation of Repentogon
 	 */
-	if (cli.ForceRepentogonUpdate() ||
+	if (sCLI->ForceRepentogonUpdate() ||
 		(!wizardRan && __installation->GetLauncherConfiguration()->HasAutomaticUpdates()) ||
 		(wizardRan && !wizardOk && !wizardInstalledRepentogon)) {
-		installerFrame = CreateRepentogonInstallerWindow(cli.ForceRepentogonUpdate());
+		installerFrame = CreateRepentogonInstallerWindow(sCLI->ForceRepentogonUpdate());
 	}
 
 	MainFrame* mainWindow = CreateMainWindow();

@@ -26,7 +26,14 @@ public:
         return _skipSelfUpdate;
     }
 
+    inline static CLIParser* instance() {
+        static CLIParser parser;
+        return &parser;
+    }
+
 private:
+    CLIParser();
+
     bool _forceWizard = false;
     bool _forceRepentogonUpdate = false;
     bool _repentogonInstallerWaitOnFinished = false;
@@ -42,3 +49,5 @@ private:
     /* static constexpr const char* help = "help";
     static constexpr const char* helpShort = "h"; */
 };
+
+#define sCLI CLIParser::instance()

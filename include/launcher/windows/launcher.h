@@ -62,7 +62,7 @@ namespace Launcher {
 		~MainFrame();
 
 		/* Load the configuration file and update the options accordingly.
-		 * 
+		 *
 		 * If no configuration is found, perform a "one-time setup" to get the
 		 * location of the Isaac installation.
 		 */
@@ -75,8 +75,8 @@ namespace Launcher {
 		void AddRepentogonOptions();
 		void AddVanillaOptions();
 
-		void AddLauncherConfigurationTextField(const char* intro, 
-			const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
+		void AddLauncherConfigurationTextField(const char* intro,
+			const char* buttonText, const char* emptyText, wxColour const& emptyColor,
 			wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId);
 
 		/* Initialize the IsaacOptions structure. */
@@ -90,7 +90,7 @@ namespace Launcher {
 		/* Event handlers. */
 		void OnIsaacSelectClick(wxCommandEvent& event);
 		// void OnSelectRepentogonFolderClick(wxCommandEvent& event);
-		void OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl, 
+		void OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl,
 			const char* emptyText);
 		void OnLevelSelect(wxCommandEvent& event);
 		void OnLauchModeSelect(wxCommandEvent& event);
@@ -111,7 +111,7 @@ namespace Launcher {
 		bool PromptBoolean(wxString const& message, wxString const& shortMessage);
 
 		/* Prompt the user for removal of a legacy installation.
-		 * 
+		 *
 		 * If the backend detects the presence of dsound.dll, this means we are
 		 * dealing with a legacy installation of Repentogon. Because the game
 		 * will load the DLL if it remains next to it, prompt the user on whether

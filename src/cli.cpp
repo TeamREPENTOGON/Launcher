@@ -5,6 +5,10 @@
 #include "shared/logger.h"
 #include "wx/cmdline.h"
 
+CLIParser::CLIParser() {
+
+}
+
 int CLIParser::Parse(int argc, wxChar** argv) {
     wxCmdLineParser parser(argc, argv);
     // parser.AddSwitch(helpShort, help, "Display this help", wxCMD_LINE_OPTION_HELP);

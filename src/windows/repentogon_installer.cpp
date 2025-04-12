@@ -13,7 +13,7 @@ EVT_CLOSE(RepentogonInstallerFrame::OnClose)
 wxEND_EVENT_TABLE()
 
 RepentogonInstallerFrame::RepentogonInstallerFrame(Launcher::Installation* installation,
-	bool forceUpdate) : 
+	bool forceUpdate) :
 		wxFrame(nullptr, wxID_ANY, "Repentogon updater"), _installation(installation),
 		_forceUpdate(forceUpdate) {
 
@@ -130,7 +130,7 @@ void RepentogonInstallerFrame::InstallRepentogonThread() {
 	auto [future, monitor] = installer.InstallLatestRepentogon(
 		_forceUpdate, _installation->GetLauncherConfiguration()->HasUnstableUpdates());
 	bool shouldContinue = true;
-	NotificationVisitor visitor(_logWindow);
+	NotificationVisitor visitor(_logWindow, sCLI->RepentogonInstallerRefreshRate());
 	while (shouldContinue && !_cancelRequested) {
 		while (future.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
 			while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get()) {
@@ -142,6 +142,8 @@ void RepentogonInstallerFrame::InstallRepentogonThread() {
 
 		shouldContinue = false;
 	}
+
+	visitor.NotifyAllDownloads(true);
 
 	{
 		std::unique_lock<std::mutex> lck(_logWindowMutex);
@@ -155,7 +157,8 @@ void RepentogonInstallerFrame::InstallRepentogonThread() {
 		_terminateDownload = false;
 	}
 
-	std::this_thread::sleep_for(std::chrono::seconds(2));
-	Close();
-	Hide();
+	if (!sCLI->RepentogonInstallerWait()) {
+		std::this_thread::sleep_for(std::chrono::seconds(2));
+		Close(true);
+	}
 }

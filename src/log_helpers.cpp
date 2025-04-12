@@ -1,3 +1,5 @@
+#include <chrono>
+
 #include "launcher/log_helpers.h"
 
 template<typename... Args>
@@ -16,28 +18,65 @@ void LogError(wxTextCtrl* ctrl, const char* fmt, Args&&... args) {
 	ctrl->SetForegroundColour(*wxBLACK);
 }
 
-NotificationVisitor::NotificationVisitor(wxTextCtrl* text) : _text(text) {
+NotificationVisitor::NotificationVisitor(wxTextCtrl* text, unsigned long refreshRate) :
+	_text(text), _refreshRate(refreshRate) {
 
 }
 
 void NotificationVisitor::operator()(Notifications::FileDownload const& download) {
-	if (_wasLastDownload && _lastDownloadedId == download._id) {
-		long current = _text->GetInsertionPoint();
-		long position = current - _lastDownloadedString.size();
-		_text->Remove(position, current);
-		_text->SetInsertionPoint(position);
+	auto it = _downloadData.find(download._id);
+	if (it == _downloadData.end()) {
+		auto [ insertIt, _ ] = _downloadData.emplace(std::make_pair(download._id, DownloadData()));
+		it = insertIt;
+
+		insertIt->second.filename = download._filename;
+		insertIt->second.id = download._id;
+		insertIt->second.lastLoggedSize = 0;
+		insertIt->second.size = 0;
 	}
 
-	uint32_t& downloadSize = _downloadedSizePerFile[download._id];
-	downloadSize += download._size;
+	DownloadData& downloadData = it->second;
+	downloadData.size += download._size;
 
+	NotifyDownload(downloadData, false, false);
+}
+
+void NotificationVisitor::NotifyDownload(DownloadData& data, bool ignoreRefreshRate, bool finalize) {
+	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+	if (!ignoreRefreshRate) {
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - data.last).count() < _refreshRate)
+			return;
+	}
+
+	data.last = now;
 	wxString s;
-	s.Printf("Downloading file %s (%u bytes)\n", download._filename.c_str(), downloadSize);
+	if (finalize) {
+		s.Printf("Downloaded file %s (%u bytes)\n", data.filename.c_str(), data.size);
+	} else {
+		s.Printf("Downloading file %s (%u bytes)\n", data.filename.c_str(), data.size);
+	}
+
+	/* if (_wasLastDownload && _lastDownloadedId == download._id) {
+		long current = _text->GetInsertionPoint();
+		long position = _lastInsertionPoint;
+		_text->Replace(position, current, s);
+
+		wxString lastLine = _text->GetRange(position, current);
+		if (lastLine.size() != s.size()) {
+			assert(lastLine.size() < s.size());
+			_text->AppendText(s.Right(s.size() - lastLine.size()));
+		}
+	} else {
+		_lastInsertionPoint = _text->GetInsertionPoint();
+		_text->AppendText(s);
+	} */
+
 	_text->AppendText(s);
+	data.lastLoggedSize = data.size;
 
 	_lastDownloadedString = s;
-	_lastDownloadedId = download._id;
-    _wasLastDownload = true;
+	_lastDownloadedId = data.id;
+	_wasLastDownload = true;
 }
 
 void NotificationVisitor::operator()(Notifications::FileRemoval const& removal) {
@@ -57,6 +96,16 @@ void NotificationVisitor::operator()(Notifications::GeneralNotification const& g
 		LogError(_text, "%s\n", general._text.c_str());
 	} else {
 		Log(_text, "%s\n", general._text.c_str());
+	}
+}
+
+void NotificationVisitor::NotifyAllDownloads(bool checkFreshness) {
+	for (auto& [_, data] : _downloadData) {
+		if (checkFreshness && data.lastLoggedSize == data.size) {
+			continue;
+		}
+
+		NotifyDownload(data, true, true);
 	}
 }
 
