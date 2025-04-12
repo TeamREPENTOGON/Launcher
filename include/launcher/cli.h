@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include "wx/wxchar.h"
 
 class CLIParser {
@@ -39,6 +40,38 @@ public:
         return _curlTimeout;
     }
 
+    inline bool SteamLaunch() const {
+        return _steamLaunch;
+    }
+
+    inline std::optional<std::string> const& IsaacPath() const {
+        return _isaacPath;
+    }
+
+    inline bool LuaDebug() const {
+        return _luaDebug;
+    }
+
+    inline std::optional<std::string> const& LuaHeapSize() const {
+        return _luaHeapSize;
+    }
+
+    inline bool NetworkTest() const {
+        return _networkTest;
+    }
+
+    inline std::optional<unsigned long> const& SetStage() const {
+        return _setStage;
+    }
+
+    inline std::optional<unsigned long> const& SetStageType() const {
+        return _setStageType;
+    }
+
+    inline std::optional<unsigned long> const& LoadRoom() const {
+        return _loadRoom;
+    }
+
 private:
     CLIParser();
 
@@ -51,6 +84,16 @@ private:
         static constexpr const char* skipSelfUpdate = "skip-self-update";
         static constexpr const char* curlLimit = "curl-limit";
         static constexpr const char* curlTimeout = "curl-timeout";
+
+        // Start from Steam options
+        static constexpr const char* steam = "steam";
+        static constexpr const char* isaacPath = "isaac";
+        static constexpr const char* luaDebug = "luadebug";
+        static constexpr const char* luaHeapSize = "luaheapsize";
+        static constexpr const char* networkTest = "networktest";
+        static constexpr const char* setStage = "set-stage";
+        static constexpr const char* setStageType = "set-stage-type";
+        static constexpr const char* loadRoom = "load-room";
     };
 
     bool _forceWizard = false;
@@ -60,6 +103,15 @@ private:
     unsigned long _repentogonInstallerRefreshRate = Options::_repentogonInstallerDefaultRefreshRate;
     unsigned long _curlLimit = 0;
     unsigned long _curlTimeout = 0;
+
+    bool _steamLaunch = false;
+    std::optional<std::string> _isaacPath;
+    bool _luaDebug = false;
+    std::optional<std::string> _luaHeapSize;
+    bool _networkTest = false;
+    std::optional<unsigned long> _setStage;
+    std::optional<unsigned long> _setStageType;
+    std::optional<unsigned long> _loadRoom;
 };
 
 #define sCLI CLIParser::instance()

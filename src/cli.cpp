@@ -2,6 +2,7 @@
 #include <Windows.h>
 
 #include "launcher/cli.h"
+#include "shared/filesystem.h"
 #include "shared/logger.h"
 #include "wx/cmdline.h"
 
@@ -23,22 +24,26 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::curlTimeout, "Timeout (in milliseconds) for curl transfers",
         wxCMD_LINE_VAL_NUMBER);
+    parser.AddLongSwitch(Options::steam, "Perform a Steam launch, bypassing as much of the "
+        "startup logic as possible");
+    parser.AddLongOption(Options::isaacPath, "Absolute path to the Isaac executable to start");
+    parser.AddLongSwitch(Options::luaDebug, "Enable system functions in the Lua API");
+    parser.AddLongOption(Options::luaHeapSize, "Size of the Lua heap in MB");
+    parser.AddLongSwitch(Options::networkTest, "Enable multiplayer features");
+    parser.AddLongOption(Options::setStage, "Start stage identifier",
+        wxCMD_LINE_VAL_NUMBER);
+    parser.AddLongOption(Options::setStageType, "Start stage variant identifier",
+        wxCMD_LINE_VAL_NUMBER);
+    parser.AddLongOption(Options::loadRoom, "ID of the room in which to start the run",
+        wxCMD_LINE_VAL_NUMBER);
     int result = parser.Parse();
 
     if (result > 0)
         return result;
 
-    if (parser.Found(Options::forceWizard)) {
-        _forceWizard = true;
-    }
-
-    if (parser.Found(Options::forceRepentogonUpdate)) {
-        _forceRepentogonUpdate = true;
-    }
-
-    if (parser.Found(Options::repentogonInstallerWait)) {
-        _repentogonInstallerWaitOnFinished = true;
-    }
+    _forceWizard = parser.Found(Options::forceWizard);
+    _forceRepentogonUpdate = parser.Found(Options::forceRepentogonUpdate);
+    _repentogonInstallerWaitOnFinished = parser.Found(Options::repentogonInstallerWait);
 
     long refreshRate = 0;
     if (parser.Found(Options::repentogonInstallerRefresh, &refreshRate)) {
@@ -49,9 +54,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         _repentogonInstallerRefreshRate = refreshRate;
     }
 
-    if (parser.Found(Options::skipSelfUpdate)) {
-        _skipSelfUpdate = true;
-    }
+    _skipSelfUpdate = parser.Found(Options::skipSelfUpdate);
 
     long curlSpeedLimit = 0;
     if (parser.Found(Options::curlLimit, &curlSpeedLimit)) {
@@ -65,6 +68,41 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         if (curlTimeout > 0) {
             _curlTimeout = curlTimeout;
         }
+    }
+
+    _steamLaunch = parser.Found(Options::steam);
+
+    wxString isaacPath;
+    if (parser.Found(Options::isaacPath, &isaacPath)) {
+        _isaacPath = std::move(isaacPath);
+    }
+
+    _luaDebug = parser.Found(Options::luaDebug);
+
+    wxString heapSize;
+    if (parser.Found(Options::luaHeapSize, &heapSize)) {
+        _luaHeapSize = std::move(heapSize);
+    }
+
+    _networkTest = parser.Found(Options::networkTest);
+
+    long stage;
+    if (parser.Found(Options::setStage, &stage)) {
+        if (stage >= 0) {
+            _setStage = stage;
+        }
+    }
+
+    long stageType;
+    if (parser.Found(Options::setStageType, &stageType)) {
+        if (stageType >= 0) {
+            _setStageType = stageType;
+        }
+    }
+
+    long loadRoom;
+    if (parser.Found(Options::loadRoom, &loadRoom)) {
+        _loadRoom = loadRoom;
     }
 
     return result;
