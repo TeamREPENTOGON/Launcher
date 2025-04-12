@@ -14,9 +14,10 @@ namespace Launcher {
 
 class RepentogonInstallerFrame : public wxFrame {
 public:
-    RepentogonInstallerFrame(Launcher::Installation* installation, bool forceUpdate);
+	RepentogonInstallerFrame(Launcher::Installation* installation, bool forceUpdate);
+	virtual ~RepentogonInstallerFrame();
 
-    void Initialize();
+	void Initialize();
 	void InstallRepentogon();
 	void OnClose(wxCloseEvent& event);
 

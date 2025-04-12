@@ -19,6 +19,10 @@ RepentogonInstallerFrame::RepentogonInstallerFrame(Launcher::Installation* insta
 
 }
 
+RepentogonInstallerFrame::~RepentogonInstallerFrame() {
+	wxASSERT(!_downloadThread.joinable());
+}
+
 void RepentogonInstallerFrame::Initialize() {
 	wxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 	wxTextCtrl* logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxDefaultSize,
@@ -74,7 +78,7 @@ void RepentogonInstallerFrame::OnClose(wxCloseEvent& event) {
 
 	if (_downloadInProgress) {
 		if (!_cancelRequested) {
-			if (!RequestCancel()) {
+			if (!RequestCancel() && event.CanVeto()) {
 				event.Veto();
 				return;
 			}
@@ -85,16 +89,16 @@ void RepentogonInstallerFrame::OnClose(wxCloseEvent& event) {
 		return;
 	}
 
-	/* In the unlikely case that the user is fast enough, it is possible to enter
-	 * this function from outside the context of the download thread itself.
-	 * 
-	 * This acts as a safety to ensure the download thread will not join itself
+	/* This acts as a safety to ensure the download thread will not join itself
 	 * (which is the most likely scenario).
 	 */
 	if (_downloadThread.joinable() && std::this_thread::get_id() != _downloadThread.get_id()) {
 		Logger::Info("RepentogonInstallerFrame: joining download thread\n");
 		_downloadThread.join();
 		Logger::Info("RepentogonInstallerFrame: joined download thread\n");
+	} else {
+		Logger::Warn("RepentogonInstallerFrame: detaching download thread\n");
+		_downloadThread.detach();
 	}
 
 	if (_mainFrame) {
@@ -103,6 +107,7 @@ void RepentogonInstallerFrame::OnClose(wxCloseEvent& event) {
 	}
 
 	_closing = true;
+	Destroy();
 }
 
 void RepentogonInstallerFrame::InstallRepentogon() {
