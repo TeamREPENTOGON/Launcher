@@ -205,7 +205,7 @@ namespace Launcher {
 			Logger::Error("Exception while resizing string in PushNotification");
 			return;
 		}
-		vsnprintf(s.data(), n, fmt, va);
+		vsnprintf(s.data(), n + 1, fmt, va);
 		va_end(va);
 
 		PushNotification(std::move(s), isError);
@@ -467,7 +467,7 @@ namespace Launcher {
 
 			if (fileOk) {
 				Logger::Info("RepentogonUpdater::ExtractRepentogon: successfully extracted %s to %s\n", name, outputPath.c_str());
-				PushNotification(false, "Extracting %s\n", name);
+				PushNotification(false, "Extracting %s", name);
 			}
 
 			filesState.push_back(std::make_tuple(name, fileOk));
