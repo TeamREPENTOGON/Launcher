@@ -3,6 +3,7 @@
 #include <wx/dialog.h>
 #include <wx/sizer.h>
 
+#include "launcher/cli.h"
 #include "launcher/windows/launcher.h"
 #include "launcher/windows/repentogon_installer.h"
 #include "launcher/log_helpers.h"
