@@ -133,22 +133,49 @@ void RepentogonInstallerFrame::InstallRepentogonThread() {
 	bool shouldContinue = true;
 	NotificationVisitor visitor(_logWindow, sCLI->RepentogonInstallerRefreshRate());
 	while (shouldContinue && !_cancelRequested) {
-		while (future.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
-			while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get()) {
-				// Sub-efficient, but less likely to cause a cancellation request to be missed
-				std::unique_lock<std::mutex> lck(_logWindowMutex);
-				std::visit(visitor, notification->_data);
-			}
+		if (future.wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {
+			shouldContinue = false;
 		}
 
-		shouldContinue = false;
+		while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get()) {
+			// Sub-efficient, but less likely to cause a cancellation request to be missed
+			std::unique_lock<std::mutex> lck(_logWindowMutex);
+			std::visit(visitor, notification->_data);
+		}
 	}
 
 	visitor.NotifyAllDownloads(true);
 
 	{
 		std::unique_lock<std::mutex> lck(_logWindowMutex);
-		_logWindow->AppendText("Repentogon installation done\n");
+
+		using r = Launcher::RepentogonInstaller;
+		r::DownloadInstallRepentogonResult result = future.get();
+
+		switch (result) {
+		case r::DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES:
+			_logWindow->SetForegroundColour(*wxRED);
+			_logWindow->AppendText("Error while checking availability of updates, "
+				"check the log file for more details\n");
+			break;
+
+		case r::DOWNLOAD_INSTALL_REPENTOGON_ERR:
+			_logWindow->SetForegroundColour(*wxRED);
+			_logWindow->AppendText("Error while performing the installation of Repentogon, "
+				"check the log file for more details\n");
+			break;
+
+		case r::DOWNLOAD_INSTALL_REPENTOGON_UTD:
+			_logWindow->AppendText("Repentogon is up-to-date\n");
+			break;
+
+		case r::DOWNLOAD_INSTALL_REPENTOGON_OK:
+			_logWindow->AppendText("Repentogon successfully installed\n");
+			break;
+
+		default:
+			wxASSERT(false);
+		}
 	}
 
 	{

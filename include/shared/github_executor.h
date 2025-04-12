@@ -16,13 +16,16 @@ public:
     void Stop();
 
     std::future<Github::DownloadAsStringResult> AddDownloadAsStringRequest(const char* url,
-        std::string&& name, std::string& response, Github::DownloadMonitor* monitor);
+        std::string&& name, std::string& response, Github::DownloadMonitor* monitor,
+        unsigned long limit, unsigned long timeout);
 
     std::future<Github::DownloadFileResult> AddDownloadFileRequest(const char* file,
-        const char* url, Github::DownloadMonitor* monitor);
+        const char* url, Github::DownloadMonitor* monitor, unsigned long limit,
+        unsigned long timeout);
 
     std::future<Github::DownloadAsStringResult> AddFetchReleasesRequest(const char* url,
-        rapidjson::Document& response, Github::DownloadMonitor* monitor);
+        rapidjson::Document& response, Github::DownloadMonitor* monitor, unsigned long limit,
+        unsigned long timeout);
 
 private:
     friend class GithubRequestVisitor;
@@ -31,6 +34,8 @@ private:
         const char* url;
         std::string name;
         std::string* response;
+        unsigned long limit;
+        unsigned long timeout;
         Github::DownloadMonitor* monitor;
         std::promise<Github::DownloadAsStringResult> result;
     };
@@ -38,6 +43,8 @@ private:
     struct DownloadFileRequest {
         const char* url;
         const char* file;
+        unsigned long limit;
+        unsigned long timeout;
         Github::DownloadMonitor* monitor;
         std::promise<Github::DownloadFileResult> result;
     };
@@ -45,6 +52,8 @@ private:
     struct FetchReleasesRequest {
         const char* url;
         rapidjson::Document* response;
+        unsigned long limit;
+        unsigned long timeout;
         Github::DownloadMonitor* monitor;
         std::promise<Github::DownloadAsStringResult> result;
     };

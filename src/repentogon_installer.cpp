@@ -1,6 +1,7 @@
 #include <cstdarg>
 #include <future>
 
+#include "launcher/cli.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/version.h"
 #include "shared/github_executor.h"
@@ -92,8 +93,8 @@ namespace Launcher {
 
 	RepentogonMonitor<bool> RepentogonInstaller::InstallRepentogon(
 		rapidjson::Document& release) {
-		return std::make_tuple(std::async(std::launch::async, 
-			&RepentogonInstaller::InstallRepentogonThread, this, std::ref(release)), 
+		return std::make_tuple(std::async(std::launch::async,
+			&RepentogonInstaller::InstallRepentogonThread, this, std::ref(release)),
 			&_monitor);
 	}
 
@@ -288,7 +289,8 @@ namespace Launcher {
 	bool RepentogonInstaller::DownloadRepentogon() {
 		Github::DownloadMonitor monitor;
 		std::future<Github::DownloadFileResult> hashDownload = sGithubExecutor->AddDownloadFileRequest(
-			HashName, _installationState.hashUrl.c_str(), &monitor);
+			HashName, _installationState.hashUrl.c_str(), &monitor, sCLI->CurlLimit(),
+			sCLI->CurlTimeout());
 		Github::DownloadFileResult hashResult = GithubToRepInstall<Github::DownloadFileResult>(
 			&monitor, hashDownload);
 
@@ -304,7 +306,8 @@ namespace Launcher {
 		}
 
 		std::future<Github::DownloadFileResult> zipDownload = sGithubExecutor->AddDownloadFileRequest(
-			RepentogonZipName, _installationState.zipUrl.c_str(), &monitor);
+			RepentogonZipName, _installationState.zipUrl.c_str(), &monitor, sCLI->CurlLimit(),
+			sCLI->CurlTimeout());
 		Github::DownloadFileResult zipResult = GithubToRepInstall<Github::DownloadFileResult>(
 			&monitor, zipDownload);
 
@@ -500,17 +503,18 @@ namespace Launcher {
 		if (!allowPreReleases) {
 			Github::DownloadMonitor monitor;
 			std::future<Github::DownloadAsStringResult> result = sGithubExecutor->AddFetchReleasesRequest(
-				RepentogonURL, response, &monitor);
+				RepentogonURL, response, &monitor, sCLI->CurlLimit(), sCLI->CurlTimeout());
 			return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
 		} else {
 			std::string allReleases;
-			Github::DownloadAsStringResult allReleasesResult = Github::DownloadAsString(RepentogonReleasesURL, 
-				"repentogon releases information", allReleases, nullptr);
+			Github::DownloadAsStringResult allReleasesResult = Github::DownloadAsString(RepentogonReleasesURL,
+				"repentogon releases information", allReleases, nullptr, sCLI->CurlLimit(),
+				sCLI->CurlTimeout());
 			if (allReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
 				Logger::Error("Unable to download list of all Repentogon releases: %d\n", allReleasesResult);
 				Github::DownloadMonitor monitor;
 				std::future<Github::DownloadAsStringResult> result = sGithubExecutor->AddFetchReleasesRequest(
-					RepentogonURL, response, &monitor);
+					RepentogonURL, response, &monitor, sCLI->CurlLimit(), sCLI->CurlTimeout());
 				return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
 			}
 
@@ -521,7 +525,7 @@ namespace Launcher {
 				Logger::Error("Unable to parse list of all Repentogon releases as JSON\n");
 				Github::DownloadMonitor monitor;
 				std::future<Github::DownloadAsStringResult> result = sGithubExecutor->AddFetchReleasesRequest(
-					RepentogonURL, response, &monitor);
+					RepentogonURL, response, &monitor, sCLI->CurlLimit(), sCLI->CurlTimeout());
 				return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
 			}
 
@@ -533,7 +537,7 @@ namespace Launcher {
 
 			Github::DownloadMonitor monitor;
 			std::future<Github::DownloadAsStringResult> result = sGithubExecutor->AddFetchReleasesRequest(
-				releases[0]["url"].GetString(), response, &monitor);
+				releases[0]["url"].GetString(), response, &monitor, sCLI->CurlLimit(), sCLI->CurlTimeout());
 			return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
 		}
 	}
