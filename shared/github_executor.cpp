@@ -2,19 +2,17 @@
 
 class GithubRequestVisitor {
 public:
-    void operator()(GithubExecutor::DownloadAsStringRequest& request) {
-        request.result.set_value(Github::DownloadAsString(request.url, request.name.c_str(),
-            *request.response, request.monitor, request.limit));
+    void operator()(GithubExecutor::DownloadAsStringRequest& r) {
+        r.result.set_value(Github::DownloadAsString(r.request, r.name.c_str(),
+            *r.response, r.monitor));
     }
 
-    void operator()(GithubExecutor::DownloadFileRequest& request) {
-        request.result.set_value(Github::DownloadFile(request.file, request.url, request.monitor,
-            request.limit));
+    void operator()(GithubExecutor::DownloadFileRequest& r) {
+        r.result.set_value(Github::DownloadFile(r.file, r.request, r.monitor));
     }
 
-    void operator()(GithubExecutor::FetchReleasesRequest& request) {
-        request.result.set_value(Github::FetchReleaseInfo(request.url, *request.response, request.monitor,
-            request.limit));
+    void operator()(GithubExecutor::FetchReleasesRequest& r) {
+        r.result.set_value(Github::FetchReleaseInfo(r.request, *r.response, r.monitor));
     }
 };
 
@@ -50,47 +48,40 @@ void GithubExecutor::Stop() {
     _stop.store(true, std::memory_order_release);
 }
 
-std::future<Github::DownloadAsStringResult> GithubExecutor::AddDownloadAsStringRequest(const char* url,
-    std::string&& name, std::string& response, Github::DownloadMonitor* monitor,
-    unsigned long limit, unsigned long timeout) {
-    DownloadAsStringRequest request;
-    request.url = url;
-    request.name = std::move(name);
-    request.limit = limit;
-    request.timeout = timeout;
-    request.response = &response;
-    request.monitor = monitor;
+std::future<Github::DownloadAsStringResult> GithubExecutor::AddDownloadAsStringRequest(
+    CURLRequest const& request, std::string&& name, std::string& response,
+    Github::DownloadMonitor* monitor) {
+    DownloadAsStringRequest r;
+    r.request = request;
+    r.name = std::move(name);
+    r.response = &response;
+    r.monitor = monitor;
 
-    std::future<Github::DownloadAsStringResult> result = request.result.get_future();
-    _requests.Push(std::move(request));
+    std::future<Github::DownloadAsStringResult> result = r.result.get_future();
+    _requests.Push(std::move(r));
     return result;
 }
 
 std::future<Github::DownloadFileResult> GithubExecutor::AddDownloadFileRequest(const char* file,
-    const char* url, Github::DownloadMonitor* monitor, unsigned long limit, unsigned long timeout) {
-    DownloadFileRequest request;
-    request.file = file;
-    request.url = url;
-    request.limit = limit;
-    request.timeout = timeout;
-    request.monitor = monitor;
+    CURLRequest const& request, Github::DownloadMonitor* monitor) {
+    DownloadFileRequest r;
+    r.request = request;
+    r.file = file;
+    r.monitor = monitor;
 
-    std::future<Github::DownloadFileResult> result = request.result.get_future();
-    _requests.Push(std::move(request));
+    std::future<Github::DownloadFileResult> result = r.result.get_future();
+    _requests.Push(std::move(r));
     return result;
 }
 
-std::future<Github::DownloadAsStringResult> GithubExecutor::AddFetchReleasesRequest(const char* url,
-    rapidjson::Document& response, Github::DownloadMonitor* monitor, unsigned long limit,
-    unsigned long timeout) {
-    FetchReleasesRequest request;
-    request.url = url;
-    request.response = &response;
-    request.limit = limit;
-    request.timeout = timeout;
-    request.monitor = monitor;
+std::future<Github::DownloadAsStringResult> GithubExecutor::AddFetchReleasesRequest(
+    CURLRequest const& request, rapidjson::Document& response, Github::DownloadMonitor* monitor) {
+    FetchReleasesRequest r;
+    r.request = request;
+    r.response = &response;
+    r.monitor = monitor;
 
-    std::future<Github::DownloadAsStringResult> result = request.result.get_future();
-    _requests.Push(std::move(request));
+    std::future<Github::DownloadAsStringResult> result = r.result.get_future();
+    _requests.Push(std::move(r));
     return result;
 }

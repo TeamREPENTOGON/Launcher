@@ -19,7 +19,11 @@ namespace Updater {
 	}
 
 	UpdateStartupCheckResult LauncherUpdater::DoStartupCheck() {
-		_releaseDownloadResult = Github::FetchReleaseInfo(_url.c_str(), _releaseInfo, nullptr);
+		CURLRequest request;
+		request.maxSpeed = request.timeout = request.serverTimeout = 0;
+		request.url = _url;
+
+		_releaseDownloadResult = Github::FetchReleaseInfo(request, _releaseInfo, nullptr);
 		if (_releaseDownloadResult != Github::DOWNLOAD_AS_STRING_OK) {
 			return UPDATE_STARTUP_CHECK_CANNOT_FETCH_RELEASE;
 		}
@@ -39,9 +43,13 @@ namespace Updater {
 
 	bool LauncherUpdater::DownloadUpdate(LauncherUpdateData* data) {
 		PopulateUpdateData(data);
+		CURLRequest request;
+		request.maxSpeed = request.serverTimeout = request.timeout = 0;
+		request.url = data->_hashUrl;
 
-		data->_hashDownloadResult = Github::DownloadAsString(data->_hashUrl.c_str(), "launcher update hash", data->_hash, &data->_hashMonitor);
-		data->_zipDownloadResult = Github::DownloadFile(data->_zipFileName.c_str(), data->_zipUrl.c_str(), &data->_zipMonitor);
+		data->_hashDownloadResult = Github::DownloadAsString(request, "launcher update hash", data->_hash, &data->_hashMonitor);
+		request.url = data->_zipUrl;
+		data->_zipDownloadResult = Github::DownloadFile(data->_zipFileName.c_str(), request, &data->_zipMonitor);
 
 		return data->_hashDownloadResult == Github::DOWNLOAD_AS_STRING_OK &&
 			data->_zipDownloadResult == Github::DOWNLOAD_FILE_OK;

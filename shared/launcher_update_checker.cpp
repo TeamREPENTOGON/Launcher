@@ -19,7 +19,10 @@ namespace Shared {
 		Threading::Monitor<Github::GithubDownloadNotification> monitor;
 		std::string releaseString;
 		// return Github::FetchReleaseInfo(ReleasesURL, answer, &monitor);
-		Github::DownloadAsStringResult result = Github::DownloadAsString(ReleasesURL, "launcher releases information", releaseString, nullptr);
+		CURLRequest request;
+		request.maxSpeed = request.serverTimeout = request.timeout = 0;
+		request.url = ReleasesURL;
+		Github::DownloadAsStringResult result = Github::DownloadAsString(request, "launcher releases information", releaseString, nullptr);
 		if (result != Github::DOWNLOAD_AS_STRING_OK) {
 			return result;
 		}
@@ -47,7 +50,7 @@ namespace Shared {
 
 		rapidjson::Document& releases = _releasesInfo;
 		_hasRelease = true;
-		
+
 		return SelectTargetRelease(releases, allowDrafts, force, version, url) && strcmp(::Launcher::version, version.c_str());
 	}
 
