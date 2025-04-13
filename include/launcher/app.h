@@ -10,6 +10,8 @@ namespace Launcher {
 	public:
 		bool OnInit() override;
 		int OnExit() override;
+
+	private:
 		bool RunWizard(bool* installedRepentogon);
 		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(bool forceUpdate);
 		MainFrame* CreateMainWindow();

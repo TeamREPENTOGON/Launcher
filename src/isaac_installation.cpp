@@ -105,7 +105,7 @@ bool IsaacInstallation::Validate(std::string const& sourcePath) {
 		Logger::Error("Installation::Validate: unable to get version of executable\n");
 		return false;
 	}
-	
+
 	_version = std::move(*version);
 	_exePath = path;
 	std::filesystem::path fsPath(path);

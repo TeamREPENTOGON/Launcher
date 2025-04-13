@@ -56,18 +56,31 @@ bool Launcher::App::OnInit() {
 	}
 
 	bool configurationOk = __configuration.Load(nullptr, sCLI->ConfigurationPath());
+	if (!configurationOk) {
+		Logger::Warn("Unable to load configuration file, starting wizard\n");
+	}
 
 	__installation = new Installation(&__nopLogGUI, &__configuration);
-	__installation->Initialize();
+	__installation->Initialize(sCLI->IsaacPath());
 
 	bool wizardOk = false, wizardRan = false;
 	bool wizardInstalledRepentogon = false;
-	if (sCLI->ForceWizard() || !configurationOk || !__installation->GetIsaacInstallation().IsValid()) {
+	bool isIsaacValid = __installation->GetIsaacInstallation().IsValid();
+	if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid) {
+		if (sCLI->ForceWizard()) {
+			Logger::Info("Force starting wizard due to command-line\n");
+		} else if (!isIsaacValid) {
+			Logger::Info("Starting wizard as no valid Isaac installation has been found\n");
+		}
+
 		wizardOk = RunWizard(&wizardInstalledRepentogon);
 		wizardRan = true;
 	}
 
 	if (!__installation->GetIsaacInstallation().IsValid()) {
+		wxMessageBox("The launcher was not able to find any valid Isaac installation.\n"
+			"Either check your Steam installation, or provide the path to the executable through the --isaac option.",
+			"Fatal error", wxOK | wxICON_EXCLAMATION);
 		Logger::Fatal("No valid Isaac installation found\n");
 		return false;
 	}
