@@ -61,7 +61,7 @@ bool Launcher::App::OnInit() {
 	}
 
 	__installation = new Installation(&__nopLogGUI, &__configuration);
-	__installation->Initialize(sCLI->IsaacPath());
+	auto [isaacPath, repentogonOk] = __installation->Initialize(sCLI->IsaacPath());
 
 	bool wizardOk = false, wizardRan = false;
 	bool wizardInstalledRepentogon = false;
@@ -86,19 +86,33 @@ bool Launcher::App::OnInit() {
 	}
 
 	RepentogonInstallerFrame* installerFrame = nullptr;
+	MainFrame* mainWindow = CreateMainWindow();
+
 	/* Install Repentogon in the following cases:
 	 *	a) The user requested a forced update
-	 *  b) The wizard did not run and the user requested automatic updates in the configuration
+	 *  b) The wizard did not run and the user requested automatic updates in the configuration,
+	 * or there is no installation of Repentogon available
 	 *  c) The wizard ran and exited without performing an installation of Repentogon
 	 */
-	if (sCLI->ForceRepentogonUpdate() ||
-		(!wizardRan && __installation->GetLauncherConfiguration()->HasAutomaticUpdates()) ||
-		(wizardRan && !wizardOk && !wizardInstalledRepentogon)) {
-		installerFrame = CreateRepentogonInstallerWindow(sCLI->ForceRepentogonUpdate());
-	}
+	bool forcedUpdate = sCLI->ForceRepentogonUpdate();
+	bool wizardLess = !wizardRan && (!repentogonOk || __installation->GetLauncherConfiguration()->HasAutomaticUpdates());
+	bool wizardFull = wizardRan && !wizardOk && !wizardInstalledRepentogon;
 
-	MainFrame* mainWindow = CreateMainWindow();
-	if (installerFrame) {
+	if (forcedUpdate || wizardLess || wizardFull) {
+		if (forcedUpdate) {
+			Logger::Info("Forcibly updating Repentogon\n");
+		} else if (wizardLess) {
+			if (!repentogonOk) {
+				Logger::Info("Installing Repentogon: wizard was skipped and Isaac installation "
+					"contains no valid Repentogon installation\n");
+			} else {
+				Logger::Info("Updating Repentogon due to auto-updates\n");
+			}
+		} else {
+			Logger::Info("Installing Repentogon: wizard was exited without installing Repentogon\n");
+		}
+
+		installerFrame = CreateRepentogonInstallerWindow(sCLI->ForceRepentogonUpdate());
 		installerFrame->SetMainFrame(mainWindow);
 		installerFrame->InstallRepentogon();
 		installerFrame->Show();
