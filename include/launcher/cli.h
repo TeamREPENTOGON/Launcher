@@ -40,6 +40,10 @@ public:
         return _curlTimeout;
     }
 
+    inline unsigned long CurlConnectTimeout() const {
+        return _curlConnectTimeout;
+    }
+
     inline bool SteamLaunch() const {
         return _steamLaunch;
     }
@@ -84,6 +88,7 @@ private:
         static constexpr const char* skipSelfUpdate = "skip-self-update";
         static constexpr const char* curlLimit = "curl-limit";
         static constexpr const char* curlTimeout = "curl-timeout";
+        static constexpr const char* curlConnectTimeout = "curl-connect-timeout";
 
         // Start from Steam options
         static constexpr const char* steam = "steam";
@@ -103,6 +108,7 @@ private:
     unsigned long _repentogonInstallerRefreshRate = Options::_repentogonInstallerDefaultRefreshRate;
     unsigned long _curlLimit = 0;
     unsigned long _curlTimeout = 0;
+    unsigned long _curlConnectTimeout = 0;
 
     bool _steamLaunch = false;
     std::optional<std::string> _isaacPath;

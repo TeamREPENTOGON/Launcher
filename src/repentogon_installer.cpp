@@ -291,7 +291,7 @@ namespace Launcher {
 		CURLRequest request;
 		request.maxSpeed = sCLI->CurlLimit();
 		request.timeout = sCLI->CurlTimeout();
-		request.serverTimeout = 0;
+		request.serverTimeout = sCLI->CurlConnectTimeout();
 		request.url = _installationState.hashUrl;
 
 		std::future<Github::DownloadFileResult> hashDownload = sGithubExecutor->AddDownloadFileRequest(
@@ -508,7 +508,7 @@ namespace Launcher {
 		CURLRequest request;
 		request.maxSpeed = sCLI->CurlLimit();
 		request.timeout = sCLI->CurlTimeout();
-		request.serverTimeout = 0;
+		request.serverTimeout = sCLI->CurlConnectTimeout();
 
 		if (!allowPreReleases) {
 			Github::DownloadMonitor monitor;

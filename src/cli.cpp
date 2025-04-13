@@ -24,6 +24,9 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::curlTimeout, "Timeout (in milliseconds) for curl transfers",
         wxCMD_LINE_VAL_NUMBER);
+    parser.AddLongOption(Options::curlConnectTimeout, "Timeout (in milliseconds) when curl opens a connection",
+        wxCMD_LINE_VAL_NUMBER);
+
     parser.AddLongSwitch(Options::steam, "Perform a Steam launch, bypassing as much of the "
         "startup logic as possible");
     parser.AddLongOption(Options::isaacPath, "Absolute path to the Isaac executable to start");
@@ -67,6 +70,13 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     if (parser.Found(Options::curlTimeout, &curlTimeout)) {
         if (curlTimeout > 0) {
             _curlTimeout = curlTimeout;
+        }
+    }
+
+    long curlConnectTimeout = 0;
+    if (parser.Found(Options::curlConnectTimeout, &curlConnectTimeout)) {
+        if (curlConnectTimeout > 0) {
+            _curlConnectTimeout = curlConnectTimeout;
         }
     }
 
