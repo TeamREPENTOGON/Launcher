@@ -33,17 +33,6 @@ namespace Launcher {
 		WINDOW_BUTTON_ADVANCED_OPTIONS
 	};
 
-	class MainFrame;
-
-	class App : public wxApp {
-	public:
-		bool OnInit() override;
-		int OnExit() override;
-		bool RunWizard(bool* installedRepentogon);
-		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(bool forceUpdate);
-		MainFrame* CreateMainWindow();
-	};
-
 	class AdvancedOptionsWindow;
 
 	class MainFrame : public wxFrame {

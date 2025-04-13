@@ -1,4 +1,5 @@
 #include "shared/externals.h"
+#include "launcher/app.h"
 #include "launcher/cli.h"
 #include "launcher/installation.h"
 #include "launcher/launcher_self_update.h"
