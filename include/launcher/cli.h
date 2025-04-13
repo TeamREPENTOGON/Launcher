@@ -76,6 +76,10 @@ public:
         return _loadRoom;
     }
 
+    inline std::optional<std::string> const& ConfigurationPath() const {
+        return _configurationPath;
+    }
+
 private:
     CLIParser();
 
@@ -89,6 +93,7 @@ private:
         static constexpr const char* curlLimit = "curl-limit";
         static constexpr const char* curlTimeout = "curl-timeout";
         static constexpr const char* curlConnectTimeout = "curl-connect-timeout";
+        static constexpr const char* configurationPath = "configuration-file";
 
         // Start from Steam options
         static constexpr const char* steam = "steam";
@@ -109,6 +114,7 @@ private:
     unsigned long _curlLimit = 0;
     unsigned long _curlTimeout = 0;
     unsigned long _curlConnectTimeout = 0;
+    std::optional<std::string> _configurationPath;
 
     bool _steamLaunch = false;
     std::optional<std::string> _isaacPath;

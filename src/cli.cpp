@@ -26,6 +26,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::curlConnectTimeout, "Timeout (in milliseconds) when curl opens a connection",
         wxCMD_LINE_VAL_NUMBER);
+    parser.AddLongOption(Options::configurationPath, "Path to the configuration file");
 
     parser.AddLongSwitch(Options::steam, "Perform a Steam launch, bypassing as much of the "
         "startup logic as possible");
@@ -78,6 +79,11 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         if (curlConnectTimeout > 0) {
             _curlConnectTimeout = curlConnectTimeout;
         }
+    }
+
+    wxString configurationPath;
+    if (parser.Found(Options::configurationPath, &configurationPath)) {
+        _configurationPath = configurationPath;
     }
 
     _steamLaunch = parser.Found(Options::steam);

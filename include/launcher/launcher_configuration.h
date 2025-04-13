@@ -29,7 +29,7 @@ public:
 		return _isLoaded;
 	}
 
-    bool Load(LauncherConfigurationLoad* result);
+    bool Load(LauncherConfigurationLoad* result, std::optional<std::string> const& path);
 	inline INIReader* GetReader() const {
 		return _configurationFile.get();
 	}
@@ -50,6 +50,8 @@ public:
 private:
 	bool Search(LauncherConfigurationLoad* result);
 	bool Process(LauncherConfigurationLoad* result);
+	bool CheckConfigurationFileExists(LauncherConfigurationLoad* result,
+		std::string const& path);
 
 	/* Path to the folder containing the configuration of the launcher. */
 	std::string _configurationPath;

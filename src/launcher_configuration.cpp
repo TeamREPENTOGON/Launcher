@@ -14,10 +14,20 @@ LauncherConfiguration::LauncherConfiguration() {
 
 }
 
-bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult) {
-    if (!Search(outResult)) {
-        return false;
-    }
+bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult,
+	std::optional<std::string> const& path) {
+	if (!path) {
+		if (!Search(outResult)) {
+			return false;
+		}
+	} else {
+		if (!CheckConfigurationFileExists(outResult, *path)) {
+			Logger::Error("Configuration file %s does not exist\n", path->c_str());
+			return false;
+		}
+
+		_configurationPath = *path;
+	}
 
 	if (!Process(outResult)) {
 		return false;
@@ -55,7 +65,6 @@ bool LauncherConfiguration::Search(LauncherConfigurationLoad* outResult) {
 
 	std::string path(homeDirectory);
 	path += "\\Documents\\My Games\\";
-
 	if (!Filesystem::FolderExists(path.c_str())) {
 		if (!Filesystem::CreateFileHierarchy(path.c_str(), "\\")) {
 
@@ -64,18 +73,13 @@ bool LauncherConfiguration::Search(LauncherConfigurationLoad* outResult) {
 			return false;
 		}
 	}
-
 	path += launcherConfigFile;
-	_configurationPath = std::move(path);
 
-	if (!Filesystem::FileExists(_configurationPath.c_str())) {
-		Logger::Info("No launcher configuration file found in My Games\n");
-
-		if (outResult)
-			*outResult = LAUNCHER_CONFIGURATION_LOAD_NOT_FOUND;
+	if (!CheckConfigurationFileExists(outResult, path)) {
 		return false;
 	}
 
+	_configurationPath = std::move(path);
 	Logger::Info("Found launcher configuration file %s\n", _configurationPath.c_str());
 	return true;
 }
@@ -103,6 +107,19 @@ bool LauncherConfiguration::Process(LauncherConfigurationLoad* outResult) {
 
 	Logger::Info("Successfully opened and parsed launcher configuration file %s\n", _configurationPath.c_str());
 	_configurationFile = std::move(reader);
+	return true;
+}
+
+bool LauncherConfiguration::CheckConfigurationFileExists(LauncherConfigurationLoad* result,
+	std::string const& path) {
+	if (!Filesystem::FileExists(path.c_str())) {
+		Logger::Info("Launcher configuration file %s does not exist\n", path.c_str());
+
+		if (result)
+			*result = LAUNCHER_CONFIGURATION_LOAD_NOT_FOUND;
+		return false;
+	}
+
 	return true;
 }
 

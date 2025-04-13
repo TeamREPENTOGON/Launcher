@@ -54,7 +54,7 @@ bool Launcher::App::OnInit() {
 		}
 	}
 
-	bool configurationOk = __configuration.Load(nullptr);
+	bool configurationOk = __configuration.Load(nullptr, sCLI->ConfigurationPath());
 
 	__installation = new Installation(&__nopLogGUI, &__configuration);
 	__installation->Initialize();
