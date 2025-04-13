@@ -395,8 +395,12 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 		}
 	}
 
-	// Rename the existing updater exe so that we can write the new one.
-	// Make a copy too just in case an error occurs, we wouldn't want to leave the user with no updater exe.
+	// The updater cannot directly overwrite its own currently-running exe with the new one from the update.
+	// To get around this, we do the following:
+	//   1. Rename the existing exe as `exe.bak`. Windows lets us rename a file thats in use, but the file remains locked until this program ends.
+	//   2. Make a copy of the existing exe under the original name, just in case we encounter an error during unpacking and can't write the new exe.
+	// So the result of this is that the running exe has been renamed as `exe.bak` (and is still locked by windows),
+	// AND we have a copy under the original name (which is not locked and can be overwritten).
 	if (std::filesystem::exists(Updater::UpdaterExeFilename)) {
 		std::filesystem::rename(Updater::UpdaterExeFilename, Updater::RenamedUpdaterExeFilename);
 		std::filesystem::copy(Updater::RenamedUpdaterExeFilename, Updater::UpdaterExeFilename);
