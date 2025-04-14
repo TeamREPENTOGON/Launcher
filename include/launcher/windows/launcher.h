@@ -12,8 +12,8 @@
 #endif
 
 #include "curl/curl.h"
-#include "launcher/configuration.h"
 #include "launcher/installation.h"
+#include "launcher/launcher_configuration.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/widgets/text_ctrl_log_widget.h"
 #include "launcher/windows/repentogon_installer.h"

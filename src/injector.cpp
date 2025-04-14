@@ -12,7 +12,8 @@
 
 #include <wx/wx.h>
 
-#include "launcher/configuration.h"
+#include "launcher/app.h"
+#include "launcher/launcher_configuration.h"
 #include "launcher/loader.h"
 
 #include "shared/externals.h"
@@ -77,8 +78,10 @@ DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* 
 	GenerateCLI(configuration, isLegacy, cli);
 
 	std::filesystem::path filepath(path);
-	std::filesystem::path parent = filepath.parent_path();
-	const char* currentDirectory = parent.string().c_str();
+	std::filesystem::path parentPath = filepath.parent_path();
+	std::string parent = parentPath.string();
+	const char* currentDirectory = parent.c_str();
+
 	Logger::Info("Creating process with path %s, lpCurrentDirectory = %s\n", path, currentDirectory);
 
 	DWORD result = CreateProcessA(path, cli, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, filepath.parent_path().string().c_str(), &startupInfo, processInfo);

@@ -7,7 +7,6 @@
 #include "shared/filesystem.h"
 #include "shared/logger.h"
 
-#include "launcher/configuration.h"
 #include "launcher/launcher_configuration.h"
 
 using namespace Configuration;
