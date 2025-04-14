@@ -18,61 +18,63 @@
 #include "shared/externals.h"
 #include "shared/logger.h"
 
-/* Perform the early setup for the injection: create the Isaac process, 
- * allocate memory for the remote thread function etc. 
- * 
+/* Perform the early setup for the injection: create the Isaac process,
+ * allocate memory for the remote thread function etc.
+ *
  * No extra thread is created in the process. ImGui should be initialized
  * afterwards to setup the injector, and then the remote thread can be
  * created.
- * 
+ *
  * Return true of the initialization was sucessful, false otherwise.
  */
-static int FirstStageInit(const char* path, bool isLegacy, struct Launcher::IsaacOptions const* options, HANDLE* process, void** page,
-	size_t* functionOffset, size_t* paramOffset, PROCESS_INFORMATION* processInfo);
+static int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const* configuration,
+	HANDLE* process, void** page, size_t* functionOffset, size_t* paramOffset,
+	PROCESS_INFORMATION* processInfo);
 
-static void GenerateCLI(const struct Launcher::IsaacOptions* options, bool isLegacy, char cli[256]);
+static void GenerateCLI(LauncherConfiguration const* configuration, bool isLegacy, char cli[256]);
 
-void GenerateCLI(const struct Launcher::IsaacOptions* options, bool isLegacy, char cli[256]) {
+void GenerateCLI(LauncherConfiguration const* configuration, bool isLegacy, char cli[256]) {
 	memset(cli, 0, sizeof(cli));
 
-	if (options->luaDebug) {
+	if (configuration->LuaDebug()) {
 		strcat(cli, "--luadebug ");
 	}
 
-	if (options->levelStage) {
+	if (configuration->Stage()) {
 		strcat(cli, "--set-stage=");
 		char buffer[13]; // 11 chars for a max int (including sign) + 1 char for space + 1 char for '\0'
-		sprintf(buffer, "%d ", options->levelStage);
+		sprintf(buffer, "%d ", configuration->Stage());
 		strcat(cli, buffer);
 	}
 
-	if (options->stageType) {
+	if (configuration->StageType()) {
 		strcat(cli, "--set-stage-type=");
 		char buffer[13]; // 11 chars for a max int (including sign) + 1 char for space + 1 char for '\0'
-		sprintf(buffer, "%d ", options->stageType);
+		sprintf(buffer, "%d ", configuration->StageType());
 		strcat(cli, buffer);
 	}
 
-	if (options->luaHeapSize) {
+	if (!configuration->LuaHeapSize().empty()) {
 		strcat(cli, "--luaheapsize=");
 		char buffer[14];
-		sprintf(buffer, "%dM ", options->luaHeapSize);
+		sprintf(buffer, "%14s ", configuration->LuaHeapSize().c_str());
 		strcat(cli, buffer);
 	}
 
-	if (isLegacy && options->mode == Launcher::LAUNCH_MODE_VANILLA) {
+	if (isLegacy && configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA) {
 		strcat(cli, "-repentogonoff ");
 	}
 }
 
-DWORD CreateIsaac(const char* path, bool isLegacy, struct Launcher::IsaacOptions const* options, PROCESS_INFORMATION* processInfo) {
+DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* configuration,
+	PROCESS_INFORMATION* processInfo) {
 	STARTUPINFOA startupInfo;
 	memset(&startupInfo, 0, sizeof(startupInfo));
 
 	memset(processInfo, 0, sizeof(*processInfo));
 
 	char cli[256];
-	GenerateCLI(options, isLegacy, cli);
+	GenerateCLI(configuration, isLegacy, cli);
 
 	std::filesystem::path filepath(path);
 	std::filesystem::path parent = filepath.parent_path();
@@ -91,7 +93,9 @@ DWORD CreateIsaac(const char* path, bool isLegacy, struct Launcher::IsaacOptions
 }
 
 // #pragma code_seg(push, r1, ".trampo")
-int UpdateMemory(struct Launcher::IsaacOptions const* options, HANDLE process, PROCESS_INFORMATION const* processInfo, void** page, size_t* functionOffset, size_t* paramOffset) {
+int UpdateMemory(LauncherConfiguration const* configuration, HANDLE process,
+	PROCESS_INFORMATION const* processInfo, void** page, size_t* functionOffset,
+	size_t* paramOffset) {
 	HMODULE self = GetModuleHandle(NULL);
 	PIMAGE_NT_HEADERS ntHeaders = ImageNtHeader(self);
 	char* base = (char*)&(ntHeaders->OptionalHeader);
@@ -125,9 +129,9 @@ int UpdateMemory(struct Launcher::IsaacOptions const* options, HANDLE process, P
 	data.loadLibraryA = LOAD_CAST(LoadLibraryA);
 #undef LOAD_CAST
 	data.InitializeStringTable();
-	data.withConsole = options->console;
+	data.withConsole = configuration->RepentogonConsole();
 
-	/* Allocate enough space to copy the entire section containing the function 
+	/* Allocate enough space to copy the entire section containing the function
 	 * and add enough room to copy an instance of LoaderData.
 	 */
 	void* remotePage = VirtualAllocEx(process, NULL, headers->Misc.VirtualSize + sizeof(LoaderData), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
@@ -172,14 +176,15 @@ int UpdateMemory(struct Launcher::IsaacOptions const* options, HANDLE process, P
 }
 // #pragma code_seg(pop, r1)
 
-int FirstStageInit(const char* path, bool isLegacy, struct Launcher::IsaacOptions const* options, HANDLE* outProcess, void** page,
-	size_t* functionOffset, size_t* paramOffset, PROCESS_INFORMATION* processInfo) {
+int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const* configuration,
+	HANDLE* outProcess, void** page, size_t* functionOffset, size_t* paramOffset,
+	PROCESS_INFORMATION* processInfo) {
 	Logger::Info("Starting injector\n");
-	DWORD processId = CreateIsaac(path, isLegacy, options, processInfo);
+	DWORD processId = CreateIsaac(path, isLegacy, configuration, processInfo);
 	if (processId == -1) {
 		return -1;
 	}
-	
+
 	HANDLE process = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
 		FALSE, processInfo->dwProcessId);
 	if (!process) {
@@ -189,20 +194,20 @@ int FirstStageInit(const char* path, bool isLegacy, struct Launcher::IsaacOption
 		Logger::Info("Acquired handle to isaac-ng.exe, process ID = %d\n", processInfo->dwProcessId);
 	}
 
-	if (options->mode == Launcher::LAUNCH_MODE_REPENTOGON) {
-		if (UpdateMemory(options, process, processInfo, page, functionOffset, paramOffset)) {
+	if (configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
+		if (UpdateMemory(configuration, process, processInfo, page, functionOffset, paramOffset)) {
 			return -1;
 		}
 	}
 
 	*outProcess = process;
-	
+
 	return 0;
 }
 
 int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_t paramOffset) {
-	HANDLE remoteThread = CreateRemoteThread(process, NULL, 0, 
-		(LPTHREAD_START_ROUTINE)((char*)remotePage + functionOffset), 
+	HANDLE remoteThread = CreateRemoteThread(process, NULL, 0,
+		(LPTHREAD_START_ROUTINE)((char*)remotePage + functionOffset),
 		(char*)remotePage + paramOffset, 0, NULL);
 	if (!remoteThread) {
 		Logger::Error("Error while creating remote thread: %d\n", GetLastError());
@@ -234,18 +239,19 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	return 0;
 }
 
-int Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy, Launcher::IsaacOptions const& options) {
+int Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
+	LauncherConfiguration const* configuration) {
 	HANDLE process;
 	void* remotePage;
 	size_t functionOffset, paramOffset;
 	PROCESS_INFORMATION processInfo;
 
-	if (FirstStageInit(path, isLegacy, &options, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
+	if (FirstStageInit(path, isLegacy, configuration, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
 		gui->LogError("Low level error encountered while starting the game, check log files\n");
 		return -1;
 	}
 
-	if (options.mode == Launcher::LAUNCH_MODE_REPENTOGON) {
+	if (configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
 		if (CreateAndWait(process, remotePage, functionOffset, paramOffset)) {
 			gui->LogError("Error encountered while injecting Repentogon, check log files\n");
 			return -1;

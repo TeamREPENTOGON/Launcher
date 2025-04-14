@@ -38,7 +38,7 @@ namespace Launcher {
 		}
 
 		if (_launcherConfiguration->Loaded()) {
-			std::string result = _launcherConfiguration->GetIsaacExecutablePath();
+			std::string result = _launcherConfiguration->IsaacExecutablePath();
 			if (_isaacInstallation.Validate(result)) {
 				return result;
 			} else {

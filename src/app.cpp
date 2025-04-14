@@ -34,7 +34,7 @@ RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(bool fo
 }
 
 Launcher::MainFrame* Launcher::App::CreateMainWindow() {
-	MainFrame* frame = new MainFrame(__installation);
+	MainFrame* frame = new MainFrame(__installation, &__configuration);
 	return frame;
 }
 
@@ -95,7 +95,7 @@ bool Launcher::App::OnInit() {
 	 *  c) The wizard ran and exited without performing an installation of Repentogon
 	 */
 	bool forcedUpdate = sCLI->ForceRepentogonUpdate();
-	bool wizardLess = !wizardRan && (!repentogonOk || __installation->GetLauncherConfiguration()->HasAutomaticUpdates());
+	bool wizardLess = !wizardRan && (!repentogonOk || __installation->GetLauncherConfiguration()->AutomaticUpdates());
 	bool wizardFull = wizardRan && !wizardOk && !wizardInstalledRepentogon;
 
 	if (forcedUpdate || wizardLess || wizardFull) {

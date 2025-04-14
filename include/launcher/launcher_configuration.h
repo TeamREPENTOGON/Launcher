@@ -15,10 +15,61 @@ enum LauncherConfigurationLoad {
 	LAUNCHER_CONFIGURATION_LOAD_PARSE_ERROR
 };
 
-namespace Launcher::Configuration {
-	static constexpr const char* GeneralSection = "General";
-	static constexpr const char* IsaacExecutableKey = "IsaacExecutable";
-	static constexpr const char* EmptyPath = "";
+enum LaunchMode {
+	LAUNCH_MODE_VANILLA,
+	LAUNCH_MODE_REPENTOGON
+};
+
+namespace Configuration::Defaults {
+	constexpr const bool console = false;
+	constexpr const int levelStage = 0;
+	constexpr const int stageType = 0;
+	constexpr const bool luaDebug = false;
+	const std::string luaHeapSize("1024M");
+	constexpr const bool update = true;
+	constexpr const bool unstableUpdates = false;
+}
+
+namespace Configuration::Sections {
+	const std::string general("General");
+	const std::string repentogon("Repentogon");
+	const std::string vanilla("Vanilla");
+	const std::string shared("Shared");
+}
+
+namespace Configuration::Keys {
+	const std::string isaacExecutableKey("IsaacExecutable");
+
+	const std::string launchMode("LaunchMode");
+
+	const std::string levelStage("LevelStage");
+	const std::string luaDebug("LuaDebug");
+	const std::string luaHeapSize("LuaHeapSize");
+	const std::string stageType("StageType");
+	const std::string roomId("RoomID");
+
+	const std::string console("Console");
+	const std::string update("Update");
+	const std::string unstableUpdates("UnstableUpdates");
+
+}
+
+#undef CONFIGURATION_FIELD
+#define CONFIGURATION_FIELD(T, NAME, FIELD) inline T const& NAME() const {\
+	return FIELD;\
+}\
+\
+inline void NAME(T const& param) {\
+		FIELD = param;\
+}
+
+#undef OPTIONAL_CONFIGURATION_FIELD
+#define OPTIONAL_CONFIGURATION_FIELD(T, NAME, FIELD) inline T const& NAME() const {\
+	return *FIELD;\
+}\
+\
+inline void NAME(T const& param) {\
+	FIELD = param;\
 }
 
 class LauncherConfiguration {
@@ -30,28 +81,32 @@ public:
 	}
 
     bool Load(LauncherConfigurationLoad* result, std::optional<std::string> const& path);
-	inline INIReader* GetReader() const {
-		return _configurationFile.get();
-	}
 
 	inline std::string const& GetConfigurationPath() const {
 		return _configurationPath;
 	}
 
-	std::string GetIsaacExecutablePath();
-	bool HasAutomaticUpdates() const;
-	bool HasUnstableUpdates() const;
+	void Write();
 
-	void OverrideAutomaticUpdates(bool value);
-	void OverrideUnstableUpdates(bool value);
-
-	void Invalidate();
+	CONFIGURATION_FIELD(std::string, IsaacExecutablePath, _isaacExecutablePath);
+	CONFIGURATION_FIELD(LaunchMode, IsaacLaunchMode, _launchMode);
+	CONFIGURATION_FIELD(bool, UnstableUpdates, _unstableUpdates);
+	CONFIGURATION_FIELD(bool, RepentogonConsole, _repentogonConsole);
+	CONFIGURATION_FIELD(bool, AutomaticUpdates, _update);
+	CONFIGURATION_FIELD(bool, LuaDebug, _luaDebug);
+	OPTIONAL_CONFIGURATION_FIELD(long, Stage, _stage);
+	OPTIONAL_CONFIGURATION_FIELD(long, StageType, _stageType);
+	OPTIONAL_CONFIGURATION_FIELD(long, RoomID, _roomId);
+	OPTIONAL_CONFIGURATION_FIELD(std::string, LuaHeapSize, _luaHeapSize);
 
 private:
 	bool Search(LauncherConfigurationLoad* result);
 	bool Process(LauncherConfigurationLoad* result);
 	bool CheckConfigurationFileExists(LauncherConfigurationLoad* result,
 		std::string const& path);
+	void Load(INIReader const& reader);
+	void LoadFromFile(INIReader const& reader);
+	void LoadFromCLI();
 
 	/* Path to the folder containing the configuration of the launcher. */
 	std::string _configurationPath;
@@ -59,12 +114,25 @@ private:
 	 * in a parse error.
 	 */
 	int _configFileParseErrorLine = 0;
-	std::unique_ptr<INIReader> _configurationFile;
 	bool _isLoaded = false;
 
-	bool _dirtyAutomaticUpdates = false;
-	bool _dirtyUnstableUpdates = false;
+	/* General options */
+	std::string _isaacExecutablePath;
 
-	bool _overrideAutomaticUpdates = false;
-	bool _overrideUnstableUpdates = false;
+	/* Shared options */
+	LaunchMode _launchMode = LAUNCH_MODE_REPENTOGON;
+
+	/* Repentogon options */
+	bool _unstableUpdates = false;
+	bool _repentogonConsole = false;
+	bool _update = true;
+
+	/* Game options */
+	bool _luaDebug = false;
+	std::optional<long> _stage;
+	std::optional<long> _stageType;
+	std::optional<std::string> _luaHeapSize;
+	std::optional<long> _roomId;
 };
+
+#undef CONFIGURATION_FIELD

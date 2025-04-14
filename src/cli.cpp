@@ -40,6 +40,12 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::loadRoom, "ID of the room in which to start the run",
         wxCMD_LINE_VAL_NUMBER);
+    parser.AddLongOption(Options::launchMode, "Whether to launch vanilla or Repentogon.\n"
+        "Accepted values: \"vanilla\", \"repentogon\". Default: repentogon.");
+    parser.AddLongSwitch(Options::repentogonConsole, "Enable the Repentogon console window");
+    parser.AddLongSwitch(Options::unstableUpdates, "Allow unstable releases when updating Repentogon");
+    parser.AddLongSwitch(Options::automaticUpdates, "Allow the launcher to keep Repentogon up-to-date");
+
     int result = parser.Parse();
 
     if (result > 0)
@@ -105,14 +111,14 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     long stage;
     if (parser.Found(Options::setStage, &stage)) {
         if (stage >= 0) {
-            _setStage = stage;
+            _stage = stage;
         }
     }
 
     long stageType;
     if (parser.Found(Options::setStageType, &stageType)) {
         if (stageType >= 0) {
-            _setStageType = stageType;
+            _stageType = stageType;
         }
     }
 
@@ -120,6 +126,21 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     if (parser.Found(Options::loadRoom, &loadRoom)) {
         _loadRoom = loadRoom;
     }
+
+    wxString launchModeStr;
+    if (parser.Found(Options::launchMode, &launchModeStr)) {
+        if (launchModeStr == "vanilla") {
+            _launchMode = LAUNCH_MODE_VANILLA;
+        } else if (launchModeStr == "repentogon") {
+            _launchMode = LAUNCH_MODE_REPENTOGON;
+        } else {
+            Logger::Error("Unknown launch mode: %s\n", launchModeStr.ToStdString().c_str());
+        }
+    }
+
+    _repentogonConsole = parser.Found(Options::repentogonConsole);
+    _unstableUpdates = parser.Found(Options::unstableUpdates);
+    _automaticUpdates = parser.Found(Options::automaticUpdates);
 
     return result;
 }

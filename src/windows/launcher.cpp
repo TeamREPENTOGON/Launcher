@@ -49,7 +49,7 @@ EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::MainFrame::
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::MainFrame::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::MainFrame::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, Launcher::MainFrame::OnOptionSelected)
-EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnCharacterWritten)
+// EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnCharacterWritten)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::MainFrame::Launch)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::MainFrame::OnIsaacSelectClick)
 // EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::MainFrame::OnSelectRepentogonFolderClick)
@@ -74,12 +74,65 @@ namespace Launcher {
 	static const char* NoRepentogonInstallationFolderText = "No folder specified, will download in current folder";
 
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
-	
-	MainFrame::MainFrame(Installation* installation) : wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
-		_installation(installation),
+
+	LuaHeapSizeValidator::LuaHeapSizeValidator() : wxValidator() { }
+
+	LuaHeapSizeValidator::LuaHeapSizeValidator(std::string* output) : wxValidator(), _output(output),
+		_regex("([0-9]+)([KMG]?)") {
+
+	}
+
+	bool LuaHeapSizeValidator::TransferFromWindow() {
+		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(GetWindow());
+		if (!ctrl) {
+			return false;
+		}
+
+		*_output = ctrl->GetValue();
+		return true;
+	}
+
+	bool LuaHeapSizeValidator::TransferToWindow() {
+		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(GetWindow());
+		if (!ctrl) {
+			return false;
+		}
+
+		ctrl->ChangeValue(*_output);
+		return true;
+	}
+
+	bool LuaHeapSizeValidator::Validate(wxWindow* parent) {
+		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(GetWindow());
+		wxString str = ctrl->GetValue();
+
+		if (str.empty()) {
+			ctrl->ChangeValue("0");
+			return true;
+		}
+
+		std::cmatch match;
+		bool result = std::regex_match((const char*)str, match, _regex);
+		if (result) {
+			return true;
+		}
+
+		if (str.size() == 1) {
+			char c = str[0];
+			if (c == 'K' || c == 'M' || c == 'G') {
+				ctrl->ChangeValue("0");
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	MainFrame::MainFrame(Installation* installation, LauncherConfiguration* configuration) :
+		wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
+		_installation(installation), _configuration(configuration),
 		_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1),
-			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)) {
-		memset(&_options, 0, sizeof(_options));
+			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)), _validator() {
 		// _optionsGrid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
 		_luaHeapSize = nullptr;
@@ -109,7 +162,7 @@ namespace Launcher {
 		AddRepentogonOptions();
 		AddVanillaOptions();
 		AddLaunchOptions();
-		
+
 		_advancedOptionsButton = new wxButton(this, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
 		wxSizerFlags advancedOptionsFlags = wxSizerFlags().Right();
 		verticalSizer->Add(_advancedOptionsButton, advancedOptionsFlags);
@@ -120,18 +173,18 @@ namespace Launcher {
 	}
 
 	MainFrame::~MainFrame() {
-		_options.WriteConfiguration(&_logWindow, *_installation);
+		_configuration->Write();
 	}
 
 	void MainFrame::AddLauncherConfigurationOptions() {
 		wxBoxSizer* isaacSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
 		AddLauncherConfigurationTextField("Indicate the path of the Isaac executable file",
-			"Select Isaac executable...", NoIsaacText, 
+			"Select Isaac executable...", NoIsaacText,
 			NoIsaacColor, isaacSelectionSizer, &_isaacFileText, WINDOW_BUTTON_SELECT_ISAAC);
 
 		/* wxBoxSizer* repentogonSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
 		AddLauncherConfigurationTextField("Indicate folder in which to download and install REPENTOGON",
-			"Select folder", 
+			"Select folder",
 			NoRepentogonInstallationFolderText, NoRepentogonInstallationFolderColor,
 			repentogonSelectionSizer, &_repentogonInstallFolderText, WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER); */
 
@@ -207,10 +260,10 @@ namespace Launcher {
 		vanillaBoxSizer->Add(_luaDebug, 0, wxLEFT | wxRIGHT, 5);
 		vanillaBoxSizer->Add(new wxStaticLine(vanillaBox), 0, wxTOP | wxBOTTOM, 5);
 
+		_validator.SetOutputVariable((std::string*)&_configuration->LuaHeapSize());
 		wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
-		wxTextValidator heapSizeValidator(wxFILTER_NUMERIC);
 		wxTextCtrl* heapSizeCtrl = new wxTextCtrl(vanillaBox, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024");
-		heapSizeCtrl->SetValidator(heapSizeValidator);
+		heapSizeCtrl->SetValidator(_validator);
 		_luaHeapSize = heapSizeCtrl;
 		wxStaticText* heapSizeText = new wxStaticText(vanillaBox, -1, "Lua heap size (MB): ");
 		heapSizeBox->Add(heapSizeText);
@@ -234,7 +287,7 @@ namespace Launcher {
 		OnFileSelected(path, NoRepentogonInstallationFolderColor, _repentogonInstallFolderText, NoRepentogonInstallationFolderText);
 	} */
 
-	void MainFrame::OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl, 
+	void MainFrame::OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl,
 		const char* emptyText) {
 		if (!path.empty()) {
 			ctrl->SetValue(path);
@@ -255,46 +308,45 @@ namespace Launcher {
 		if (std::regex_search(text, match, std::basic_regex("([0-9])\\.([0-9])"))) {
 			int stage = std::stoi(match[1].str(), NULL, 0);
 			int type = std::stoi(match[2].str(), NULL, 0);
-			_options.levelStage = stage;
-			_options.stageType = type;
+			_configuration->Stage(stage);
+			_configuration->StageType(type);
 		} else if (!strcmp(text, "--")) {
-			_options.levelStage = _options.stageType = 0;
+			_configuration->Stage(0);
+			_configuration->StageType(0);
 		}
 	}
 
 	void MainFrame::OnLauchModeSelect(wxCommandEvent& event) {
 		wxComboBox* box = dynamic_cast<wxComboBox*>(event.GetEventObject());
 		if (box->GetValue() == "Vanilla") {
-			_options.mode = LAUNCH_MODE_VANILLA;
+			_configuration->IsaacLaunchMode(LAUNCH_MODE_VANILLA);
 		} else {
-			_options.mode = LAUNCH_MODE_REPENTOGON;
+			_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
 		}
 	}
 
-	void MainFrame::OnCharacterWritten(wxCommandEvent& event) {
+	/* void MainFrame::OnCharacterWritten(wxCommandEvent& event) {
 		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(event.GetEventObject());
 		_options.luaHeapSize = std::stoi(ctrl->GetValue().c_str().AsChar());
-	}
+	} */
 
 	void MainFrame::OnOptionSelected(wxCommandEvent& event) {
 		wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
 		switch (box->GetId()) {
 		case WINDOW_CHECKBOX_REPENTOGON_CONSOLE:
-			_options.console = box->GetValue();
+			_configuration->RepentogonConsole(box->GetValue());
 			break;
 
 		case WINDOW_CHECKBOX_REPENTOGON_UPDATES:
-			_options.update = box->GetValue();
-			_installation->GetLauncherConfiguration()->OverrideAutomaticUpdates(_options.update);
+			_configuration->AutomaticUpdates(box->GetValue());
 			break;
 
 		case WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES:
-			_options.unstableUpdates = box->GetValue();
-			_installation->GetLauncherConfiguration()->OverrideUnstableUpdates(_options.unstableUpdates);
+			_configuration->UnstableUpdates(box->GetValue());
 			break;
 
 		case WINDOW_CHECKBOX_VANILLA_LUADEBUG:
-			_options.luaDebug = box->GetValue();
+			_configuration->LuaDebug(box->GetValue());
 			break;
 
 		default:
@@ -305,23 +357,23 @@ namespace Launcher {
 	void MainFrame::Launch(wxCommandEvent& event) {
 		_logWindow.Log("Launching the game with the following options:");
 		_logWindow.Log("\tRepentogon:");
-		if (_options.mode == LAUNCH_MODE_VANILLA) {
+		if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA) {
 			_logWindow.Log("\t\tRepentogon is disabled");
 		} else {
 			_logWindow.Log("\t\tRepentogon is enabled");
-			_logWindow.Log("\t\tEnable Repentogon console window: %s", _options.console ? "yes" : "no");
+			_logWindow.Log("\t\tEnable Repentogon console window: %s", _configuration->RepentogonConsole() ? "yes" : "no");
 		}
 		_logWindow.Log("\tVanilla:");
-		if (_options.levelStage) {
-			_logWindow.Log("\t\tStarting stage: %d.%d", _options.levelStage, _options.stageType);
+		if (_configuration->Stage()) {
+			_logWindow.Log("\t\tStarting stage: %d.%d", _configuration->Stage(), _configuration->StageType());
 		} else {
 			_logWindow.Log("\t\tStarting stage: not selected");
 		}
-		_logWindow.Log("\t\tLua debug: %s", _options.luaDebug ? "yes" : "no");
-		_logWindow.Log("\t\tLua heap size: %dM", _options.luaHeapSize);
+		_logWindow.Log("\t\tLua debug: %s", _configuration->LuaDebug() ? "yes" : "no");
+		_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize());
 
-		_options.WriteConfiguration(&_logWindow, *_installation);
-		::Launcher::Launch(&_logWindow, _isaacFileText->GetValue().c_str().AsChar(), _installation->GetRepentogonInstallation().IsLegacy(), _options);
+		_configuration->Write();
+		::Launcher::Launch(&_logWindow, _isaacFileText->GetValue().c_str().AsChar(), _installation->GetRepentogonInstallation().IsLegacy(), _configuration);
 	}
 
 	void MainFrame::EnableInterface(bool enable) {
@@ -433,43 +485,88 @@ namespace Launcher {
 	}
 
 	void MainFrame::InitializeOptions() {
-		INIReader* reader = _installation->GetLauncherConfiguration()->GetReader();
-		if (!reader) {
-			wxMessageDialog dialog(this, "Do you want to have the launcher automatically update Repentogon?\n"
-				"(Selecting \"Yes\" will immediately update Repentogon to the latest versions)", 
-				"Automatic Repentogon updates", wxYES_NO | wxCANCEL);
-			int result = dialog.ShowModal();
-
-			wxMessageDialog unstableDialog(this, "Do you want to download unstable updates ?\n"
-				"(If you are not a modder, you probably don't want this)",
-				"Unstable Repentogon updates", wxYES_NO | wxCANCEL);
-			int unstableResult = unstableDialog.ShowModal();
-
-			_options.InitializeDefaults(&_logWindow,
-				result == wxID_OK || result == wxID_YES,
-				unstableResult == wxID_OK || unstableResult == wxID_YES, 
-				_installation->GetRepentogonInstallation().IsValid(true));
-		} else {
-			_options.InitializeFromConfig(&_logWindow, *reader,
-				_installation->GetRepentogonInstallation().IsValid(true));
-		}
-		
+		SanitizeConfiguration();
 		InitializeGUIFromOptions();
 	}
 
+	void MainFrame::SanitizeConfiguration() {
+		namespace c = Configuration;
+		LaunchMode mode = _configuration->IsaacLaunchMode();
+		if (mode != LAUNCH_MODE_REPENTOGON && mode != LAUNCH_MODE_VANILLA) {
+			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default", mode, c::Keys::launchMode.c_str());
+			if (_installation->GetRepentogonInstallation().IsValid(false)) {
+				_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
+			} else {
+				_configuration->IsaacLaunchMode(LAUNCH_MODE_VANILLA);
+			}
+		}
+
+		std::string luaHeapSize = _configuration->LuaHeapSize();
+		(void)std::remove_if(luaHeapSize.begin(), luaHeapSize.end(), [](char c) -> bool { return c == ' '; });
+		std::regex r("([0-9]+)([KMG]?)");
+		std::cmatch match;
+		bool hasMatch = std::regex_match(luaHeapSize.c_str(), match, r);
+
+		if (!hasMatch) {
+			_logWindow.LogWarn("Invalid value %s for %s field in configuration file. Ignoring\n",
+				luaHeapSize.c_str(), c::Keys::luaHeapSize.c_str());
+			_configuration->LuaHeapSize("");
+		} else {
+			_configuration->LuaHeapSize(luaHeapSize);
+		}
+
+		int levelStage = _configuration->Stage();
+		if (levelStage < IsaacInterface::STAGE_NULL || levelStage > IsaacInterface::STAGE8) {
+			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default",
+				levelStage, c::Keys::levelStage.c_str());
+			_configuration->Stage(c::Defaults::levelStage);
+			_configuration->StageType(c::Defaults::stageType);
+		}
+
+		int stageType = _configuration->StageType();
+		if (stageType < IsaacInterface::STAGETYPE_ORIGINAL || stageType > IsaacInterface::STAGETYPE_REPENTANCE_B) {
+			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default",
+				stageType, c::Keys::stageType.c_str());
+			_configuration->StageType(c::Defaults::stageType);
+		}
+
+		if (stageType == IsaacInterface::STAGETYPE_GREEDMODE) {
+			_logWindow.LogWarn("Value 3 (Greed mode) for %s field in configuration file is deprecated since Repentance."
+				"Overriding with default", c::Keys::stageType.c_str());
+			_configuration->StageType(c::Defaults::stageType);
+		}
+
+		// Validate stage type for Chapter 4.
+		if (levelStage == IsaacInterface::STAGE4_1 || levelStage == IsaacInterface::STAGE4_2) {
+			if (stageType == IsaacInterface::STAGETYPE_REPENTANCE_B) {
+				_logWindow.LogWarn("Invalid value %d for %s field associated with value %d "
+					"for %s field in configuration file. Overriding with default", stageType, c::Keys::levelStage.c_str(),
+					stageType, c::Keys::stageType.c_str());
+				_configuration->StageType(c::Defaults::stageType);
+			}
+		}
+
+		// Validate stage type for Chapters > 4.
+		if (levelStage >= IsaacInterface::STAGE4_3 && levelStage <= IsaacInterface::STAGE8) {
+			if (stageType != IsaacInterface::STAGETYPE_ORIGINAL) {
+				_logWindow.LogWarn("Invalid value %d for %s field associated with value %d "
+					"for %s field in configuration file. Overriding with default", levelStage, c::Keys::levelStage.c_str(),
+					stageType, c::Keys::stageType.c_str());
+				_configuration->StageType(c::Defaults::stageType);
+			}
+		}
+	}
+
 	void MainFrame::InitializeGUIFromOptions() {
-		_console->SetValue(_options.console);
-		_updates->SetValue(_options.update);
-		_unstableRepentogon->SetValue(_options.unstableUpdates);
+		_console->SetValue(_configuration->RepentogonConsole());
+		_updates->SetValue(_configuration->AutomaticUpdates());
+		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
 
-		// stringstream sucks
-		char buffer[11];
-		sprintf(buffer, "%d", _options.luaHeapSize);
-		_luaHeapSize->SetValue(wxString(buffer));
+		_luaHeapSize->SetValue(_configuration->LuaHeapSize());
 
-		_luaDebug->SetValue(_options.luaDebug);
+		_luaDebug->SetValue(_configuration->LuaDebug());
 		InitializeLevelSelectFromOptions();
-		if (_options.mode == LAUNCH_MODE_REPENTOGON) {
+		if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
 			_launchMode->SetValue("Repentogon");
 		} else {
 			_launchMode->SetValue("Vanilla");
@@ -477,7 +574,7 @@ namespace Launcher {
 	}
 
 	void MainFrame::InitializeLevelSelectFromOptions() {
-		int level = _options.levelStage, type = _options.stageType;
+		int level = _configuration->Stage(), type = _configuration->StageType();
 		std::string value;
 		if (level == 0) {
 			value = "--";
@@ -524,7 +621,7 @@ namespace Launcher {
 			_launchMode->SetValue("Repentogon");
 
 			/* Intentionally not changing the selected launch mode value.
-			 * 
+			 *
 			 * While the change in the above if branch is mandatory to prevent
 			 * the game from incorrectly being injected with Repentogon in case
 			 * of a legacy installation, or broken installation, changing the
@@ -542,7 +639,7 @@ namespace Launcher {
 
 		RepentogonInstaller::DownloadInstallRepentogonResult result = future.get();
 
-		if (result == RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_ERR || 
+		if (result == RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_ERR ||
 			result == RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES) {
 			_logWindow.LogError("Unable to force Repentogon update\n");
 			return;
@@ -577,7 +674,7 @@ namespace Launcher {
 	}
 
 	void MainFrame::AddLauncherConfigurationTextField(const char* intro,
-		const char* buttonText, const char* emptyText, wxColour const& emptyColor, 
+		const char* buttonText, const char* emptyText, wxColour const& emptyColor,
 		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
 		_configurationSizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 20);
 		wxButton* isaacSelectionButton = new wxButton(_configurationBox, windowId, buttonText);

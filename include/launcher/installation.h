@@ -34,7 +34,7 @@ namespace Launcher {
 			return _isaacInstallation;
 		}
 
-		inline LauncherConfiguration* GetLauncherConfiguration() const {
+		inline LauncherConfiguration const* GetLauncherConfiguration() const {
 			return _launcherConfiguration;
 		}
 
@@ -48,6 +48,6 @@ namespace Launcher {
 		ILoggableGUI* _gui = nullptr;
 		RepentogonInstallation _repentogonInstallation;
 		IsaacInstallation _isaacInstallation;
-		LauncherConfiguration* _launcherConfiguration;
+		LauncherConfiguration const* _launcherConfiguration;
 	};
 }
