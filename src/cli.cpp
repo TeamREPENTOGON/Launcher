@@ -13,7 +13,9 @@ CLIParser::CLIParser() {
 int CLIParser::Parse(int argc, wxChar** argv) {
     wxCmdLineParser parser(argc, argv);
     // parser.AddSwitch(helpShort, help, "Display this help", wxCMD_LINE_OPTION_HELP);
+    parser.AddLongSwitch(Options::skipWizard, "Skip the wizard");
     parser.AddLongSwitch(Options::forceWizard, "Force the wizard to run, even if it should not");
+    parser.AddLongSwitch(Options::skipRepentogonUpdate, "Skip the Repentogon update");
     parser.AddLongSwitch(Options::forceRepentogonUpdate, "Force a Repentogon update at startup");
     parser.AddLongSwitch(Options::repentogonInstallerWait, "Prevent the Repentogon installer from closing after "
         "installation is complete");
@@ -52,7 +54,19 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         return result;
 
     _forceWizard = parser.Found(Options::forceWizard);
+    _skipWizard = parser.Found(Options::skipWizard);
+
+    if (_forceWizard && _skipWizard) {
+        wxASSERT_MSG(false, "Cannot force and skip the wizard at the same time");
+    }
+
     _forceRepentogonUpdate = parser.Found(Options::forceRepentogonUpdate);
+    _skipRepentogonUpdate = parser.Found(Options::skipRepentogonUpdate);
+
+    if (_forceRepentogonUpdate && _skipRepentogonUpdate) {
+        wxASSERT_MSG(false, "Cannot force and skip Repentogon update at the same time");
+    }
+
     _repentogonInstallerWaitOnFinished = parser.Found(Options::repentogonInstallerWait);
 
     long refreshRate = 0;

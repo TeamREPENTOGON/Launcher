@@ -66,15 +66,17 @@ bool Launcher::App::OnInit() {
 	bool wizardOk = false, wizardRan = false;
 	bool wizardInstalledRepentogon = false;
 	bool isIsaacValid = __installation->GetIsaacInstallation().IsValid();
-	if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid) {
-		if (sCLI->ForceWizard()) {
-			Logger::Info("Force starting wizard due to command-line\n");
-		} else if (!isIsaacValid) {
-			Logger::Info("Starting wizard as no valid Isaac installation has been found\n");
-		}
+	if (!sCLI->SkipWizard()) {
+		if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid) {
+			if (sCLI->ForceWizard()) {
+				Logger::Info("Force starting wizard due to command-line\n");
+			} else if (!isIsaacValid) {
+				Logger::Info("Starting wizard as no valid Isaac installation has been found\n");
+			}
 
-		wizardOk = RunWizard(&wizardInstalledRepentogon);
-		wizardRan = true;
+			wizardOk = RunWizard(&wizardInstalledRepentogon);
+			wizardRan = true;
+		}
 	}
 
 	if (!__installation->GetIsaacInstallation().IsValid()) {
@@ -98,7 +100,7 @@ bool Launcher::App::OnInit() {
 	bool wizardLess = !wizardRan && (!repentogonOk || __installation->GetLauncherConfiguration()->AutomaticUpdates());
 	bool wizardFull = wizardRan && !wizardOk && !wizardInstalledRepentogon;
 
-	if (forcedUpdate || wizardLess || wizardFull) {
+	if (!sCLI->SkipRepentogonUpdate() && (forcedUpdate || wizardLess || wizardFull)) {
 		if (forcedUpdate) {
 			Logger::Info("Forcibly updating Repentogon\n");
 		} else if (wizardLess) {

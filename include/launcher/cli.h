@@ -98,12 +98,22 @@ public:
         return _automaticUpdates;
     }
 
+    inline bool SkipWizard() const {
+        return _skipWizard;
+    }
+
+    inline bool SkipRepentogonUpdate() const {
+        return _skipRepentogonUpdate;
+    }
+
 private:
     CLIParser();
 
     struct Options {
         static constexpr unsigned long _repentogonInstallerDefaultRefreshRate = 100;
         static constexpr const char* forceWizard = "force-wizard";
+        static constexpr const char* skipWizard = "skip-wizard";
+        static constexpr const char* skipRepentogonUpdate = "skip-repentogon-update";
         static constexpr const char* forceRepentogonUpdate = "force-repentogon-update";
         static constexpr const char* repentogonInstallerWait = "repentogon-installer-wait";
         static constexpr const char* repentogonInstallerRefresh = "repentogon-installer-refresh";
@@ -128,7 +138,9 @@ private:
         static constexpr const char* automaticUpdates = "auto-update";
     };
 
+    bool _skipWizard = false;
     bool _forceWizard = false;
+    bool _skipRepentogonUpdate = false;
     bool _forceRepentogonUpdate = false;
     bool _repentogonInstallerWaitOnFinished = false;
     bool _skipSelfUpdate = false;
