@@ -17,7 +17,7 @@
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
 
 Version const knownVersions[] = {
-		{ "04469d0c3d3581936fcf85bea5f9f4f3a65b2ccf96b36310456c9626bac36dc6", "v1.7.9b.J835 (Steam)", true },
+		{ "fd5b4a2ea3b397aec9f2b311ecc3be2e7e66bcd8723989096008d4d8258d92ea", "v1.9.7.10.J212 (Steam)", true },
 		{ "d00523d04dd43a72071f1d936e5ff34892da20800d32f05a143eba0a4fe29361", "Dummy (Test Suite)", true },
 		{ "31846486979cfa07c8c968221553052c3ff603518681ca11912d445f96ca9404", "v1.7.9b.J835 (Steamless, no binding section)", true },
 		{ "530b4d2accef833b8dbf6f1a9f781fe1e051c1916ca5acdb579df05a34640627", "v1.7.9b.J835 (Steamless, with binding section)", true },
@@ -105,7 +105,7 @@ bool IsaacInstallation::Validate(std::string const& sourcePath) {
 		Logger::Error("Installation::Validate: unable to get version of executable\n");
 		return false;
 	}
-	
+
 	_version = std::move(*version);
 	_exePath = path;
 	std::filesystem::path fsPath(path);
