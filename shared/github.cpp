@@ -24,10 +24,11 @@ namespace Github {
 	static GithubDownloadNotification CreateDoneNotification(const char* url);
 	static GithubDownloadNotification CreateParseResponseNotification(const char* url, bool done);
 
-	DownloadAsStringResult DownloadAsString(const char* url, const char* name, std::string& response,
-		DownloadMonitor* monitor, unsigned long limitRate, unsigned long timeout) {
+	DownloadAsStringResult DownloadAsString(CURLRequest const& request, const char* name,
+		std::string& response, DownloadMonitor* monitor) {
 		CURL* curl;
 		CURLcode curlResult;
+		const char* url = request.url.c_str();
 
 		CurlStringResponse data;
 		uint32_t id = __gitDownloadCounter.fetch_add(1, std::memory_order_acq_rel) + 1;
@@ -44,7 +45,7 @@ namespace Github {
 		}
 
 		ScopedCURL session(curl);
-		InitCurlSession(curl, url, &data, limitRate, timeout);
+		InitCurlSession(curl, request, &data);
 
 		if (monitor) {
 			monitor->Push(CreateInitCurlNotification(url, true));
@@ -67,12 +68,12 @@ namespace Github {
 		return DOWNLOAD_AS_STRING_OK;
 	}
 
-	DownloadAsStringResult FetchReleaseInfo(const char* url,
-		rapidjson::Document& response, DownloadMonitor* monitor,
-		unsigned long limitRate, unsigned long timeout) {
+	DownloadAsStringResult FetchReleaseInfo(CURLRequest const& request,
+		rapidjson::Document& response, DownloadMonitor* monitor) {
 		std::string stringResponse;
-		DownloadAsStringResult result = DownloadAsString(url, "release info", stringResponse,
-			monitor, limitRate, timeout);
+		const char* url = request.url.c_str();
+		DownloadAsStringResult result = DownloadAsString(request, "release info", stringResponse,
+			monitor);
 		if (result != DOWNLOAD_AS_STRING_OK) {
 			return result;
 		}
@@ -117,8 +118,9 @@ namespace Github {
 		}
 	}
 
-	DownloadFileResult DownloadFile(const char* file, const char* url,
-		DownloadMonitor* monitor, unsigned long limitRate, unsigned long timeout) {
+	DownloadFileResult DownloadFile(const char* file, CURLRequest const& request,
+		DownloadMonitor* monitor) {
+		const char* url = request.url.c_str();
 		CurlFileResponse response(file);
 
 		if (!response.GetFile()) {
@@ -141,7 +143,7 @@ namespace Github {
 		}
 
 		ScopedCURL scoppedCurl(curl);
-		InitCurlSession(curl, url, &response, limitRate, timeout);
+		InitCurlSession(curl, request, &response);
 
 		if (monitor) {
 			monitor->Push(CreateInitCurlNotification(url, true));
@@ -162,8 +164,8 @@ namespace Github {
 		return DOWNLOAD_FILE_OK;
 	}
 
-	void InitCurlSession(CURL* curl, const char* url, AbstractCurlResponseHandler* handler,
-		unsigned long limitRate, unsigned long timeout) {
+	void InitCurlSession(CURL* curl, CURLRequest const& request,
+		AbstractCurlResponseHandler* handler) {
 		struct curl_slist* headers = NULL;
 		headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
 		headers = curl_slist_append(headers, "X-GitHub-Api-Version: 2022-11-28");
@@ -189,18 +191,22 @@ namespace Github {
 			headers = curl_slist_append(headers, buffer);
 		}
 
-		curl_easy_setopt(curl, CURLOPT_URL, url);
+		curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
 		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AbstractCurlResponseHandler::ResponseSkeleton);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, handler);
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
-		if (limitRate) {
-			curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, (curl_off_t)limitRate);
+		if (request.maxSpeed) {
+			curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, request.maxSpeed);
 		}
 
-		if (timeout) {
-			curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, (curl_off_t)timeout);
+		if (request.timeout) {
+			curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, request.timeout);
+		}
+
+		if (request.serverTimeout) {
+			curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, request.serverTimeout);
 		}
 	}
 

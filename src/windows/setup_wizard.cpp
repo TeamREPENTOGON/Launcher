@@ -239,8 +239,8 @@ void LauncherWizard::ConfigureRepentogonSetupPage() {
 
     LauncherConfiguration const* configuration = _installation->GetLauncherConfiguration();
     if (configuration && configuration->Loaded()) {
-        _repentogonSetup._autoUpdates->SetValue(configuration->HasAutomaticUpdates());
-        _repentogonSetup._unstableUpdates->SetValue(configuration->HasUnstableUpdates());
+        _repentogonSetup._autoUpdates->SetValue(configuration->AutomaticUpdates());
+        _repentogonSetup._unstableUpdates->SetValue(configuration->UnstableUpdates());
     }
 }
 

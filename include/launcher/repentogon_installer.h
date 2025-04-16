@@ -84,7 +84,7 @@ namespace Launcher {
 			std::string _text;
 			bool _isError;
 		};
-		
+
 		struct FileRemoval {
 			std::string _name;
 			bool _ok;
@@ -129,7 +129,7 @@ namespace Launcher {
 		 *
 		 * Parameter force indicates whether the function should download and
 		 * install the latest release even if the installation is up-to-date.
-		 * 
+		 *
 		 * This function initiates a multi-threading context. The future can be
 		 * used to synchronize with the completion of the underlying thread.
 		 */
@@ -199,7 +199,7 @@ namespace Launcher {
 		 *
 		 * The base parameter should be the result of querying the latest
 		 * release, as provided by a successful call to CheckRepentogonUpdates().
-		 * 
+		 *
 		 * Return true if the installation is successful, false otherwise.
 		 */
 		bool InstallRepentogonThread(rapidjson::Document& document);

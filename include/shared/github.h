@@ -6,6 +6,7 @@
 
 #include "rapidjson/document.h"
 
+#include "shared/curl_request.h"
 #include "shared/monitor.h"
 #include "shared/curl/abstract_response_handler.h"
 
@@ -77,40 +78,37 @@ namespace Github {
 	VersionCheckResult CheckUpdates(const char* installedVersion,
 		const char* tool, rapidjson::Document& document);
 
-	/* Fetch the content at url and store it in response.
+	/* Fetch the content at the url in the request and store it in response.
 	 *
 	 * @a name is a symbolic name used for logging purposes.
 	 *
 	 * This function cannot return the DOWNLOAD_AS_STRING_NO_NAME or
 	 * DOWNLOAD_AS_STRING_INVALID_JSON error codes.
 	 */
-	DownloadAsStringResult DownloadAsString(const char* url,
-		const char* name, std::string& response, DownloadMonitor* monitor,
-		unsigned long limitRate = 0, unsigned long timeout = 0);
+	DownloadAsStringResult DownloadAsString(CURLRequest const& request,
+		const char* name, std::string& response, DownloadMonitor* monitor);
 
-	/* Fetch the content at url, assuming it to describe a release, and store it
-	 * in response.
+	/* Fetch the content at the url in the request, assuming it to describe a
+	 * release, and store it in response.
 	 *
 	 * The release is well formed if it is JSON formatted and contains a "name"
 	 * field.
 	 */
-	DownloadAsStringResult FetchReleaseInfo(const char* url,
-		rapidjson::Document& response, DownloadMonitor* monitor,
-		unsigned long limitRate = 0, unsigned long timeout = 0);
+	DownloadAsStringResult FetchReleaseInfo(CURLRequest const& request,
+		rapidjson::Document& response, DownloadMonitor* monitor);
 
-	/* Download file @file from the url @url. */
-	DownloadFileResult DownloadFile(const char* file, const char* url,
-		DownloadMonitor* monitor, unsigned long limitRate = 0,
-		unsigned long timeout = 0);
+	/* Download file @file from the url in the request. */
+	DownloadFileResult DownloadFile(const char* file, CURLRequest const& request,
+		DownloadMonitor* monitor);
 
 	/* Initialize a cURL session with sane parameters.
 	 *
-	 * url is the target address. handler is an instance of the generic class
-	 * used to process the data received.
+	 * url is stored in the request. handler is an instance of the generic class
+	 * used to process the data received. Other parameters in the request are
+	 * given to the appropriate curl options.
 	 */
-	void InitCurlSession(CURL* curl, const char* url,
-		AbstractCurlResponseHandler* handler, unsigned long limitRate = 0,
-		unsigned long timeout = 0);
+	void InitCurlSession(CURL* curl, CURLRequest const& request,
+		AbstractCurlResponseHandler* handler);
 
 	/* Returns a human readable description of a DownloadAsStringResult for use in logging. */
 	const char* DownloadAsStringResultToLogString(DownloadAsStringResult result);

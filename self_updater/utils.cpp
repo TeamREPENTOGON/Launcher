@@ -187,10 +187,10 @@ namespace Updater::Utils {
 			return LOCK_UPDATER_ERR_INTERNAL;
 		}
 
-		HANDLE file = CreateFileA(lockFilePath, GENERIC_READ, 0, NULL, CREATE_ALWAYS, 0, NULL);
+		HANDLE file = CreateFileA(lockFilePath, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 		free(lockFilePath);
 
-		if (!file) {
+		if (file == INVALID_HANDLE_VALUE) {
 			DWORD lastError = GetLastError();
 			if (lastError == ERROR_SHARING_VIOLATION) {
 				Logger::Warn("LockUpdater: lock file is already owned by another process\n");
@@ -285,7 +285,7 @@ namespace Updater::Utils {
 	}
 
 	ScopedHandle::ScopedHandle(HANDLE handle) : _handle(handle) { }
-	ScopedHandle::~ScopedHandle() { if (_handle) CloseHandle(_handle); }
+	ScopedHandle::~ScopedHandle() { if (_handle != NULL && _handle != INVALID_HANDLE_VALUE) CloseHandle(_handle); }
 	ScopedHandle::operator HANDLE() { return _handle; }
 
 	ScopedFile::ScopedFile(FILE* f) : _f(f) { }

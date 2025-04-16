@@ -22,20 +22,37 @@
 #include "shared/sha256.h"
 
 namespace Launcher {
-	Installation::Installation(ILoggableGUI* gui, LauncherConfiguration* configuration) : _gui(gui), 
+	Installation::Installation(ILoggableGUI* gui, LauncherConfiguration* configuration) : _gui(gui),
 		_repentogonInstallation(gui), _isaacInstallation(gui),
 		_launcherConfiguration(configuration) {
 	}
 
-	std::optional<std::string> Installation::LocateIsaac() {
-		if (_launcherConfiguration->Loaded()) {
-			std::string result = _launcherConfiguration->GetIsaacExecutablePath();
-			if (_isaacInstallation.Validate(result)) {
-				return result;
+	std::optional<std::string> Installation::LocateIsaac(std::optional<std::string> const& isaacPath) {
+		if (isaacPath) {
+			if (_isaacInstallation.Validate(*isaacPath)) {
+				return isaacPath;
+			} else {
+				Logger::Warn("Manually provided Isaac path %s is not a valid Isaac installation, "
+					"attempting detection from configuration\n", isaacPath->c_str());
 			}
 		}
 
-		return _isaacInstallation.AutoDetect();
+		if (_launcherConfiguration->Loaded()) {
+			std::string result = _launcherConfiguration->IsaacExecutablePath();
+			if (_isaacInstallation.Validate(result)) {
+				return result;
+			} else {
+				Logger::Warn("Configured Isaac path %s is not a valid Isaac installation, "
+					"attempting to auto-detect\n", result.c_str());
+			}
+		}
+
+		std::optional<std::string> result = _isaacInstallation.AutoDetect();
+		if (!result) {
+			Logger::Error("Unable to auto-detect Isaac installation\n");
+		}
+
+		return result;
 	}
 
 	bool Installation::CheckRepentogonInstallation() {
@@ -47,11 +64,12 @@ namespace Launcher {
 		return _repentogonInstallation.Validate(_isaacInstallation.GetFolderPath());
 	}
 
-	std::tuple<std::optional<std::string>, bool> Installation::Initialize() {
-		std::optional<std::string> isaacPath = LocateIsaac();
-		bool repentogonOk = isaacPath ? CheckRepentogonInstallation() : false;
+	std::tuple<std::optional<std::string>, bool> Installation::Initialize(
+		std::optional<std::string> const& isaacPath) {
+		std::optional<std::string> locatedIsaacPath = LocateIsaac(isaacPath);
+		bool repentogonOk = locatedIsaacPath ? CheckRepentogonInstallation() : false;
 
-		return std::make_tuple(isaacPath, repentogonOk);
+		return std::make_tuple(locatedIsaacPath, repentogonOk);
 	}
 
 	int Installation::SetIsaacExecutable(std::string const& file) {

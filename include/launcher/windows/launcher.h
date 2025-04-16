@@ -2,6 +2,8 @@
 
 #include <mutex>
 #include <optional>
+#include <regex>
+#include <string>
 
 #include <wx/wxprec.h>
 
@@ -10,8 +12,8 @@
 #endif
 
 #include "curl/curl.h"
-#include "launcher/configuration.h"
 #include "launcher/installation.h"
+#include "launcher/launcher_configuration.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/widgets/text_ctrl_log_widget.h"
 #include "launcher/windows/repentogon_installer.h"
@@ -33,18 +35,25 @@ namespace Launcher {
 		WINDOW_BUTTON_ADVANCED_OPTIONS
 	};
 
-	class MainFrame;
-
-	class App : public wxApp {
-	public:
-		bool OnInit() override;
-		int OnExit() override;
-		bool RunWizard(bool* installedRepentogon);
-		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(bool forceUpdate);
-		MainFrame* CreateMainWindow();
-	};
-
 	class AdvancedOptionsWindow;
+
+	class LuaHeapSizeValidator : public wxValidator {
+	public:
+		LuaHeapSizeValidator();
+		LuaHeapSizeValidator(std::string* output);
+
+		inline void SetOutputVariable(std::string* output) {
+			_output = output;
+		}
+
+		virtual bool TransferFromWindow() override;
+		virtual bool TransferToWindow() override;
+		virtual bool Validate(wxWindow* parent) override;
+
+	private:
+		std::string* _output;
+		std::regex _regex;
+	};
 
 	class MainFrame : public wxFrame {
 	public:
@@ -58,7 +67,7 @@ namespace Launcher {
 			ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE
 		};
 
-		MainFrame(Installation* installation);
+		MainFrame(Installation* installation, LauncherConfiguration* configuration);
 		~MainFrame();
 
 		/* Load the configuration file and update the options accordingly.
@@ -81,6 +90,7 @@ namespace Launcher {
 
 		/* Initialize the IsaacOptions structure. */
 		void InitializeOptions();
+		void SanitizeConfiguration();
 		/* Initialize GUI components from the IsaacOptions structure. */
 		void InitializeGUIFromOptions();
 		/* Helper to initialize the level selection field from the IsaacOptions structure. */
@@ -94,7 +104,7 @@ namespace Launcher {
 			const char* emptyText);
 		void OnLevelSelect(wxCommandEvent& event);
 		void OnLauchModeSelect(wxCommandEvent& event);
-		void OnCharacterWritten(wxCommandEvent& event);
+		// void OnCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
 
@@ -129,7 +139,6 @@ namespace Launcher {
 
 		void EnableInterface(bool enable);
 
-		IsaacOptions _options;
 		wxStaticBoxSizer* _optionsSizer;
 		wxStaticBoxSizer* _configurationSizer;
 		wxCheckBox* _console;
@@ -148,9 +157,11 @@ namespace Launcher {
 		wxButton* _advancedOptionsButton;
 		int _repentogonLaunchModeIdx = -1;
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
+		LuaHeapSizeValidator _validator;
 
 		wxTextCtrlLog _logWindow;
 		Installation* _installation;
+		LauncherConfiguration* _configuration;
 		/* Log string used in CheckUpdates to indicate which tool is being checked. */
 		std::string _currentUpdate;
 

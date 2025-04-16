@@ -15,45 +15,36 @@ public:
     void Start();
     void Stop();
 
-    std::future<Github::DownloadAsStringResult> AddDownloadAsStringRequest(const char* url,
-        std::string&& name, std::string& response, Github::DownloadMonitor* monitor,
-        unsigned long limit, unsigned long timeout);
+    std::future<Github::DownloadAsStringResult> AddDownloadAsStringRequest(CURLRequest const& request,
+        std::string&& name, std::string& response, Github::DownloadMonitor* monitor);
 
     std::future<Github::DownloadFileResult> AddDownloadFileRequest(const char* file,
-        const char* url, Github::DownloadMonitor* monitor, unsigned long limit,
-        unsigned long timeout);
+        CURLRequest const& request, Github::DownloadMonitor* monitor);
 
-    std::future<Github::DownloadAsStringResult> AddFetchReleasesRequest(const char* url,
-        rapidjson::Document& response, Github::DownloadMonitor* monitor, unsigned long limit,
-        unsigned long timeout);
+    std::future<Github::DownloadAsStringResult> AddFetchReleasesRequest(CURLRequest const& request,
+        rapidjson::Document& response, Github::DownloadMonitor* monitor);
 
 private:
     friend class GithubRequestVisitor;
 
     struct DownloadAsStringRequest {
-        const char* url;
+        CURLRequest request;
         std::string name;
         std::string* response;
-        unsigned long limit;
-        unsigned long timeout;
         Github::DownloadMonitor* monitor;
         std::promise<Github::DownloadAsStringResult> result;
     };
 
     struct DownloadFileRequest {
-        const char* url;
+        CURLRequest request;
         const char* file;
-        unsigned long limit;
-        unsigned long timeout;
         Github::DownloadMonitor* monitor;
         std::promise<Github::DownloadFileResult> result;
     };
 
     struct FetchReleasesRequest {
-        const char* url;
+        CURLRequest request;
         rapidjson::Document* response;
-        unsigned long limit;
-        unsigned long timeout;
         Github::DownloadMonitor* monitor;
         std::promise<Github::DownloadAsStringResult> result;
     };

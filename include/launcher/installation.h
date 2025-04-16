@@ -3,6 +3,9 @@
 #include <WinSock2.h>
 #include <Windows.h>
 
+#include <optional>
+#include <string>
+
 #include "launcher/isaac_installation.h"
 #include "launcher/launcher_configuration.h"
 #include "launcher/repentogon_installation.h"
@@ -17,10 +20,11 @@ namespace Launcher {
 
 		Installation(ILoggableGUI* gui, LauncherConfiguration* launcherConfiguration);
 
-		std::optional<std::string> LocateIsaac();
+		std::optional<std::string> LocateIsaac(std::optional<std::string> const& isaacPath);
 		bool CheckRepentogonInstallation();
 
-		std::tuple<std::optional<std::string>, bool> Initialize();
+		std::tuple<std::optional<std::string>, bool> Initialize(
+			std::optional<std::string> const& isaacPath);
 
 		inline RepentogonInstallation const& GetRepentogonInstallation() const {
 			return _repentogonInstallation;
@@ -30,7 +34,7 @@ namespace Launcher {
 			return _isaacInstallation;
 		}
 
-		inline LauncherConfiguration* GetLauncherConfiguration() const {
+		inline LauncherConfiguration const* GetLauncherConfiguration() const {
 			return _launcherConfiguration;
 		}
 
@@ -44,6 +48,6 @@ namespace Launcher {
 		ILoggableGUI* _gui = nullptr;
 		RepentogonInstallation _repentogonInstallation;
 		IsaacInstallation _isaacInstallation;
-		LauncherConfiguration* _launcherConfiguration;
+		LauncherConfiguration const* _launcherConfiguration;
 	};
 }

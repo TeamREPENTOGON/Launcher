@@ -39,7 +39,7 @@ private:
     /* Configures the widgets on the Repentogon setup page based on the
      * the current Isaac installation and available launcher configuration.
      * This function refreshes the values of widgets on the fly.
-     * 
+     *
      * All widgets need to have been created and initialized.
      */
     void ConfigureRepentogonSetupPage();
@@ -52,11 +52,11 @@ private:
 
     /* Called when the user changes from the Isaac setup page to the Repentogon
      * setup page.
-     * 
+     *
      * If the Isaac installation is not compatible with Repentogon, immediately
      * prompt the user on whether they want to go through with the installation
      * and/or configuration of Repentogon.
-     * 
+     *
      * Return true if the user wants to proceed, false otherwise.
      */
     bool CheckRepentogonCompatibilityOnPageChange();
