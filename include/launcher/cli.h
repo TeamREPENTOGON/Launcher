@@ -106,6 +106,14 @@ public:
         return _skipRepentogonUpdate;
     }
 
+    inline bool TrapIsaacLaunch() const {
+        return _trapIsaacLaunch;
+    }
+
+    inline long IsaacWaitTime() const {
+        return _isaacWaitTime;
+    }
+
 private:
     CLIParser();
 
@@ -122,6 +130,8 @@ private:
         static constexpr const char* curlTimeout = "curl-timeout";
         static constexpr const char* curlConnectTimeout = "curl-connect-timeout";
         static constexpr const char* configurationPath = "configuration-file";
+        static constexpr const char* trapIsaacLaunch = "trap-isaac-launch";
+        static constexpr const char* isaacWaitTime = "isaac-wait-time";
 
         // Start from Steam options
         static constexpr const char* steam = "steam";
@@ -138,6 +148,8 @@ private:
         static constexpr const char* automaticUpdates = "auto-update";
     };
 
+    long _isaacWaitTime = 0;
+    bool _trapIsaacLaunch = false;
     bool _skipWizard = false;
     bool _forceWizard = false;
     bool _skipRepentogonUpdate = false;

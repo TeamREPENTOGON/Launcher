@@ -13,6 +13,7 @@
 #include <wx/wx.h>
 
 #include "launcher/app.h"
+#include "launcher/cli.h"
 #include "launcher/launcher_configuration.h"
 #include "launcher/loader.h"
 
@@ -208,7 +209,15 @@ int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const*
 	return 0;
 }
 
+static volatile int __trapIsaacLaunch = 1;
+
 int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_t paramOffset) {
+	if (sCLI->TrapIsaacLaunch()) {
+		while (__trapIsaacLaunch) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
+	}
+
 	HANDLE remoteThread = CreateRemoteThread(process, NULL, 0,
 		(LPTHREAD_START_ROUTINE)((char*)remotePage + functionOffset),
 		(char*)remotePage + paramOffset, 0, NULL);
@@ -220,7 +229,15 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	}
 
 	Logger::Info("Waiting for remote thread to complete\n");
-	DWORD result = WaitForSingleObject(remoteThread, 60 * 1000);
+
+	DWORD waitTime = sCLI->IsaacWaitTime();
+	if (waitTime == 0) {
+		waitTime = 60000;
+	} else if (waitTime == -1) {
+		waitTime = INFINITE;
+	}
+
+	DWORD result = WaitForSingleObject(remoteThread, waitTime);
 	switch (result) {
 	case WAIT_OBJECT_0:
 		Logger::Info("RemoteThread completed\n");

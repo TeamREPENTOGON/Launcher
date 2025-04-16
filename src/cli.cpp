@@ -29,6 +29,9 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     parser.AddLongOption(Options::curlConnectTimeout, "Timeout (in milliseconds) when curl opens a connection",
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::configurationPath, "Path to the configuration file");
+    parser.AddLongSwitch(Options::trapIsaacLaunch, "Trap the launcher when starting Isaac, allowing for a debugger to attach");
+    parser.AddLongOption(Options::isaacWaitTime, "Max wait time (in milliseconds) after creating the Repentogon remote thread",
+        wxCMD_LINE_VAL_NUMBER);
 
     parser.AddLongSwitch(Options::steam, "Perform a Steam launch, bypassing as much of the "
         "startup logic as possible");
@@ -52,6 +55,8 @@ int CLIParser::Parse(int argc, wxChar** argv) {
 
     if (result > 0)
         return result;
+
+    _trapIsaacLaunch = parser.Found(Options::trapIsaacLaunch);
 
     _forceWizard = parser.Found(Options::forceWizard);
     _skipWizard = parser.Found(Options::skipWizard);
@@ -100,6 +105,14 @@ int CLIParser::Parse(int argc, wxChar** argv) {
             _curlConnectTimeout = curlConnectTimeout;
         }
     }
+
+    long isaacWaitTime = 0;
+    if (parser.Found(Options::isaacWaitTime, &isaacWaitTime)) {
+        if (isaacWaitTime < 0) {
+            isaacWaitTime = -1;
+        }
+    }
+    _isaacWaitTime = isaacWaitTime;
 
     wxString configurationPath;
     if (parser.Found(Options::configurationPath, &configurationPath)) {
