@@ -189,6 +189,7 @@ namespace Github {
 			fclose(f);
 			Logger::Info("Adding Authorization header: %s\n", buffer);
 			headers = curl_slist_append(headers, buffer);
+			free(buffer);
 		}
 
 		curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
