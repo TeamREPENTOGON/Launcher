@@ -13,6 +13,7 @@
 #include "shared/sha256.h"
 #include "shared/steam.h"
 #include "shared/unique_free_ptr.h"
+#include "launcher/standalone_rgon_folder.h"
 
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
 
@@ -112,6 +113,24 @@ bool IsaacInstallation::Validate(std::string const& sourcePath) {
 	fsPath.remove_filename();
 	_folderPath = fsPath.string();
 	_isCompatibleWithRepentogon = CheckCompatibilityWithRepentogon();
+
+	if (_isCompatibleWithRepentogon && !exeIsCopy(path)) {
+		std::filesystem::path fsTempPath(path);
+		std::filesystem::path copyexepath = getCopyExePath(fsTempPath);
+		if (!exeCopyExists(path) || !Validate(copyexepath.string())) {
+
+			copyFiles(path);
+			_isCompatibleWithRepentogon = true;
+			_version = std::move(*version);
+		}
+		_exePath = copyexepath.string();
+		copyexepath.remove_filename();
+		_folderPath = copyexepath.string();
+	}
+	else if (!_isCompatibleWithRepentogon && exeIsCopy(path)) {
+		fsPath.parent_path();
+		Validate(fsPath.string());
+	}
 
 	return true;
 }
