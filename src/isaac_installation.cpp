@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <io.h>
 
+#include <fstream>    
 #include <filesystem>
 #include <stdexcept>
 
@@ -118,8 +119,7 @@ bool IsaacInstallation::Validate(std::string const& sourcePath) {
 		std::filesystem::path fsTempPath(path);
 		std::filesystem::path copyexepath = getCopyExePath(fsTempPath);
 		if (!exeCopyExists(path) || !Validate(copyexepath.string())) {
-
-			copyFiles(path);
+			copyFiles(path, _needspatch);
 			_isCompatibleWithRepentogon = true;
 			_version = std::move(*version);
 		}
@@ -319,6 +319,21 @@ std::optional<std::string> IsaacInstallation::ComputeVersion(std::string const& 
 }
 
 bool IsaacInstallation::CheckCompatibilityWithRepentogon() {
+	fs::path fullPath = fs::current_path() / "patch/version.txt";
+	if (fs::exists(fullPath)) {
+		std::ifstream file(fullPath);
+		if (!file) {
+			std::cerr << "Failed to open file: " << fullPath << std::endl;
+			return "";
+		}
+
+		std::ostringstream ss;
+		ss << file.rdbuf();  // Read the whole file into the stringstream
+		if (ss.str() == GetVersion()) {
+			_needspatch = true;
+			return true;
+		}
+	}
 	return RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
 }
 

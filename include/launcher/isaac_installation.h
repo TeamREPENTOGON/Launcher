@@ -77,4 +77,5 @@ private:
     std::variant<const Version*, std::string> _version;
     bool _isCompatibleWithRepentogon = false;
     bool _isValid = false;
+    bool _needspatch = false;
 };

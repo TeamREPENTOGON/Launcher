@@ -11,6 +11,7 @@
 #include <wx/wx.h>
 #include <wx/frame.h>
 #include <wx/stattext.h>
+#include <launcher/diff_patcher.h>
 
 //mostly grabbed from https://steamdb.info/depot/3353471 then filled in what came from a previous depot manually, if new files are added in new versions, we will need to add them here, if shit is removed, its fine...
 std::string tocopy[] = { "crash_uploader.exe" 
@@ -1258,16 +1259,16 @@ std::string tocopy[] = { "crash_uploader.exe"
 
 wxFrame* waitwindow = nullptr;
 
-void createWaitWindow(wxWindow* parent = nullptr) {
+void createWaitWindow(const char* title, const char* text,wxWindow* parent = nullptr) {
     if (waitwindow != nullptr)
         return; // Already exists
 
-    waitwindow = new wxFrame(parent, wxID_ANY, "Copying Files",
+    waitwindow = new wxFrame(parent, wxID_ANY, title,
         wxDefaultPosition, wxSize(250, 100),
         wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP | wxCAPTION);
     waitwindow->SetBackgroundColour(*wxWHITE);
 
-    new wxStaticText(waitwindow, wxID_ANY, "REPENTOGON is installing... \n Please Wait!",
+    new wxStaticText(waitwindow, wxID_ANY, text,
         wxPoint(70, 35), wxDefaultSize, wxALIGN_CENTER);
 
     waitwindow->Center();
@@ -1292,8 +1293,8 @@ bool createSteamAppIdFile(const std::string& targetPath) {
     return true;
 }
 
-bool copyFiles(const std::string& basePath) {
-    createWaitWindow();
+bool copyFiles(const std::string& basePath, bool patch = false) {
+    createWaitWindow("Copying Files", "REPENTOGON is installing... \n Please Wait!");
 
     fs::path sourceBase = fs::absolute(basePath).remove_filename();
     fs::path destBase = sourceBase / "Repentogon";
@@ -1325,7 +1326,13 @@ bool copyFiles(const std::string& basePath) {
     else {
         Logger::Warn("Finished copying some files to /Repentogon [[ %d ERRORS!! ]]\n", failcount);
     }
-
+    if (patch) {
+        destroyWaitWindow();
+        createWaitWindow("Patching Files", "REPENTOGON is doing magic... \n Hold On!");
+        fs::path patchPath = fs::current_path() / "patch";
+        patchfolder(destBase, patchPath);
+        //patchfolder(fs::path("Z:\\diffcreator\\test"), fs::path("Z:\\diffcreator\\output"));
+    }
     destroyWaitWindow();
     return allgud; //doesnt necessarily mean that execution should be stopped if false, but I feel it will be good to know if it failed or not.
 }

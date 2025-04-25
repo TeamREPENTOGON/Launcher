@@ -30,6 +30,9 @@ include (cmake/deps/libzip_pre.cmake)
 add_subdirectory (deps/libzip)
 include (cmake/deps/libzip.cmake)
 
+add_subdirectory(deps/bzip2)
+add_subdirectory(deps/bsdiff)
+
 # Generate the resource file
 set (RESOURCE_PATH "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
 configure_file (${CMAKE_SOURCE_DIR}/self_updater/self_updater.rc.in ${CMAKE_SOURCE_DIR}/self_updater/self_updater.rc)
@@ -44,6 +47,10 @@ target_include_directories (shared PRIVATE
 target_compile_options (shared PUBLIC "/MD")
 target_link_libraries (shared libcurl zip)
 
+target_link_libraries (bspatch bzip2)
+target_include_directories (bspatch PRIVATE 
+    "${CMAKE_SOURCE_DIR}/deps/bzip2")
+
 file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h" self_updater/self_updater.rc)
 add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES})
 target_compile_options (REPENTOGONLauncher PUBLIC "/MD")
@@ -52,12 +59,21 @@ target_include_directories (REPENTOGONLauncher PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/wxWidgets/include" 
     "${CMAKE_SOURCE_DIR}/deps"
     "${CMAKE_SOURCE_DIR}/deps/zlib"
+    "${CMAKE_SOURCE_DIR}/deps/bzip2"
+	"${CMAKE_SOURCE_DIR}/deps/bsdiff"
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
     "${CMAKE_SOURCE_DIR}/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
 target_compile_definitions (REPENTOGONLauncher PRIVATE UNICODE INI_SHARED_LIB "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
-target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp)
-add_custom_command (TARGET REPENTOGONLauncher POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS)
+target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch)
+add_custom_command(
+    TARGET REPENTOGONLauncher POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_SOURCE_DIR}/patch"
+        "$<TARGET_FILE_DIR:REPENTOGONLauncher>/patch"
+)
+
 
 file (GLOB_RECURSE UPDATER_FILES "include/self_updater/*.h" self_updater/*.cpp "include/launcher/version.h" src/version.cpp ${SHARED_FILES})
 add_executable (REPENTOGONLauncherUpdater WIN32 ${UPDATER_FILES})
