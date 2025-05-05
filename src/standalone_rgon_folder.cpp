@@ -16,7 +16,6 @@
 //mostly grabbed from https://steamdb.info/depot/3353471 then filled in what came from a previous depot manually, if new files are added in new versions, we will need to add them here, if shit is removed, its fine...
 std::string tocopy[] = { "crash_uploader.exe" 
 ,"curl-ca-bundle.crt"
-,"isaac-ng.exe"
 ,"libcurl.dll"
 ,"Lua5.3.3f.dll"
 ,"Lua5.3.3r.dll"
@@ -1254,7 +1253,8 @@ std::string tocopy[] = { "crash_uploader.exe"
 ,"tools/RoomEditor/Linux/RoomEditor"
 ,"tools/RoomEditor/RoomEditor.exe"
 ,"tools/RoomEditor/rooms.txt"
-,"vccorlib110.dll" };
+,"vccorlib110.dll"
+, "isaac-ng.exe" }; //the exe needs to be the last thing to get copied, so we can ensure that all files were copied without having any extra logic for it, lol
 
 
 wxFrame* waitwindow = nullptr;
