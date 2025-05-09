@@ -15,7 +15,7 @@ static const char* mandatoryFileNames[] = {
 	NULL
 };
 
-RepentogonInstallation::RepentogonInstallation(ILoggableGUI* gui) : _gui(gui) { 
+RepentogonInstallation::RepentogonInstallation(ILoggableGUI* gui) : _gui(gui) {
 	ClearInstallation();
 }
 
@@ -226,8 +226,7 @@ HMODULE RepentogonInstallation::LoadLib(const char* name, LoadableDlls dll) {
 }
 
 bool RepentogonInstallation::IsIsaacVersionCompatible(const char* version) {
-
-	return !strcmp(version, "v1.9.7.10.J212");
+	return !strcmp(version, "v1.9.7.12.J273");
 }
 
 void RepentogonInstallation::Invalidate() {
