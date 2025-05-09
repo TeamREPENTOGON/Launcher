@@ -362,7 +362,8 @@ namespace Launcher {
 	void MainFrame::Launch(wxCommandEvent& event) {
 		_logWindow.Log("Launching the game with the following options:");
 		_logWindow.Log("\tRepentogon:");
-		if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA) {
+		bool launchingVanilla = _configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA;
+		if (launchingVanilla) {
 			_logWindow.Log("\t\tRepentogon is disabled");
 		} else {
 			_logWindow.Log("\t\tRepentogon is enabled");
@@ -378,7 +379,7 @@ namespace Launcher {
 		_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize());
 
 		_configuration->Write();
-		::Launcher::Launch(&_logWindow, _isaacFileText->GetValue().c_str().AsChar(), _installation->GetRepentogonInstallation().IsLegacy(), _configuration);
+		::Launcher::Launch(&_logWindow, _isaacFileText->GetValue().c_str().AsChar(), launchingVanilla, _configuration);
 	}
 
 	void MainFrame::EnableInterface(bool enable) {
