@@ -376,7 +376,7 @@ namespace Launcher {
 			_logWindow.Log("\t\tStarting stage: not selected");
 		}
 		_logWindow.Log("\t\tLua debug: %s", _configuration->LuaDebug() ? "yes" : "no");
-		_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize());
+		_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize().c_str());
 
 		_configuration->Write();
 		::Launcher::Launch(&_logWindow, _isaacFileText->GetValue().c_str().AsChar(), launchingVanilla, _configuration);
