@@ -297,7 +297,7 @@ void LauncherWizard::UpdateRepentogonInstallationNavigationButtons() {
     wxWindow* next = FindWindowById(wxID_FORWARD, this);
 
     std::unique_lock<std::mutex> lck(_installerMutex);
-    bool hasCompleted = _installer->HasCompleted(true);
+    bool hasCompleted = _installer && _installer->HasCompleted(true);
     if (prev) {
         prev->Enable(hasCompleted);
     }
