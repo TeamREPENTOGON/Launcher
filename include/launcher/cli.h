@@ -114,6 +114,10 @@ public:
         return _isaacWaitTime;
     }
 
+    inline bool StrictThreadCancel() const {
+        return _strictThreadCancel;
+    }
+
 private:
     CLIParser();
 
@@ -132,6 +136,7 @@ private:
         static constexpr const char* configurationPath = "configuration-file";
         static constexpr const char* trapIsaacLaunch = "trap-isaac-launch";
         static constexpr const char* isaacWaitTime = "isaac-wait-time";
+        static constexpr const char* strictThreadCancel = "strict-thread-cancel";
 
         // Start from Steam options
         static constexpr const char* steam = "steam";
@@ -156,6 +161,7 @@ private:
     bool _forceRepentogonUpdate = false;
     bool _repentogonInstallerWaitOnFinished = false;
     bool _skipSelfUpdate = false;
+    bool _strictThreadCancel = false;
     unsigned long _repentogonInstallerRefreshRate = Options::_repentogonInstallerDefaultRefreshRate;
     unsigned long _curlLimit = 0;
     unsigned long _curlTimeout = 0;

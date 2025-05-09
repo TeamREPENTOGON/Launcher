@@ -103,7 +103,7 @@ namespace Launcher {
 	using RepentogonMonitor = Threading::MonitoredFuture<T, RepentogonInstallationNotification>;
 
 	template<typename T>
-	using GithubMonitor = Threading::MonitoredFuture<T, Github::GithubDownloadNotification>;
+	using GithubMonitor = Threading::MonitoredFuture<T, curl::DownloadNotification>;
 
 	class RepentogonInstaller {
 	public:
@@ -148,13 +148,21 @@ namespace Launcher {
 			return _installationState;
 		}
 
+		inline void CancelInstallation() {
+			_cancelRequested.store(true, std::memory_order_release);
+		}
+
 	private:
+		inline bool CancelRequested() const {
+			return _cancelRequested.load(std::memory_order_acquire);
+		}
+
 		bool HandleLegacyInstallation();
 
-		void PushNotification(std::string&& string, bool error);
-		void PushFileRemovalNotification(std::string&& name, bool success);
+		void PushNotification(std::string string, bool error);
+		void PushFileRemovalNotification(std::string name, bool success);
 		void PushNotification(bool isError, const char* fmt, ...) _Printf_format_string_;
-		void PushFileDownloadNotification(std::string&& name, uint32_t size, uint32_t id);
+		void PushFileDownloadNotification(std::string name, uint32_t size, uint32_t id);
 
 		std::string GetDsoundDLLPath() const;
 		bool NeedRemoveDsoundDLL() const;
@@ -216,44 +224,44 @@ namespace Launcher {
 			bool allowPreReleases);
 
 		/* Fetch the JSON of the latest Repentogon release. */
-		Github::DownloadAsStringResult FetchRepentogonUpdates(rapidjson::Document& result,
+		Github::ReleaseInfoResult FetchRepentogonUpdates(rapidjson::Document& result,
 			bool allowPreReleases);
 
 		template<typename T>
-		T GithubToRepInstall(Github::DownloadMonitor* monitor,
+		std::optional<T> GithubToRepInstall(curl::DownloadMonitor* monitor,
 			std::future<T>& future) {
 			while (future.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
-				while (std::optional<Github::GithubDownloadNotification> message = monitor->Get()) {
+				if (CancelRequested()) {
+					return std::nullopt;
+				}
+
+				while (std::optional<curl::DownloadNotification> message = monitor->Get()) {
+					if (CancelRequested()) {
+						return std::nullopt;
+					}
+
 					switch (message->type) {
-					case Github::GH_NOTIFICATION_INIT_CURL:
+					case curl::DOWNLOAD_INIT_CURL:
 						PushNotification(false, "[RepentogonUpdater] Initializing cURL connection to %s", std::get<std::string>(message->data).c_str());
 						break;
 
-					case Github::GH_NOTIFICATION_INIT_CURL_DONE:
+					case curl::DOWNLOAD_INIT_CURL_DONE:
 						PushNotification(false, "[RepentogonUpdater] Initialized cURL connection to %s", std::get<std::string>(message->data).c_str());
 						break;
 
-					case Github::GH_NOTIFICATION_CURL_PERFORM:
+					case curl::DOWNLOAD_CURL_PERFORM:
 						PushNotification(false, "[RepentogonUpdater] Performing cURL request to %s", std::get<std::string>(message->data).c_str());
 						break;
 
-					case Github::GH_NOTIFICATION_CURL_PERFORM_DONE:
+					case curl::DOWNLOAD_CURL_PERFORM_DONE:
 						PushNotification(false, "[RepentogonUpdater] Performed cURL request to %s", std::get<std::string>(message->data).c_str());
 						break;
 
-					case Github::GH_NOTIFICATION_DATA_RECEIVED:
+					case curl::DOWNLOAD_DATA_RECEIVED:
 						PushFileDownloadNotification(std::move(message->name), std::get<size_t>(message->data), message->id);
 						break;
 
-					case Github::GH_NOTIFICATION_PARSE_RESPONSE:
-						PushNotification(false, "[RepentogonUpdater] Parsing result of cURL request from %s", std::get<std::string>(message->data).c_str());
-						break;
-
-					case Github::GH_NOTIFICATION_PARSE_RESPONSE_DONE:
-						PushNotification(false, "[RepentogonUpdater] Parsed result of cURL request from %s", std::get<std::string>(message->data).c_str());
-						break;
-
-					case Github::GH_NOTIFICATION_DONE:
+					case curl::DOWNLOAD_DONE:
 						PushNotification(false, "[RepentogonUpdater] Successfully downloaded content from %s", std::get<std::string>(message->data).c_str());
 						break;
 
@@ -263,7 +271,8 @@ namespace Launcher {
 					}
 				}
 			}
-			return future.get();
+
+			return std::make_optional(future.get());
 		}
 
 		Installation* _installation;
@@ -272,6 +281,7 @@ namespace Launcher {
 		std::string _zhlVersion;
 		std::string _repentogonVersion;
 		std::string _loaderVersion;
+		std::atomic<bool> _cancelRequested = false;
 
 		Threading::Monitor<RepentogonInstallationNotification> _monitor;
 

@@ -1,20 +1,23 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 
 #include <wx/frame.h>
 
 #include "launcher/installation.h"
+#include "launcher/windows/installer_helper.h"
 
-// Forward decl to avoid circular depdency
+// Forward decl to avoid circular dependency
 namespace Launcher {
 	class MainFrame;
 }
 
 class RepentogonInstallerFrame : public wxFrame {
 public:
-	RepentogonInstallerFrame(Launcher::Installation* installation, bool forceUpdate);
+	RepentogonInstallerFrame(Launcher::Installation* installation, bool forceUpdate,
+		bool allowUnstable);
 	virtual ~RepentogonInstallerFrame();
 
 	void Initialize();
@@ -30,44 +33,24 @@ public:
 	}
 
 private:
-	void InstallRepentogonThread();
-	bool RequestCancel();
-	void RequestReCancel();
+	void OnRepentogonInstalled(bool finished);
 
 	/* Pointer to the main window.
-	 * 
+	 *
 	 * If this is not null, then the main window is set visible when this window
 	 * is closed.
-	 * 
+	 *
 	 * This is used in the initialization to have both windows exist in parallel.
 	 * Upon completion of the installation, this window transfers control to
 	 * the main window.
 	 */
 	Launcher::MainFrame* _mainFrame = nullptr;
 	wxTextCtrl* _logWindow = nullptr;
-	bool _downloadInProgress = false;
 	bool _forceUpdate = false;
+	bool _allowUnstable = false;
 
-	/* How many times a cancel was requested. */
-	uint32_t _cancelRequested = 0;
-	/* Set to true once the download thread has been joined and the main 
-	 * window (if any) has been set to visible. Further close requests will
-	 * not go through our handler if this is set to true.
-	 */
-	bool _closing = false;
-	/* Forcibly terminate the download. This acts as a last resort option in
-	 * case the downloader gets stuck.
-	 */
-	std::atomic<bool> _terminateDownload = false;
-	/* Point at which the cancel request started. If the user requests cancelation
-	 * several times, this is used to configure a threshold after which the
-	 * cancelation turns into a termination.
-	 */
-	std::chrono::steady_clock::time_point _cancelStart;
-
-	std::thread _downloadThread;
-	std::mutex _downloadMutex;
-	std::mutex _logWindowMutex;
+	std::mutex _installerMutex;
+	std::unique_ptr<RepentogonInstallerHelper> _helper;
 
 	Launcher::Installation* _installation = nullptr;
 

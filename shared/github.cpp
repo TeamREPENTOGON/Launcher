@@ -15,89 +15,40 @@
 namespace Github {
 	static std::atomic<uint32_t> __gitDownloadCounter = 0;
 
-	static void MonitorNotifyOnDataReceived(Threading::Monitor<GithubDownloadNotification>* monitor,
-		const char* name, uint32_t id, bool first, void* data, size_t n, size_t count);
-
-	static GithubDownloadNotification CreateNotification(GithubDownloadNotificationType type);
-	static GithubDownloadNotification CreateInitCurlNotification(const char* url, bool done);
-	static GithubDownloadNotification CreatePerformCurlNotification(const char* url, bool done);
-	static GithubDownloadNotification CreateDoneNotification(const char* url);
-	static GithubDownloadNotification CreateParseResponseNotification(const char* url, bool done);
-
-	DownloadAsStringResult DownloadAsString(CURLRequest const& request, const char* name,
-		std::string& response, DownloadMonitor* monitor) {
-		CURL* curl;
-		CURLcode curlResult;
-		const char* url = request.url.c_str();
-
-		CurlStringResponse data;
-		uint32_t id = __gitDownloadCounter.fetch_add(1, std::memory_order_acq_rel) + 1;
-
-		if (monitor) {
-			data.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor, name, id));
-			monitor->Push(CreateInitCurlNotification(url, false));
-		}
-
-		curl = curl_easy_init();
-		if (!curl) {
-			Logger::Error("DownloadAsString: error while initializing cURL session for %s\n", url);
-			return DOWNLOAD_AS_STRING_BAD_CURL;
-		}
-
-		ScopedCURL session(curl);
-		InitCurlSession(curl, request, &data);
-
-		if (monitor) {
-			monitor->Push(CreateInitCurlNotification(url, true));
-			monitor->Push(CreatePerformCurlNotification(url, false));
-		}
-
-		curlResult = curl_easy_perform(curl);
-		if (curlResult != CURLE_OK) {
-			Logger::Error("DownloadAsString: %s: error while performing HTTP request: "
-				"cURL error: %s", url, curl_easy_strerror(curlResult));
-			return DOWNLOAD_AS_STRING_BAD_REQUEST;
-		}
-
-		if (monitor) {
-			monitor->Push(CreatePerformCurlNotification(url, true));
-			monitor->Push(CreateDoneNotification(url));
-		}
-
-		response = data.GetData();
-		return DOWNLOAD_AS_STRING_OK;
+	ReleaseInfoResult FetchReleaseInfo(curl::RequestParameters const& request,
+		rapidjson::Document& response, curl::DownloadStringResult* curlResult,
+		std::string name) {
+		curl::DownloadStringDescriptor descriptor = curl::DownloadString(request, std::move(name));
+		return ValidateReleaseInfo(descriptor, response, curlResult);
 	}
 
-	DownloadAsStringResult FetchReleaseInfo(CURLRequest const& request,
-		rapidjson::Document& response, DownloadMonitor* monitor) {
-		std::string stringResponse;
-		const char* url = request.url.c_str();
-		DownloadAsStringResult result = DownloadAsString(request, "release info", stringResponse,
-			monitor);
-		if (result != DOWNLOAD_AS_STRING_OK) {
-			return result;
+	std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> AsyncFetchReleaseInfo(
+		curl::RequestParameters const& request) {
+		return curl::AsyncDownloadString(request, "release info");
+	}
+
+	ReleaseInfoResult ValidateReleaseInfo(curl::DownloadStringDescriptor const& desc,
+		rapidjson::Document& response, curl::DownloadStringResult* curlResult) {
+		if (curlResult) {
+			*curlResult = desc.result;
 		}
 
-		if (monitor)
-			monitor->Push(CreateParseResponseNotification(url, false));
-
-		response.Parse(stringResponse.c_str());
-
-		if (monitor)
-			monitor->Push(CreateParseResponseNotification(url, true));
-
-		if (response.HasParseError()) {
-			Logger::Error("FetchReleaseInfo: %s: error while parsing HTTP response. rapidjson error code %d", url,
-				response.GetParseError());
-			return Github::DOWNLOAD_AS_STRING_INVALID_JSON;
+		if (desc.result != curl::DOWNLOAD_STRING_OK) {
+			return RELEASE_INFO_CURL_ERROR;
 		}
 
-		if (!response.HasMember("name")) {
-			Logger::Error("FetchReleaseInfo: %s: malformed HTTP response: no field called \"name\"", url);
-			return Github::DOWNLOAD_AS_STRING_NO_NAME;
+		rapidjson::Document document;
+		document.Parse(desc.string.c_str());
+		if (document.HasParseError()) {
+			return RELEASE_INFO_JSON_ERROR;
 		}
 
-		return DOWNLOAD_AS_STRING_OK;
+		if (!document.HasMember("name")) {
+			return RELEASE_INFO_NO_NAME;
+		}
+
+		response = std::move(document);
+		return RELEASE_INFO_OK;
 	}
 
 	VersionCheckResult CheckUpdates(const char* installed, const char* tool,
@@ -118,58 +69,10 @@ namespace Github {
 		}
 	}
 
-	DownloadFileResult DownloadFile(const char* file, CURLRequest const& request,
-		DownloadMonitor* monitor) {
-		const char* url = request.url.c_str();
-		CurlFileResponse response(file);
-
-		if (!response.GetFile()) {
-			Logger::Error("DownloadFile: unable to open %s for writing\n", file);
-			return DOWNLOAD_FILE_BAD_FS;
-		}
-
-		uint32_t id = ++__gitDownloadCounter;
-		if (monitor) {
-			response.RegisterHook(std::bind_front(MonitorNotifyOnDataReceived, monitor, file, id));
-			monitor->Push(CreateInitCurlNotification(url, false));
-		}
-
-		CURL* curl = curl_easy_init();
-		CURLcode code;
-
-		if (!curl) {
-			Logger::Error("DownloadFile: error while initializing curl session to download hash\n");
-			return DOWNLOAD_FILE_BAD_CURL;
-		}
-
-		ScopedCURL scoppedCurl(curl);
-		InitCurlSession(curl, request, &response);
-
-		if (monitor) {
-			monitor->Push(CreateInitCurlNotification(url, true));
-			monitor->Push(CreatePerformCurlNotification(url, false));
-		}
-
-		code = curl_easy_perform(curl);
-		if (code != CURLE_OK) {
-			Logger::Error("DownloadFile: error while downloading hash: %s\n", curl_easy_strerror(code));
-			return DOWNLOAD_FILE_DOWNLOAD_ERROR;
-		}
-
-		if (monitor) {
-			monitor->Push(CreatePerformCurlNotification(url, true));
-			monitor->Push(CreateDoneNotification(url));
-		}
-
-		return DOWNLOAD_FILE_OK;
-	}
-
-	void InitCurlSession(CURL* curl, CURLRequest const& request,
-		AbstractCurlResponseHandler* handler) {
-		struct curl_slist* headers = NULL;
-		headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
-		headers = curl_slist_append(headers, "X-GitHub-Api-Version: 2022-11-28");
-		headers = curl_slist_append(headers, "User-Agent: REPENTOGON");
+	void GenerateGithubHeaders(curl::RequestParameters& parameters) {
+		parameters.headers.push_back("Accept: application/vnd.github+json");
+		parameters.headers.push_back("X-GitHub-Api-Version: 2022-11-28");
+		parameters.headers.push_back("User-Agent: REPENTOGON");
 
 		const char* file = "github.token";
 		if (Filesystem::FileExists(file)) {
@@ -188,93 +91,8 @@ namespace Github {
 			buffer[len - 1] = '\0';
 			fclose(f);
 			Logger::Info("Adding Authorization header: %s\n", buffer);
-			headers = curl_slist_append(headers, buffer);
+			parameters.headers.push_back(buffer);
 			free(buffer);
-		}
-
-		curl_easy_setopt(curl, CURLOPT_URL, request.url.c_str());
-		curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AbstractCurlResponseHandler::ResponseSkeleton);
-		curl_easy_setopt(curl, CURLOPT_WRITEDATA, handler);
-		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-		if (request.maxSpeed) {
-			curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, request.maxSpeed);
-		}
-
-		if (request.timeout) {
-			curl_easy_setopt(curl, CURLOPT_TIMEOUT_MS, request.timeout);
-		}
-
-		if (request.serverTimeout) {
-			curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, request.serverTimeout);
-		}
-	}
-
-	void MonitorNotifyOnDataReceived(Threading::Monitor<GithubDownloadNotification>* monitor, const char* name,
-		uint32_t id, bool first, void* data, size_t n, size_t count) {
-		GithubDownloadNotification notification;
-		notification.name = name;
-		notification.type = GH_NOTIFICATION_DATA_RECEIVED;
-		notification.data = n * count;
-		notification.id = id;
-		monitor->Push(notification);
-	}
-
-	GithubDownloadNotification CreateNotification(GithubDownloadNotificationType type) {
-		GithubDownloadNotification notification;
-		notification.type = type;
-		return notification;
-	}
-
-	GithubDownloadNotification CreateInitCurlNotification(const char* url, bool done) {
-		GithubDownloadNotification notification;
-		notification.type = done ? GH_NOTIFICATION_INIT_CURL_DONE : GH_NOTIFICATION_INIT_CURL;
-		notification.data = url;
-		return notification;
-	}
-
-	GithubDownloadNotification CreatePerformCurlNotification(const char* url, bool done) {
-		GithubDownloadNotification notification;
-		notification.type = done ? GH_NOTIFICATION_CURL_PERFORM_DONE : GH_NOTIFICATION_CURL_PERFORM;
-		notification.data = url;
-		return notification;
-	}
-
-	GithubDownloadNotification CreateParseResponseNotification(const char* url, bool done) {
-		GithubDownloadNotification notification;
-		notification.type = done ? GH_NOTIFICATION_PARSE_RESPONSE_DONE : GH_NOTIFICATION_PARSE_RESPONSE;
-		notification.data = url;
-		return notification;
-	}
-
-	GithubDownloadNotification CreateDoneNotification(const char* url) {
-		GithubDownloadNotification notification;
-		notification.type = GH_NOTIFICATION_DONE;
-		notification.data = url;
-		return notification;
-	}
-
-	const char* DownloadAsStringResultToLogString(const Github::DownloadAsStringResult result) {
-		switch (result) {
-		case Github::DOWNLOAD_AS_STRING_OK:
-			return "Successfully downloaded";
-
-		case Github::DOWNLOAD_AS_STRING_BAD_CURL:
-			return "Error while initiating cURL connection";
-
-		case Github::DOWNLOAD_AS_STRING_BAD_REQUEST:
-			return "Error while performing cURL request";
-
-		case Github::DOWNLOAD_AS_STRING_INVALID_JSON:
-			return "Malformed JSON in answer";
-
-		case Github::DOWNLOAD_AS_STRING_NO_NAME:
-			return "JSON answer contains no \"name\" field";
-
-		default:
-			sprintf(_downloadAsStringResultToLogStringBuffer, "Unexpected error %d: Please report this as a bug", result);
-			return _downloadAsStringResultToLogStringBuffer;
 		}
 	}
 }

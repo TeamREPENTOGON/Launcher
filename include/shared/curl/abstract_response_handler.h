@@ -4,7 +4,8 @@
 #include <vector>
 
 class AbstractCurlResponseHandler {
-	typedef std::function<void(bool, void*, size_t, size_t)> OnDataHandlerFn;
+public:
+	typedef std::function<bool(bool, void*, size_t, size_t)> OnDataHandlerFn;
 
 public:
 	virtual size_t OnFirstData(void* data, size_t size, size_t n) { return size * n; }

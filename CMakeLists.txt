@@ -44,7 +44,7 @@ target_include_directories (shared PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
-target_compile_options (shared PUBLIC "/MD")
+target_compile_options (shared PUBLIC "/MD" "/w44061")
 target_link_libraries (shared libcurl zip)
 
 target_link_libraries (bspatch bzip2)
@@ -53,10 +53,10 @@ target_include_directories (bspatch PRIVATE
 
 file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h" self_updater/self_updater.rc)
 add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES})
-target_compile_options (REPENTOGONLauncher PUBLIC "/MD")
+target_compile_options (REPENTOGONLauncher PUBLIC "/MD" "/w44061")
 target_include_directories (REPENTOGONLauncher PRIVATE 
-    "${CMAKE_SOURCE_DIR}/deps/curl/include" 
-    "${CMAKE_SOURCE_DIR}/deps/wxWidgets/include" 
+    "${CMAKE_SOURCE_DIR}/deps/curl/include"
+    "${CMAKE_SOURCE_DIR}/deps/wxWidgets/include"
     "${CMAKE_SOURCE_DIR}/deps"
     "${CMAKE_SOURCE_DIR}/deps/zlib"
     "${CMAKE_SOURCE_DIR}/deps/bzip2"
@@ -83,7 +83,7 @@ target_include_directories (REPENTOGONLauncherUpdater PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
-target_compile_options (REPENTOGONLauncherUpdater PUBLIC "/MD")
+target_compile_options (REPENTOGONLauncherUpdater PUBLIC "/MD" "/w44061")
 
 add_custom_command (TARGET REPENTOGONLauncherUpdater POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:REPENTOGONLauncherUpdater> "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
 

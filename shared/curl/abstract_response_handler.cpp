@@ -1,8 +1,12 @@
+#include <curl/curl.h>
+
 #include "shared/curl/abstract_response_handler.h"
 
 size_t AbstractCurlResponseHandler::OnData(void* data, size_t size, size_t n) {
 	for (OnDataHandlerFn const& fn : _hooks) {
-		fn(!_firstReceived, data, size, n);
+		if (!fn(!_firstReceived, data, size, n)) {
+			return CURL_WRITEFUNC_ERROR;
+		}
 	}
 
 	if (!_firstReceived) {

@@ -52,43 +52,42 @@ namespace Updater {
 	}
 
 	bool LauncherUpdateManager::DownloadUpdate(LauncherUpdateData* updateData) {
-		Threading::Monitor<Github::GithubDownloadNotification> monitor;
-		std::future<bool> future = std::async(std::launch::async, &LauncherUpdater::DownloadUpdate,
-			&_updater, updateData);
+		Threading::Monitor<curl::DownloadNotification> monitor;
+		_updater.DownloadUpdate(updateData);
+
 		size_t totalDownloadSize = 0;
 		struct {
-			Threading::Monitor<Github::GithubDownloadNotification>* monitor;
+			Threading::Monitor<curl::DownloadNotification>* monitor;
 			std::string name;
 			bool done;
 		} monitorAndName[] = {
-			{ &updateData->_hashMonitor, "Hash file", false },
-			{ &updateData->_zipMonitor, "Launcher archive", false },
+			{ &updateData->_hashDownloadDesc->base.monitor, "Hash file", false },
+			{ &updateData->_zipDownloadDesc->base.monitor, "Launcher archive", false },
 			{ NULL, "" }
 		};
 
 		std::chrono::steady_clock::time_point lastReceived = std::chrono::steady_clock::now();
-		while (future.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready && 
-			std::any_of(monitorAndName, monitorAndName + 2, [](auto const& monitor) -> bool { return !monitor.done;  })) {
+		while (std::any_of(monitorAndName, monitorAndName + 2, [](auto const& monitor) -> bool { return !monitor.done;  })) {
 			for (auto s = monitorAndName; s->monitor; ++s) {
-				while (std::optional<Github::GithubDownloadNotification> message = s->monitor->Get()) {
+				while (std::optional<curl::DownloadNotification> message = s->monitor->Get()) {
 					switch (message->type) {
-					case Github::GH_NOTIFICATION_INIT_CURL:
+					case curl::DOWNLOAD_INIT_CURL:
 						_gui->Log("", true, "[%s] Initializing cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
-					case Github::GH_NOTIFICATION_INIT_CURL_DONE:
+					case curl::DOWNLOAD_INIT_CURL_DONE:
 						_gui->Log("", true, "[%s] Initialized cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
-					case Github::GH_NOTIFICATION_CURL_PERFORM:
+					case curl::DOWNLOAD_CURL_PERFORM:
 						_gui->Log("", true, "[%s] Performing cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
-					case Github::GH_NOTIFICATION_CURL_PERFORM_DONE:
+					case curl::DOWNLOAD_CURL_PERFORM_DONE:
 						_gui->Log("", true, "[%s] Performed cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
-					case Github::GH_NOTIFICATION_DATA_RECEIVED:
+					case curl::DOWNLOAD_DATA_RECEIVED:
 					{
 						totalDownloadSize += std::get<size_t>(message->data);
 
@@ -100,15 +99,7 @@ namespace Updater {
 						break;
 					}
 
-					case Github::GH_NOTIFICATION_PARSE_RESPONSE:
-						_gui->Log("", true, "[%s] Parsing result of cURL request from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
-						break;
-
-					case Github::GH_NOTIFICATION_PARSE_RESPONSE_DONE:
-						_gui->Log("", true, "[%s] Parsed result of cURL request from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
-						break;
-
-					case Github::GH_NOTIFICATION_DONE:
+					case curl::DOWNLOAD_DONE:
 						s->done = true;
 						_gui->Log("", true, "[%s] Successfully downloaded content from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
@@ -125,33 +116,40 @@ namespace Updater {
 		 * side-effects here. Therefore, there is no need to introduce a fence in
 		 * order to read the content of updateData.
 		 */
-		return future.get();
+		curl::DownloadStringDescriptor hashDescriptor = updateData->_hashDownloadDesc->result.get();
+		curl::DownloadFileDescriptor zipDescriptor = updateData->_zipDownloadDesc->result.get();
+
+		updateData->_hashDescriptor = hashDescriptor;
+		updateData->_zipDescriptor = zipDescriptor;
+
+		return hashDescriptor.result == curl::DOWNLOAD_STRING_OK &&
+			zipDescriptor.result == curl::DOWNLOAD_FILE_OK;
 	}
 
 	bool LauncherUpdateManager::PostDownloadChecks(bool downloadOk, LauncherUpdateData* data) {
 		if (!downloadOk) {
 			_gui->LogError("Error while downloading launcher update");
 
-			if (data->_hashDownloadResult != Github::DOWNLOAD_AS_STRING_OK) {
-				LogGithubDownloadAsString("hash download", data->_hashDownloadResult);
+			if (data->_hashDescriptor->result != curl::DOWNLOAD_STRING_OK) {
+				LogGithubDownloadAsString("hash download", data->_hashDescriptor->result);
 			}
 
-			if (data->_zipDownloadResult != Github::DOWNLOAD_FILE_OK) {
-				switch (data->_zipDownloadResult) {
-				case Github::DOWNLOAD_FILE_BAD_CURL:
+			if (data->_zipDescriptor->result != curl::DOWNLOAD_FILE_OK) {
+				switch (data->_zipDescriptor->result) {
+				case curl::DOWNLOAD_FILE_BAD_CURL:
 					_gui->LogError("Launcher archive: error while initializeing cURL connection to %s", data->_zipUrl.c_str());
 					break;
 
-				case Github::DOWNLOAD_FILE_BAD_FS:
-					_gui->LogError("Launcher archive: error while creating file %s on disk", data->_zipFileName.c_str());
+				case curl::DOWNLOAD_FILE_BAD_FS:
+					_gui->LogError("Launcher archive: error while creating file %s on disk", data->_zipFilename.c_str());
 					break;
 
-				case Github::DOWNLOAD_FILE_DOWNLOAD_ERROR:
+				case curl::DOWNLOAD_FILE_DOWNLOAD_ERROR:
 					_gui->LogError("Launcher archive: error while downloading archive from %s", data->_zipUrl.c_str());
 					break;
 
 				default:
-					_gui->LogError("Launcher archive: unexpected error code %d", data->_zipDownloadResult);
+					_gui->LogError("Launcher archive: unexpected error code %d", data->_zipDescriptor->result);
 					break;
 				}
 			}
@@ -160,8 +158,8 @@ namespace Updater {
 		} else {
 			_gui->Log("Checking release integrity...\n");
 
-			data->TrimHash();
-			if (!_updater.CheckHashConsistency(data->_zipFileName.c_str(), data->_hash.c_str())) {
+			Sha256::Trim(data->_hashDescriptor->string);
+			if (!_updater.CheckHashConsistency(data->_zipFilename.c_str(), data->_hashDescriptor->string.c_str())) {
 				_gui->LogError("Hash mismatch: download was corrupted\n");
 				return false;
 			} else {
@@ -188,7 +186,7 @@ namespace Updater {
 		bool downloadResult = DownloadUpdate(&updateData);
 
 		_gui->Log("Update scheduled from version %s to version %s\n", Launcher::version, _updater.GetReleaseInfo()["name"].GetString());
-		
+
 		if (!PostDownloadChecks(downloadResult, &updateData)) {
 			_gui->LogError("Error while downloading release\n");
 			return false;
@@ -204,7 +202,7 @@ namespace Updater {
 	}
 
 	bool LauncherUpdateManager::ExtractArchive(LauncherUpdateData* data) {
-		const char* filename = data->_zipFileName.c_str();
+		const char* filename = data->_zipFilename.c_str();
 		ExtractArchiveResult result = _updater.ExtractArchive(filename);
 		switch (result.errCode) {
 		case EXTRACT_ARCHIVE_OK:
@@ -277,20 +275,21 @@ namespace Updater {
 		return false;
 	}
 
-	void LauncherUpdateManager::LogGithubDownloadAsString(const char* prefix, Github::DownloadAsStringResult result) {
-		_gui->Log("%s: %s\n", prefix, Github::DownloadAsStringResultToLogString(result));
+	void LauncherUpdateManager::LogGithubDownloadAsString(const char* prefix,
+		curl::DownloadStringResult result) {
+		_gui->Log("%s: %s\n", prefix, curl::DownloadAsStringResultToLogString(result));
 	}
 
 	LauncherUpdateManager::SelfUpdateCheckResult LauncherUpdateManager::CheckSelfUpdateAvailability(bool allowPreReleases,
 		std::string& version, std::string& url) {
 		_gui->LogNoNL("Checking for availability of launcher updates... ");
-		Github::DownloadAsStringResult downloadReleasesResult;
+		curl::DownloadStringResult downloadReleasesResult;
 		if (_updateChecker.IsSelfUpdateAvailable(allowPreReleases, false, version, url, &downloadReleasesResult)) {
 			_gui->Log("OK\n");
 			_gui->Log("", true, "New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
 			return SELF_UPDATE_CHECK_UPDATE_AVAILABLE;
 		} else {
-			if (downloadReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
+			if (downloadReleasesResult != curl::DOWNLOAD_STRING_OK) {
 				_gui->Log("KO");
 				_gui->LogError("Error encountered while checking for availability of launcher update");
 				LogGithubDownloadAsString("Launcher Update Check", downloadReleasesResult);

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
+#include <mutex>
 #include <thread>
 
 #include "wx/checkbox.h"
@@ -11,7 +13,10 @@
 #include "wx/stattext.h"
 #include "wx/textctrl.h"
 #include "wx/wizard.h"
+
 #include "launcher/installation.h"
+#include "shared/curl_request.h"
+#include "launcher/windows/installer_helper.h"
 
 class LauncherWizard : public wxWizard {
 public:
@@ -24,9 +29,11 @@ public:
     void BeforePageChanged(wxWizardEvent& event);
     void OnIsaacExecutableSelected(wxCommandEvent& event);
     void OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event);
+    void OnCancel(wxWizardEvent& event);
 
-    inline bool WasRepentogonInstalled() const {
-        return _repentogonInstallationDone;
+    inline bool WasRepentogonInstalled(bool allowCancel) const {
+        std::unique_lock<std::mutex> lck(_installerMutex);
+        return _installer && _installer->HasCompleted(allowCancel);
     }
 
 private:
@@ -64,9 +71,9 @@ private:
     void PromptIsaacExecutable();
 
     void OnIsaacExecutableSelected(std::string const& path);
+    void OnRepentogonInstallationCompleted(bool success);
 
     void StartRepentogonInstallation();
-    void RepentogonInstallationThread();
 
     wxWizardPageSimple* _introductionPage = nullptr;
     wxWizardPageSimple* _isaacSetupPage = nullptr;
@@ -101,12 +108,12 @@ private:
 
     bool _isaacFound = false;
     bool _compatibleWithRepentogon = false;
-    bool _repentogonInstallationDone = false;
     bool _dirtyUnstableUpdates = false;
     wxIcon _questionMark;
     wxBitmap _questionMarkBitmap;
 
-    std::thread _repentogonInstallerThread;
+    mutable std::mutex _installerMutex;
+    std::unique_ptr<RepentogonInstallerHelper> _installer;
 
     wxDECLARE_EVENT_TABLE();
 };

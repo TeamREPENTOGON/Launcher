@@ -32,6 +32,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     parser.AddLongSwitch(Options::trapIsaacLaunch, "Trap the launcher when starting Isaac, allowing for a debugger to attach");
     parser.AddLongOption(Options::isaacWaitTime, "Max wait time (in milliseconds) after creating the Repentogon remote thread",
         wxCMD_LINE_VAL_NUMBER);
+    parser.AddLongSwitch(Options::strictThreadCancel, "Crash the launcher if a cancelled thread does not enter its cancellable state");
 
     parser.AddLongSwitch(Options::steam, "Perform a Steam launch, bypassing as much of the "
         "startup logic as possible");
@@ -118,6 +119,8 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     if (parser.Found(Options::configurationPath, &configurationPath)) {
         _configurationPath = configurationPath;
     }
+
+    _strictThreadCancel = parser.Found(Options::strictThreadCancel);
 
     _steamLaunch = parser.Found(Options::steam);
 

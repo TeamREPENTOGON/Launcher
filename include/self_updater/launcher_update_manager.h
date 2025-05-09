@@ -27,7 +27,7 @@ namespace Updater {
 		LauncherUpdater _updater;
 		Shared::LauncherUpdateChecker _updateChecker;
 
-		void LogGithubDownloadAsString(const char* prefix, Github::DownloadAsStringResult code);
+		void LogGithubDownloadAsString(const char* prefix, curl::DownloadStringResult code);
 
 		bool DoPreUpdateChecks();
 		bool DownloadUpdate(LauncherUpdateData* data);

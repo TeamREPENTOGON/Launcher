@@ -15,7 +15,8 @@ namespace Launcher {
 
 	private:
 		bool RunWizard(bool* installedRepentogon);
-		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(bool forceUpdate);
+		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(bool forceUpdate,
+			bool allowUnstable);
 		MainFrame* CreateMainWindow();
 	};
 }

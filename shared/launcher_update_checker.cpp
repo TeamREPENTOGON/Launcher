@@ -11,40 +11,34 @@
 #include "shared/logger.h"
 
 namespace Shared {
-	static Github::DownloadAsStringResult FetchReleases(rapidjson::Document& answer);
+	static curl::DownloadStringResult FetchReleases(rapidjson::Document& answer);
 
 	static const char* ReleasesURL = "https://api.github.com/repos/TeamREPENTOGON/Launcher/releases";
 
-	Github::DownloadAsStringResult FetchReleases(rapidjson::Document& answer) {
-		Threading::Monitor<Github::GithubDownloadNotification> monitor;
-		std::string releaseString;
-		// return Github::FetchReleaseInfo(ReleasesURL, answer, &monitor);
-		CURLRequest request;
+	curl::DownloadStringResult FetchReleases(rapidjson::Document& answer) {
+		curl::RequestParameters request;
 		request.maxSpeed = request.serverTimeout = request.timeout = 0;
 		request.url = ReleasesURL;
-		Github::DownloadAsStringResult result = Github::DownloadAsString(request, "launcher releases information", releaseString, nullptr);
-		if (result != Github::DOWNLOAD_AS_STRING_OK) {
-			return result;
-		}
+		Github::GenerateGithubHeaders(request);
 
-		answer.Parse(releaseString.c_str());
-		if (answer.HasParseError()) {
-			return Github::DOWNLOAD_AS_STRING_INVALID_JSON;
-		}
+		curl::DownloadStringResult result;
+		Github::ReleaseInfoResult descriptor = Github::FetchReleaseInfo(
+			request, answer, &result, "launcher releases info");
 
-		return Github::DOWNLOAD_AS_STRING_OK;
+		return result;
 	}
 
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
 		bool force, std::string& version, std::string& url);
 
 	bool LauncherUpdateChecker::IsSelfUpdateAvailable(bool allowDrafts, bool force,
-		std::string& version, std::string& url, Github::DownloadAsStringResult* fetchReleasesResult) {
-		Github::DownloadAsStringResult downloadResult = FetchReleases(_releasesInfo);
-		if (fetchReleasesResult)
+		std::string& version, std::string& url, curl::DownloadStringResult* fetchReleasesResult) {
+		curl::DownloadStringResult downloadResult = FetchReleases(_releasesInfo);
+		if (fetchReleasesResult) {
 			*fetchReleasesResult = downloadResult;
+		}
 
-		if (downloadResult != Github::DOWNLOAD_AS_STRING_OK) {
+		if (downloadResult != curl::DOWNLOAD_STRING_OK) {
 			return false;
 		}
 
@@ -80,8 +74,8 @@ namespace Shared {
 		SelfUpdateErrorCode result;
 		rapidjson::Document releases;
 
-		Github::DownloadAsStringResult releasesResult = FetchReleases(releases);
-		if (releasesResult != Github::DOWNLOAD_AS_STRING_OK) {
+		curl::DownloadStringResult releasesResult = FetchReleases(releases);
+		if (releasesResult != curl::DOWNLOAD_STRING_OK) {
 			result.base = SELF_UPDATE_UPDATE_CHECK_FAILED;
 			result.detail = releasesResult;
 			return result;

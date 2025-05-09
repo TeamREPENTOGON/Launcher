@@ -16,24 +16,24 @@ namespace Updater {
 	enum UpdateState {
 		/* Backend is not yet initialized. */
 		UPDATE_STATE_NONE = -1,
-		/* Launcher has created the updater, and is ready to be updated. 
+		/* Launcher has created the updater, and is ready to be updated.
 		 * Nothing stored inside.
 		 */
 		UPDATE_STATE_INIT,
-		/* RepentogonUpdater is ready to perform the download. 
+		/* RepentogonUpdater is ready to perform the download.
 		 * CLI params stored within.
 		 */
 		UPDATE_STATE_READY,
-		/* RepentogonUpdater has downloaded the update. 
-		 * Name of the zip is contained within. 
+		/* RepentogonUpdater has downloaded the update.
+		 * Name of the zip is contained within.
 		 */
 		UPDATE_STATE_DOWNLOADED,
-		/* RepentogonUpdater received invalid URL, update abandonned. 
-		 * URL contained within. 
+		/* RepentogonUpdater received invalid URL, update abandonned.
+		 * URL contained within.
 		 */
 		UPDATE_STATE_BAD_URL,
 		/* RepentogonUpdater received lock file in an invalid state.
-		 * Previous state contained within. 
+		 * Previous state contained within.
 		 */
 		UPDATE_STATE_INVALID_STATE
 	};
@@ -73,19 +73,14 @@ namespace Updater {
 	static constexpr const char* LauncherFileNameTemplate = "Launcher_%s.zip";
 
 	struct LauncherUpdateData {
-		Threading::Monitor<Github::GithubDownloadNotification> _zipMonitor;
+		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> _zipDownloadDesc;
+		std::optional<curl::DownloadFileDescriptor> _zipDescriptor;
 		std::string _zipUrl;
-		std::string _zipFileName;
-		Github::DownloadFileResult _zipDownloadResult;
+		std::string _zipFilename;
 
-		Threading::Monitor<Github::GithubDownloadNotification> _hashMonitor;
+		std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> _hashDownloadDesc;
+		std::optional<curl::DownloadStringDescriptor> _hashDescriptor;
 		std::string _hashUrl;
-		std::string _hash;
-		Github::DownloadAsStringResult _hashDownloadResult;
-
-		inline void TrimHash() {
-			Sha256::Trim(_hash);
-		}
 	};
 
 	class LauncherUpdater {
@@ -101,31 +96,28 @@ namespace Updater {
 		LauncherUpdater& operator=(LauncherUpdater&&) = delete;
 
 		/* Check that the backend is properly configured.
-		 * 
+		 *
 		 * This ensures that the lock file exists and that it is in the appropriate
 		 * state. The function also checks that it can fetch the release data.
-		 * 
-		 * This functions sets the current state to the one read from the file, 
+		 *
+		 * This functions sets the current state to the one read from the file,
 		 * if any.
 		 */
 		UpdateStartupCheckResult DoStartupCheck();
 
 		UpdateState GetUpdateState() const;
 
-		/* Download the update. 
+		/* Asynchronously download the update.
 		 *
-		 * The content of data is set to the appropriate information depending
-		 * on what happened during the download.
-		 * 
-		 * The function returns true if everything went well, false otherwise.
+		 * Descriptors inside @a data are set accordingly.
 		 */
-		bool DownloadUpdate(LauncherUpdateData* data);
+		void DownloadUpdate(LauncherUpdateData* data);
 
 		ExtractArchiveResult ExtractArchive(const char* name);
 
 		bool CheckHashConsistency(const char* zipFile, const char* hash);
 
-		Github::DownloadAsStringResult GetReleaseDownloadResult() const;
+		curl::DownloadStringResult GetReleaseDownloadResult() const;
 		rapidjson::Document const& GetReleaseInfo() const;
 		ReleaseInfoState GetReleaseInfoState() const;
 
@@ -135,7 +127,7 @@ namespace Updater {
 		std::string _hashUrl, _zipUrl;
 
 		rapidjson::Document _releaseInfo;
-		Github::DownloadAsStringResult _releaseDownloadResult = Github::DOWNLOAD_AS_STRING_OK;
+		curl::DownloadStringResult _releaseDownloadResult = curl::DOWNLOAD_STRING_OK;
 		ReleaseInfoState _releaseInfoState = ReleaseInfoState::RELEASE_INFO_STATE_OK;
 		UpdateState _state = UPDATE_STATE_NONE;
 

@@ -19,12 +19,13 @@ namespace Updater {
 	}
 
 	UpdateStartupCheckResult LauncherUpdater::DoStartupCheck() {
-		CURLRequest request;
+		curl::RequestParameters request;
+		Github::GenerateGithubHeaders(request);
 		request.maxSpeed = request.timeout = request.serverTimeout = 0;
 		request.url = _url;
 
-		_releaseDownloadResult = Github::FetchReleaseInfo(request, _releaseInfo, nullptr);
-		if (_releaseDownloadResult != Github::DOWNLOAD_AS_STRING_OK) {
+		Github::FetchReleaseInfo(request, _releaseInfo, &_releaseDownloadResult, "launcher releases info");
+		if (_releaseDownloadResult != curl::DOWNLOAD_STRING_OK) {
 			return UPDATE_STARTUP_CHECK_CANNOT_FETCH_RELEASE;
 		}
 
@@ -41,27 +42,25 @@ namespace Updater {
 		return Sha256::Equals(fileHash.c_str(), hash);
 	}
 
-	bool LauncherUpdater::DownloadUpdate(LauncherUpdateData* data) {
+	void LauncherUpdater::DownloadUpdate(LauncherUpdateData* data) {
 		PopulateUpdateData(data);
-		CURLRequest request;
+		curl::RequestParameters request;
 		request.maxSpeed = request.serverTimeout = request.timeout = 0;
 		request.url = data->_hashUrl;
+		Github::GenerateGithubHeaders(request);
 
-		data->_hashDownloadResult = Github::DownloadAsString(request, "launcher update hash", data->_hash, &data->_hashMonitor);
+		data->_hashDownloadDesc = curl::AsyncDownloadString(request, "update hash");
 		request.url = data->_zipUrl;
-		data->_zipDownloadResult = Github::DownloadFile(data->_zipFileName.c_str(), request, &data->_zipMonitor);
-
-		return data->_hashDownloadResult == Github::DOWNLOAD_AS_STRING_OK &&
-			data->_zipDownloadResult == Github::DOWNLOAD_FILE_OK;
+		data->_zipDownloadDesc = curl::AsyncDownloadFile(request, data->_zipFilename);
 	}
 
 	void LauncherUpdater::GenerateArchiveFilename(LauncherUpdateData* data) {
 		char buffer[4096];
 		sprintf(buffer, LauncherFileNameTemplate, _releaseInfo["name"].GetString());
-		data->_zipFileName = buffer;
+		data->_zipFilename = buffer;
 	}
 
-	Github::DownloadAsStringResult LauncherUpdater::GetReleaseDownloadResult() const {
+	curl::DownloadStringResult LauncherUpdater::GetReleaseDownloadResult() const {
 		return _releaseDownloadResult;
 	}
 

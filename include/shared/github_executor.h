@@ -3,7 +3,7 @@
 #include <atomic>
 #include <future>
 
-#include "shared/github.h"
+#include "shared/curl_request.h"
 #include "shared/monitor.h"
 
 class GithubExecutor {
@@ -15,41 +15,32 @@ public:
     void Start();
     void Stop();
 
-    std::future<Github::DownloadAsStringResult> AddDownloadAsStringRequest(CURLRequest const& request,
-        std::string&& name, std::string& response, Github::DownloadMonitor* monitor);
+    std::future<curl::DownloadStringDescriptor> AddDownloadStringRequest(std::string&& name,
+        curl::RequestParameters const& request,
+        std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> const& desc);
 
-    std::future<Github::DownloadFileResult> AddDownloadFileRequest(const char* file,
-        CURLRequest const& request, Github::DownloadMonitor* monitor);
-
-    std::future<Github::DownloadAsStringResult> AddFetchReleasesRequest(CURLRequest const& request,
-        rapidjson::Document& response, Github::DownloadMonitor* monitor);
+    std::future<curl::DownloadFileDescriptor> AddDownloadFileRequest(std::string&& filename,
+        curl::RequestParameters const& request,
+        std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> const& desc);
 
 private:
     friend class GithubRequestVisitor;
 
-    struct DownloadAsStringRequest {
-        CURLRequest request;
-        std::string name;
-        std::string* response;
-        Github::DownloadMonitor* monitor;
-        std::promise<Github::DownloadAsStringResult> result;
+    struct DownloadStringRequest {
+        curl::RequestParameters                                     request;
+        std::string                                                 name;
+        std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> descriptor;
+        std::promise<curl::DownloadStringDescriptor>                result;
     };
 
     struct DownloadFileRequest {
-        CURLRequest request;
-        const char* file;
-        Github::DownloadMonitor* monitor;
-        std::promise<Github::DownloadFileResult> result;
+        curl::RequestParameters                                     request;
+        std::string                                                 filename;
+        std::shared_ptr<curl::AsynchronousDownloadFileDescriptor>   descriptor;
+        std::promise<curl::DownloadFileDescriptor>                  result;
     };
 
-    struct FetchReleasesRequest {
-        CURLRequest request;
-        rapidjson::Document* response;
-        Github::DownloadMonitor* monitor;
-        std::promise<Github::DownloadAsStringResult> result;
-    };
-
-    typedef std::variant<DownloadAsStringRequest, DownloadFileRequest, FetchReleasesRequest> GithubRequest;
+    typedef std::variant<DownloadStringRequest, DownloadFileRequest> GithubRequest;
     Threading::Monitor<GithubRequest> _requests;
 
     GithubExecutor();

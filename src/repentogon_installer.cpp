@@ -173,7 +173,7 @@ namespace Launcher {
 		return true;
 	}
 
-	void RepentogonInstaller::PushNotification(std::string&& text, bool error) {
+	void RepentogonInstaller::PushNotification(std::string text, bool error) {
 		RepentogonInstallationNotification::GeneralNotification general;
 		general._text = std::move(text);
 		general._isError = error;
@@ -182,7 +182,7 @@ namespace Launcher {
 		_monitor.Push(notification);
 	}
 
-	void RepentogonInstaller::PushFileRemovalNotification(std::string&& name, bool success) {
+	void RepentogonInstaller::PushFileRemovalNotification(std::string name, bool success) {
 		RepentogonInstallationNotification::FileRemoval fileRemoval;
 		fileRemoval._name = std::move(name);
 		fileRemoval._ok = success;
@@ -212,7 +212,7 @@ namespace Launcher {
 		PushNotification(std::move(s), isError);
 	}
 
-	void RepentogonInstaller::PushFileDownloadNotification(std::string&& name, uint32_t size, uint32_t id) {
+	void RepentogonInstaller::PushFileDownloadNotification(std::string name, uint32_t size, uint32_t id) {
 		RepentogonInstallationNotification::FileDownload fileDownload;
 		fileDownload._filename = std::move(name);
 		fileDownload._size = size;
@@ -287,19 +287,27 @@ namespace Launcher {
 	}
 
 	bool RepentogonInstaller::DownloadRepentogon() {
-		Github::DownloadMonitor monitor;
-		CURLRequest request;
+		// curl::DownloadMonitor monitor;
+		curl::RequestParameters request;
 		request.maxSpeed = sCLI->CurlLimit();
 		request.timeout = sCLI->CurlTimeout();
 		request.serverTimeout = sCLI->CurlConnectTimeout();
 		request.url = _installationState.hashUrl;
 
-		std::future<Github::DownloadFileResult> hashDownload = sGithubExecutor->AddDownloadFileRequest(
-			HashName, request, &monitor);
-		Github::DownloadFileResult hashResult = GithubToRepInstall<Github::DownloadFileResult>(
-			&monitor, hashDownload);
+		Github::GenerateGithubHeaders(request);
 
-		if (hashResult != Github::DOWNLOAD_FILE_OK) {
+		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> hashDownloadDescriptor =
+			curl::AsyncDownloadFile(request, HashName);
+		std::optional<curl::DownloadFileDescriptor> hashResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
+			&hashDownloadDescriptor->base.monitor, hashDownloadDescriptor->result);
+
+		if (!hashResult) {
+			hashDownloadDescriptor->base.cancel.store(true, std::memory_order_release);
+			Logger::Info("RepentogonUpdater::DownloadRepentogon: cancel requested\n");
+			return false;
+		}
+
+		if (hashResult->result != curl::DOWNLOAD_FILE_OK) {
 			Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading hash\n");
 			return false;
 		}
@@ -311,12 +319,18 @@ namespace Launcher {
 		}
 
 		request.url = _installationState.zipUrl;
-		std::future<Github::DownloadFileResult> zipDownload = sGithubExecutor->AddDownloadFileRequest(
-			RepentogonZipName, request, &monitor);
-		Github::DownloadFileResult zipResult = GithubToRepInstall<Github::DownloadFileResult>(
-			&monitor, zipDownload);
+		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> zipDownloadDesc =
+			curl::AsyncDownloadFile(request, RepentogonZipName);
+		std::optional<curl::DownloadFileDescriptor> zipResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
+			&zipDownloadDesc->base.monitor, zipDownloadDesc->result);
 
-		if (zipResult != Github::DOWNLOAD_FILE_OK) {
+		if (!zipResult) {
+			zipDownloadDesc->base.cancel.store(true, std::memory_order_release);
+			Logger::Info("RepentogonUpdater::DownloadRepentogon: cancel requested\n");
+			return false;
+		}
+
+		if (zipResult->result != curl::DOWNLOAD_FILE_OK) {
 			Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading zip\n");
 			return false;
 		}
@@ -491,8 +505,8 @@ namespace Launcher {
 		bool allowPreReleases) {
 		RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
 
-		Github::DownloadAsStringResult fetchResult = FetchRepentogonUpdates(doc, allowPreReleases);
-		if (fetchResult != Github::DOWNLOAD_AS_STRING_OK) {
+		Github::ReleaseInfoResult fetchResult = FetchRepentogonUpdates(doc, allowPreReleases);
+		if (fetchResult != Github::RELEASE_INFO_OK) {
 			return Github::VERSION_CHECK_ERROR;
 		}
 
@@ -503,31 +517,52 @@ namespace Launcher {
 		return Github::CheckUpdates(repentogon.GetZHLVersion().c_str(), "Repentogon", doc);
 	}
 
-	Github::DownloadAsStringResult RepentogonInstaller::FetchRepentogonUpdates(rapidjson::Document& response,
-		bool allowPreReleases) {
-		CURLRequest request;
+	Github::ReleaseInfoResult RepentogonInstaller::FetchRepentogonUpdates(
+		rapidjson::Document& response, bool allowPreReleases) {
+		curl::RequestParameters request;
 		request.maxSpeed = sCLI->CurlLimit();
 		request.timeout = sCLI->CurlTimeout();
 		request.serverTimeout = sCLI->CurlConnectTimeout();
 
+		Github::GenerateGithubHeaders(request);
+
 		if (!allowPreReleases) {
-			Github::DownloadMonitor monitor;
 			request.url = RepentogonURL;
-			std::future<Github::DownloadAsStringResult> result = sGithubExecutor->AddFetchReleasesRequest(
-				request, response, &monitor);
-			return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
+			std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> releasesDesc =
+				Github::AsyncFetchReleaseInfo(request);
+			std::optional<curl::DownloadStringDescriptor> descriptor =
+				GithubToRepInstall<curl::DownloadStringDescriptor>(
+					&releasesDesc->base.monitor, releasesDesc->result);
+
+			if (!descriptor) {
+				releasesDesc->base.cancel.store(true, std::memory_order_release);
+				Logger::Info("[RepentogonInstaller] Cancel requested\n");
+				return Github::RELEASE_INFO_CURL_ERROR;
+			}
+
+			return Github::ValidateReleaseInfo(*descriptor, response, nullptr);
 		} else {
 			std::string allReleases;
 			request.url = RepentogonReleasesURL;
-			Github::DownloadAsStringResult allReleasesResult = Github::DownloadAsString(request,
-				"repentogon releases information", allReleases, nullptr);
-			if (allReleasesResult != Github::DOWNLOAD_AS_STRING_OK) {
-				Logger::Error("Unable to download list of all Repentogon releases: %d\n", allReleasesResult);
-				Github::DownloadMonitor monitor;
+			curl::DownloadStringDescriptor allReleasesResult = curl::DownloadString(request,
+				"repentogon releases information");
+			if (allReleasesResult.result != curl::DOWNLOAD_STRING_OK) {
+				Logger::Error("Unable to download list of all Repentogon releases: %d\n", allReleasesResult.result);
 				request.url = RepentogonURL;
-				std::future<Github::DownloadAsStringResult> result = sGithubExecutor->AddFetchReleasesRequest(
-					request, response, &monitor);
-				return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
+
+				std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> releasesDesc =
+					Github::AsyncFetchReleaseInfo(request);
+				std::optional<curl::DownloadStringDescriptor> descriptor =
+					GithubToRepInstall<curl::DownloadStringDescriptor>(
+						&releasesDesc->base.monitor, releasesDesc->result);
+
+				if (!descriptor) {
+					releasesDesc->base.cancel.store(true, std::memory_order_release);
+					Logger::Info("[RepentogonInstaller] Cancel requested\n");
+					return Github::RELEASE_INFO_CURL_ERROR;
+				}
+
+				return Github::ValidateReleaseInfo(*descriptor, response, nullptr);
 			}
 
 			rapidjson::Document asJson;
@@ -535,24 +570,45 @@ namespace Launcher {
 
 			if (asJson.HasParseError()) {
 				Logger::Error("Unable to parse list of all Repentogon releases as JSON\n");
-				Github::DownloadMonitor monitor;
+				curl::DownloadMonitor monitor;
 				request.url = RepentogonURL;
-				std::future<Github::DownloadAsStringResult> result = sGithubExecutor->AddFetchReleasesRequest(
-					request, response, &monitor);
-				return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
+
+				std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> releasesDesc =
+					Github::AsyncFetchReleaseInfo(request);
+				std::optional<curl::DownloadStringDescriptor> descriptor =
+					GithubToRepInstall<curl::DownloadStringDescriptor>(
+						&releasesDesc->base.monitor, releasesDesc->result);
+
+				if (!descriptor) {
+					releasesDesc->base.cancel.store(true, std::memory_order_release);
+					Logger::Info("[RepentogonInstaller] Cancel requested\n");
+					return Github::RELEASE_INFO_CURL_ERROR;
+				}
+
+				return Github::ValidateReleaseInfo(*descriptor, response, nullptr);
 			}
 
 			auto releases = asJson.GetArray();
 			if (releases.Empty()) {
 				Logger::Error("Trying to download a new Repentogon release, but none available\n");
-				return Github::DOWNLOAD_AS_STRING_INVALID_JSON;
+				return Github::RELEASE_INFO_JSON_ERROR;
 			}
 
-			Github::DownloadMonitor monitor;
+			curl::DownloadMonitor monitor;
 			request.url = releases[0]["url"].GetString();
-			std::future<Github::DownloadAsStringResult> result = sGithubExecutor->AddFetchReleasesRequest(
-				request, response, &monitor);
-			return GithubToRepInstall<Github::DownloadAsStringResult>(&monitor, result);
+			std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> releasesDesc =
+				Github::AsyncFetchReleaseInfo(request);
+			std::optional<curl::DownloadStringDescriptor> descriptor =
+				GithubToRepInstall<curl::DownloadStringDescriptor>(
+					&releasesDesc->base.monitor, releasesDesc->result);
+
+			if (!descriptor) {
+				releasesDesc->base.cancel.store(true, std::memory_order_release);
+				Logger::Info("[RepentogonInstaller] Cancel requested\n");
+				return Github::RELEASE_INFO_CURL_ERROR;
+			}
+
+			return Github::ValidateReleaseInfo(*descriptor, response, nullptr);
 		}
 	}
 

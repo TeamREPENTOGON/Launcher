@@ -2,12 +2,15 @@
 #include <Windows.h>
 
 #include <ctime>
+#include <mutex>
 
 #include "shared/logger.h"
 
 FILE* Logger::_file = NULL;
+static std::mutex __logMutex;
 
 void Logger::Init(const char* filename, bool append) {
+	std::unique_lock<std::mutex> lck(__logMutex);
 	if (!_file) {
 		_file = fopen(filename, append ? "a" : "w");
 		if (!_file) {
@@ -70,7 +73,8 @@ void Logger::Log(const char* prefix, const char* fmt, va_list va) {
 	tm* nowTm = localtime(&now);
 	char timeBuffer[4096];
 	strftime(timeBuffer, 4095, "[%Y-%m-%d %H:%M:%S] ", nowTm);
-	
+
+	std::unique_lock<std::mutex> lck(__logMutex);
 	fprintf(_file, "%s", prefix);
 	fprintf(_file, "%s", timeBuffer);
 	vfprintf(_file, fmt, va);

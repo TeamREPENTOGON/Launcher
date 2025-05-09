@@ -21,14 +21,16 @@ bool Launcher::App::RunWizard(bool* installedRepentogon) {
 	LauncherWizard* wizard = new LauncherWizard(__installation);
 	wizard->AddPages(false);
 	bool wizardOk = wizard->Run();
-	*installedRepentogon = wizard->WasRepentogonInstalled();
+	*installedRepentogon = wizard->WasRepentogonInstalled(false);
 	wizard->Destroy();
 
 	return wizardOk;
 }
 
-RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(bool forceUpdate) {
-	RepentogonInstallerFrame* frame = new RepentogonInstallerFrame(__installation, forceUpdate);
+RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(bool forceUpdate,
+	bool allowUnstable) {
+	RepentogonInstallerFrame* frame = new RepentogonInstallerFrame(__installation,
+		forceUpdate, allowUnstable);
 	frame->Initialize();
 	return frame;
 }
@@ -114,7 +116,8 @@ bool Launcher::App::OnInit() {
 			Logger::Info("Installing Repentogon: wizard was exited without installing Repentogon\n");
 		}
 
-		installerFrame = CreateRepentogonInstallerWindow(sCLI->ForceRepentogonUpdate());
+		installerFrame = CreateRepentogonInstallerWindow(sCLI->ForceRepentogonUpdate(),
+			__configuration.UnstableUpdates());
 		installerFrame->SetMainFrame(mainWindow);
 		installerFrame->InstallRepentogon();
 		installerFrame->Show();

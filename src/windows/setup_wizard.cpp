@@ -26,6 +26,7 @@ EVT_WIZARD_PAGE_CHANGED(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::OnPageCh
 EVT_BUTTON(LAUNCHER_WIZARD_CONTROL_ISAAC_SETUP_BUTTON, LauncherWizard::OnIsaacExecutableSelected)
 EVT_WIZARD_BEFORE_PAGE_CHANGED(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::BeforePageChanged)
 EVT_CHECKBOX(LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX, LauncherWizard::OnUnstableUpdatesCheckBoxClicked)
+EVT_WIZARD_CANCEL(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::OnCancel)
 wxEND_EVENT_TABLE()
 
 LauncherWizard::LauncherWizard(Launcher::Installation* installation) :
@@ -260,7 +261,6 @@ void LauncherWizard::AddRepentogonInstallationPage() {
     _repentogonInstallation._gauge = gauge;
 
     _repentogonInstallationPage = page;
-    _repentogonInstallationDone = false;
 }
 
 void LauncherWizard::AddCompletionPage() {
@@ -278,7 +278,8 @@ void LauncherWizard::OnPageChanged(wxWizardEvent& event) {
         ConfigureRepentogonSetupPage();
     }  else if (source == _repentogonInstallationPage) {
         UpdateRepentogonInstallationNavigationButtons();
-        if (!_repentogonInstallationDone) {
+        std::unique_lock<std::mutex> lck(_installerMutex);
+        if (!_installer) {
             StartRepentogonInstallation();
         }
     }
@@ -295,42 +296,26 @@ void LauncherWizard::UpdateRepentogonInstallationNavigationButtons() {
     wxWindow* prev = FindWindowById(wxID_BACKWARD, this);
     wxWindow* next = FindWindowById(wxID_FORWARD, this);
 
+    std::unique_lock<std::mutex> lck(_installerMutex);
+    bool hasCompleted = _installer->HasCompleted(true);
     if (prev) {
-        prev->Enable(_repentogonInstallationDone);
+        prev->Enable(hasCompleted);
     }
 
     if (next) {
-        next->Enable(_repentogonInstallationDone);
+        next->Enable(hasCompleted);
     }
+}
+
+void LauncherWizard::OnRepentogonInstallationCompleted(bool finished) {
+    UpdateRepentogonInstallationNavigationButtons();
 }
 
 void LauncherWizard::StartRepentogonInstallation() {
-    wxASSERT(!_repentogonInstallationDone);
-    wxASSERT(!_repentogonInstallerThread.joinable());
-
-    _repentogonInstallerThread = std::thread(&LauncherWizard::RepentogonInstallationThread, this);
-}
-
-void LauncherWizard::RepentogonInstallationThread() {
-    Launcher::RepentogonInstaller installer(_installation);
-    auto [future, monitor] = installer.InstallLatestRepentogon(false, _repentogonSetup._unstableUpdates->GetValue());
-    bool shouldContinue = true;
-    NotificationVisitor visitor(_repentogonInstallation._logText, sCLI->RepentogonInstallerRefreshRate());
-    while (shouldContinue && !Launcher::CancelRequested()) {
-        while (future.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
-            wxASSERT(shouldContinue);
-            while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get()) {
-                std::visit(visitor, notification->_data);
-            }
-        }
-
-        shouldContinue = false;
-    }
-
-    _repentogonInstallation._logText->AppendText("Repentogon installation finished\n");
-    future.get();
-   _repentogonInstallationDone = true;
-   UpdateRepentogonInstallationNavigationButtons();
+    std::unique_lock<std::mutex> lck(_installerMutex);
+    _installer = std::make_unique<RepentogonInstallerHelper>(this, _installation,
+        _repentogonSetup._unstableUpdates, false, _repentogonInstallation._logText);
+    _installer->Install(std::bind_front(&LauncherWizard::OnRepentogonInstallationCompleted, this));
 }
 
 void LauncherWizard::OnIsaacExecutableSelected(wxCommandEvent& event) {
@@ -428,6 +413,20 @@ void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
             _repentogonSetup._updateWarning->SetLabel("This change in options may require a Repentogon update");
         } else {
             _repentogonSetup._updateWarning->SetLabel("");
+        }
+    }
+}
+
+void LauncherWizard::OnCancel(wxWizardEvent& event) {
+    std::unique_lock<std::mutex> lck(_installerMutex);
+    if (_installer) {
+        switch (_installer->Terminate()) {
+        case RepentogonInstallerHelper::TERMINATE_CANCEL_REJECTED:
+            event.Veto();
+            break;
+
+        default:
+            break;
         }
     }
 }
