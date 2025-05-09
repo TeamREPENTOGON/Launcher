@@ -50,6 +50,10 @@ void RepentogonInstallerFrame::OnClose(wxCloseEvent& event) {
 			}
 			break;
 
+		case RepentogonInstallerHelper::TERMINATE_OK:
+			Destroy();
+			break;
+
 		default:
 			break;
 		}
@@ -69,5 +73,7 @@ void RepentogonInstallerFrame::OnRepentogonInstalled(bool finished) {
 		_mainFrame->Show();
 	}
 
-	Destroy();
+	if (!sCLI->RepentogonInstallerWait()) {
+		Destroy();
+	}
 }
