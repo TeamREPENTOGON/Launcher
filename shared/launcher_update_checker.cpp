@@ -11,21 +11,36 @@
 #include "shared/logger.h"
 
 namespace Shared {
-	static curl::DownloadStringResult FetchReleases(rapidjson::Document& answer);
+	static bool FetchReleases(curl::DownloadStringResult* curlResult,
+		rapidjson::Document& answer);
 
 	static const char* ReleasesURL = "https://api.github.com/repos/TeamREPENTOGON/Launcher/releases";
 
-	curl::DownloadStringResult FetchReleases(rapidjson::Document& answer) {
+	bool FetchReleases(curl::DownloadStringResult* curlResult,
+		rapidjson::Document& answer) {
 		curl::RequestParameters request;
 		request.maxSpeed = request.serverTimeout = request.timeout = 0;
 		request.url = ReleasesURL;
 		Github::GenerateGithubHeaders(request);
 
-		curl::DownloadStringResult result;
-		Github::ReleaseInfoResult descriptor = Github::FetchReleaseInfo(
-			request, answer, &result, "launcher releases info");
+		curl::DownloadStringDescriptor result = curl::DownloadString(request, "launcher releases info");
+		if (curlResult) {
+			*curlResult = result.result;
+		}
 
-		return result;
+		if (result.result != curl::DOWNLOAD_STRING_OK) {
+			return false;
+		}
+
+		rapidjson::Document response;
+		response.Parse(result.string.c_str());
+
+		if (response.HasParseError()) {
+			return false;
+		}
+
+		answer = std::move(response);
+		return true;
 	}
 
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
@@ -33,19 +48,14 @@ namespace Shared {
 
 	bool LauncherUpdateChecker::IsSelfUpdateAvailable(bool allowDrafts, bool force,
 		std::string& version, std::string& url, curl::DownloadStringResult* fetchReleasesResult) {
-		curl::DownloadStringResult downloadResult = FetchReleases(_releasesInfo);
-		if (fetchReleasesResult) {
-			*fetchReleasesResult = downloadResult;
-		}
+		bool downloadResult = FetchReleases(fetchReleasesResult, _releasesInfo);
 
-		if (downloadResult != curl::DOWNLOAD_STRING_OK) {
+		if (!downloadResult) {
 			return false;
 		}
 
-		rapidjson::Document& releases = _releasesInfo;
 		_hasRelease = true;
-
-		return SelectTargetRelease(releases, allowDrafts, force, version, url) && strcmp(::Launcher::version, version.c_str());
+		return SelectTargetRelease(_releasesInfo, allowDrafts, force, version, url) && strcmp(::Launcher::version, version.c_str());
 	}
 
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
@@ -74,7 +84,8 @@ namespace Shared {
 		SelfUpdateErrorCode result;
 		rapidjson::Document releases;
 
-		curl::DownloadStringResult releasesResult = FetchReleases(releases);
+		curl::DownloadStringResult releasesResult;
+		bool ok = FetchReleases(&releasesResult, releases);
 		if (releasesResult != curl::DOWNLOAD_STRING_OK) {
 			result.base = SELF_UPDATE_UPDATE_CHECK_FAILED;
 			result.detail = releasesResult;

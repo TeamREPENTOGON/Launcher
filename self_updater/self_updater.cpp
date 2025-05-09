@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "comm/messages.h"
+#include "shared/github_executor.h"
 #include "self_updater/self_updater.h"
 #include "self_updater/logger.h"
 #include "self_updater/utils.h"
@@ -219,7 +220,7 @@ void Updater::ProgressBarThread() {
 
 	MSG msg = {};
 	BOOL bRet = 0;
-	
+
 	while (true) {
 		while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -434,30 +435,38 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(LPSTR cli) {
 
 int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 	Logger::Init("updater.log");
-
 	Logger::Info("%s started with command-line args: %s\n", Updater::UpdaterProcessName, cli);
+
+	sGithubExecutor->Start();
 
 	// Start up a progress bar window on a separate thread so that we can show some not-frozen UI to the user.
 	std::thread progressBarThread(Updater::ProgressBarThread);
 
 	Updater::UpdateLauncherResult result = Updater::TryUpdateLauncher(cli);
 
+	int res = -1;
+
 	switch (result) {
 	case Updater::UPDATE_ALREADY_UP_TO_DATE:
 	case Updater::UPDATE_SKIPPED:
-		return 0;
+		res = 0;
+		break;
 
 	case Updater::UPDATE_SUCCESSFUL:
 		Updater::StartLauncher();
-		return 0;
+		res = 0;
+		break;
 
 	case Updater::UPDATE_ERROR:
-		return -1;
+		res = -1;
+		break;
 
 	default:
 		Logger::Error("Unexpected update result value: %d", result);
-		return -1;
+		res = -1;
+		break;
 	}
 
-	return -1;
+	sGithubExecutor->Stop();
+	return res;
 }

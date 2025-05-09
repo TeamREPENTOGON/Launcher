@@ -55,19 +55,19 @@ namespace Updater {
 		Threading::Monitor<curl::DownloadNotification> monitor;
 		_updater.DownloadUpdate(updateData);
 
-		size_t totalDownloadSize = 0;
 		struct {
 			Threading::Monitor<curl::DownloadNotification>* monitor;
 			std::string name;
-			bool done;
+			size_t totalDownloadSize;
 		} monitorAndName[] = {
-			{ &updateData->_hashDownloadDesc->base.monitor, "Hash file", false },
-			{ &updateData->_zipDownloadDesc->base.monitor, "Launcher archive", false },
+			{ &updateData->_hashDownloadDesc->base.monitor, "Hash file", 0 },
+			{ &updateData->_zipDownloadDesc->base.monitor, "Launcher archive", 0 },
 			{ NULL, "" }
 		};
 
 		std::chrono::steady_clock::time_point lastReceived = std::chrono::steady_clock::now();
-		while (std::any_of(monitorAndName, monitorAndName + 2, [](auto const& monitor) -> bool { return !monitor.done;  })) {
+		while (updateData->_hashDownloadDesc->result.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready ||
+			updateData->_zipDownloadDesc->result.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
 			for (auto s = monitorAndName; s->monitor; ++s) {
 				while (std::optional<curl::DownloadNotification> message = s->monitor->Get()) {
 					switch (message->type) {
@@ -89,18 +89,17 @@ namespace Updater {
 
 					case curl::DOWNLOAD_DATA_RECEIVED:
 					{
-						totalDownloadSize += std::get<size_t>(message->data);
+						s->totalDownloadSize += std::get<size_t>(message->data);
 
 						std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 						if (std::chrono::duration_cast<std::chrono::nanoseconds>(now - lastReceived).count() > 100000000) {
-							_gui->Log("", true, "[%s] Downloaded %lu bytes\n", s->name.c_str(), totalDownloadSize);
+							_gui->Log("", true, "[%s] Downloaded %lu bytes\n", s->name.c_str(), s->totalDownloadSize);
 							lastReceived = now;
 						}
 						break;
 					}
 
 					case curl::DOWNLOAD_DONE:
-						s->done = true;
 						_gui->Log("", true, "[%s] Successfully downloaded content from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
