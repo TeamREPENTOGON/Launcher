@@ -103,7 +103,7 @@ namespace Launcher {
 		void OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl,
 			const char* emptyText);
 		void OnLevelSelect(wxCommandEvent& event);
-		void OnLauchModeSelect(wxCommandEvent& event);
+		void OnLaunchModeSelect(wxCommandEvent& event);
 		// void OnCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);

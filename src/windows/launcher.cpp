@@ -45,7 +45,8 @@
 
 wxBEGIN_EVENT_TABLE(Launcher::MainFrame, wxFrame)
 EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::MainFrame::OnLevelSelect)
-EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLauchModeSelect)
+EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLaunchModeSelect)
+EVT_TEXT(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLaunchModeSelect)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::MainFrame::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::MainFrame::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::MainFrame::OnOptionSelected)
@@ -75,6 +76,9 @@ namespace Launcher {
 	static const char* NoRepentogonInstallationFolderText = "No folder specified, will download in current folder";
 
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
+
+	static constexpr const char* ComboBoxVanilla = "Vanilla";
+	static constexpr const char* ComboBoxRepentogon = "Repentogon";
 
 	LuaHeapSizeValidator::LuaHeapSizeValidator() : wxValidator() { }
 
@@ -205,9 +209,9 @@ namespace Launcher {
 		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "));
 
 		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE);
-		_repentogonLaunchModeIdx = _launchMode->Append("Repentogon");
-		_launchMode->Append("Vanilla");
-		_launchMode->SetValue("Repentogon");
+		_repentogonLaunchModeIdx = _launchMode->Append(ComboBoxRepentogon);
+		_launchMode->Append(ComboBoxVanilla);
+		_launchMode->SetValue(ComboBoxRepentogon);
 
 		box->Add(_launchMode);
 
@@ -317,9 +321,9 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::OnLauchModeSelect(wxCommandEvent& event) {
+	void MainFrame::OnLaunchModeSelect(wxCommandEvent& event) {
 		wxComboBox* box = dynamic_cast<wxComboBox*>(event.GetEventObject());
-		if (box->GetValue() == "Vanilla") {
+		if (box->GetValue() == ComboBoxVanilla) {
 			_configuration->IsaacLaunchMode(LAUNCH_MODE_VANILLA);
 		} else {
 			_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
@@ -568,9 +572,9 @@ namespace Launcher {
 		_luaDebug->SetValue(_configuration->LuaDebug());
 		InitializeLevelSelectFromOptions();
 		if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
-			_launchMode->SetValue("Repentogon");
+			_launchMode->SetValue(ComboBoxRepentogon);
 		} else {
-			_launchMode->SetValue("Vanilla");
+			_launchMode->SetValue(ComboBoxVanilla);
 		}
 	}
 
@@ -606,20 +610,35 @@ namespace Launcher {
 		RepentogonInstallation const& repentogonInstallation = _installation->GetRepentogonInstallation();
 		IsaacInstallation const& isaacInstallation = _installation->GetIsaacInstallation();
 
-		if (!repentogonInstallation.IsValid(false) || !isaacInstallation.IsCompatibleWithRepentogon()) {
+		bool isValid = repentogonInstallation.IsValid(true);
+		bool isLegacy = isValid && repentogonInstallation.IsLegacy();
+		bool isIncompatible = !isaacInstallation.IsCompatibleWithRepentogon();
+
+		if (!isValid || isLegacy || isIncompatible) {
 			if (_repentogonLaunchModeIdx != -1) {
-				_logWindow.LogWarn("Removing Repentogon start option due to legacy installation\n");
+				if (!isValid) {
+					_logWindow.LogWarn("Removing Repentogon start option as the Repentogon installation is broken\n");
+				}
+
+				if (isLegacy) {
+					_logWindow.LogWarn("Removing Repentogon start option due to legacy installation\n");
+				}
+
+				if (isIncompatible) {
+					_logWindow.LogWarn("Removing Repentogon start option as the Isaac executable is not compatible\n");
+				}
+
 				_launchMode->Delete(_repentogonLaunchModeIdx);
 				_repentogonLaunchModeIdx = -1;
 			}
 
-			_launchMode->SetValue("Vanilla");
+			_launchMode->SetValue(ComboBoxVanilla);
 		} else {
 			if (_repentogonLaunchModeIdx == -1) {
-				_repentogonLaunchModeIdx = _launchMode->Append("Repentogon");
+				_repentogonLaunchModeIdx = _launchMode->Append(ComboBoxRepentogon);
 			}
 
-			_launchMode->SetValue("Repentogon");
+			_launchMode->SetValue(ComboBoxRepentogon);
 
 			/* Intentionally not changing the selected launch mode value.
 			 *
