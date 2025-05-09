@@ -542,7 +542,6 @@ namespace Launcher {
 
 			return Github::ValidateReleaseInfo(*descriptor, response, nullptr);
 		} else {
-			std::string allReleases;
 			request.url = RepentogonReleasesURL;
 			curl::DownloadStringDescriptor allReleasesResult = curl::DownloadString(request,
 				"repentogon releases information");
@@ -566,10 +565,10 @@ namespace Launcher {
 			}
 
 			rapidjson::Document asJson;
-			asJson.Parse(allReleases.c_str());
+			asJson.Parse(allReleasesResult.string.c_str());
 
 			if (asJson.HasParseError()) {
-				Logger::Error("Unable to parse list of all Repentogon releases as JSON\n");
+				Logger::Error("Unable to parse list of all Repentogon releases as JSON. Defaulting to latest release\n");
 				curl::DownloadMonitor monitor;
 				request.url = RepentogonURL;
 
