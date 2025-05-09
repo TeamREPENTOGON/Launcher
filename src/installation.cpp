@@ -88,32 +88,4 @@ namespace Launcher {
 
 		return ok ? IsaacInstallationValid : 0;
 	}
-
-	/* void Installation::WriteLauncherConfigurationFile() {
-		if (_configurationPath.empty()) {
-			Logger::Fatal("Installation::WriteLauncherConfigurationFile called, but configuration path was not properly initialized before\n");
-			throw std::runtime_error("Inconsistent runtime state: attempted to write launcher configuration without a valid path");
-		}
-
-		if (_isaacExecutable.empty()) {
-			Logger::Fatal("Installation::WriteLauncherConfigurationFile: _isaacExecutable is empty\n");
-			throw std::runtime_error("Inconsistent runtime state: attempted to write launcher configuration without a valid Isaac folder");
-		}
-
-		std::ofstream configuration(_configurationPath, std::ios::out);
-		configuration << "[" << Configuration::GeneralSection << "]" << std::endl;
-		configuration << Configuration::IsaacExecutableKey << " = " << _isaacExecutable << std::endl;
-		configuration.close();
-
-		_configurationFile.reset(new INIReader(_configurationPath));
-		if (int line = _configurationFile->ParseError(); line != 0) {
-			Logger::Fatal("Installation::WriteLauncherConfigurationFile: error while rereading configuration file\n");
-			if (line == -1) {
-				Logger::Fatal("Unable to open configuration file %s\n", _configurationPath.c_str());
-			} else {
-				Logger::Fatal("Parse error on line %d of configuration file %s\n", line, _configurationPath.c_str());
-			}
-			throw std::runtime_error("Error while writing configuration file");
-		}
-	} */
 }
