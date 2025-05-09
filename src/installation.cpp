@@ -67,6 +67,9 @@ namespace Launcher {
 	std::tuple<std::optional<std::string>, bool> Installation::Initialize(
 		std::optional<std::string> const& isaacPath) {
 		std::optional<std::string> locatedIsaacPath = LocateIsaac(isaacPath);
+		if (locatedIsaacPath) {
+			_launcherConfiguration->IsaacExecutablePath(_isaacInstallation.GetExePath());
+		}
 		bool repentogonOk = locatedIsaacPath ? CheckRepentogonInstallation() : false;
 
 		return std::make_tuple(locatedIsaacPath, repentogonOk);
@@ -75,6 +78,7 @@ namespace Launcher {
 	int Installation::SetIsaacExecutable(std::string const& file) {
 		bool ok = _isaacInstallation.Validate(file);
 		if (ok) {
+			_launcherConfiguration->IsaacExecutablePath(_isaacInstallation.GetExePath());
 			if (CheckRepentogonInstallation()) {
 				return BothInstallationsValid;
 			}

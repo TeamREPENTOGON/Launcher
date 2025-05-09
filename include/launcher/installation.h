@@ -48,6 +48,6 @@ namespace Launcher {
 		ILoggableGUI* _gui = nullptr;
 		RepentogonInstallation _repentogonInstallation;
 		IsaacInstallation _isaacInstallation;
-		LauncherConfiguration const* _launcherConfiguration;
+		LauncherConfiguration* _launcherConfiguration;
 	};
 }
