@@ -2,7 +2,7 @@
 #include <Windows.h>
 #include <io.h>
 
-#include <fstream>    
+#include <fstream>
 #include <filesystem>
 #include <stdexcept>
 
@@ -17,6 +17,8 @@
 #include "launcher/standalone_rgon_folder.h"
 
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
+
+namespace srgon = standalone_rgon;
 
 Version const knownVersions[] = {
 		{ "fd5b4a2ea3b397aec9f2b311ecc3be2e7e66bcd8723989096008d4d8258d92ea", "v1.9.7.10.J212 (Steam)", true },
@@ -115,11 +117,11 @@ bool IsaacInstallation::Validate(std::string const& sourcePath) {
 	_folderPath = fsPath.string();
 	_isCompatibleWithRepentogon = CheckCompatibilityWithRepentogon();
 
-	if (_isCompatibleWithRepentogon && !exeIsCopy(path)) {
+	if (_isCompatibleWithRepentogon && !srgon::exeIsCopy(path)) {
 		std::filesystem::path fsTempPath(path);
-		std::filesystem::path copyexepath = getCopyExePath(fsTempPath);
-		if (!exeCopyExists(path) || !Validate(copyexepath.string())) {
-			copyFiles(path, _needspatch);
+		std::filesystem::path copyexepath = srgon::getCopyExePath(fsTempPath);
+		if (!srgon::exeCopyExists(path) || !Validate(copyexepath.string())) {
+			srgon::copyFiles(path, _needspatch);
 			_isCompatibleWithRepentogon = true;
 			_version = std::move(*version);
 		}
@@ -127,8 +129,7 @@ bool IsaacInstallation::Validate(std::string const& sourcePath) {
 		copyexepath.remove_filename();
 		_folderPath = copyexepath.string();
 	}
-	else if (!_isCompatibleWithRepentogon && exeIsCopy(path)) {
-		fsPath.parent_path();
+	else if (!_isCompatibleWithRepentogon && srgon::exeIsCopy(path)) {
 		Validate(fsPath.string());
 	}
 
@@ -165,17 +166,6 @@ struct SectionHeader {
 static_assert(sizeof(SectionHeader) == 40);
 
 IsaacInstallation::IsaacInstallation(ILoggableGUI* gui) : _gui(gui) { }
-
-/* const Version* IsaacInstallation::GetVersionFromHash(std::string const& path) {
-	try {
-		std::string hash = Sha256::Sha256F(path.c_str());
-		Logger::Info("Computed hash of isaac-ng.exe: %s\n", hash.c_str());
-		return GetIsaacVersionFromHash(hash.c_str());
-	} catch (std::runtime_error& e) {
-		Logger::Error("Updater::CheckIsaacInstallation: exception while computing hash: %s\n", e.what());
-		return nullptr;
-	}
-} */
 
 std::optional<std::string> IsaacInstallation::GetVersionStringFromMemory(std::string const& path) {
 	if (path.empty()) {
@@ -319,6 +309,8 @@ std::optional<std::string> IsaacInstallation::ComputeVersion(std::string const& 
 }
 
 bool IsaacInstallation::CheckCompatibilityWithRepentogon() {
+	namespace fs = std::filesystem;
+
 	fs::path fullPath = fs::current_path() / "patch/version.txt";
 	if (fs::exists(fullPath)) {
 		std::ifstream file(fullPath);

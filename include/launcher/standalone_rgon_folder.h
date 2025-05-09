@@ -4,10 +4,10 @@
 #include <vector>
 #include "shared/logger.h"
 
-namespace fs = std::filesystem; //so I dont go insane
-extern std::string tocopy[];
-extern bool copyFiles(const std::string& basePath, bool patch);
-extern fs::path getOGExePath(const fs::path& exePath);
-extern fs::path getCopyExePath(const fs::path& exePath);
-extern bool exeIsCopy(const fs::path& exePath);
-extern bool exeCopyExists(const fs::path& exePath);
+namespace standalone_rgon {
+    bool copyFiles(const std::string& basePath, bool patch);
+    std::filesystem::path getOGExePath(const std::filesystem::path& exePath);
+    std::filesystem::path getCopyExePath(const std::filesystem::path& exePath);
+    bool exeIsCopy(const std::filesystem::path& exePath);
+    bool exeCopyExists(const std::filesystem::path& exePath);
+}
