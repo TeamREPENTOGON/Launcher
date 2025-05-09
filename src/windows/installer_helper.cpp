@@ -75,7 +75,11 @@ RepentogonInstallerHelper::TerminateResult RepentogonInstallerHelper::Terminate(
 
 	default:
 		wxASSERT(false);
+		__assume(0);
 	}
+
+	__assume(0);
+	return TERMINATE_OK;
 }
 
 void RepentogonInstallerHelper::TerminateInternal() {
@@ -96,6 +100,8 @@ bool RepentogonInstallerHelper::Cancel() {
 	_status = STATUS_CANCELLED;
 	_cancelCount = 1;
 	_cancelStart = std::chrono::steady_clock::now();
+
+	return true;
 }
 
 bool RepentogonInstallerHelper::ReCancel() {
@@ -227,6 +233,7 @@ void RepentogonInstallerHelper::InstallerThread() {
 			wxASSERT(false);
 		}
 
+		_installation->CheckRepentogonInstallation();
 		_callback(true);
 	}
 }
