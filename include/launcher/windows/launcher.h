@@ -152,7 +152,7 @@ namespace Launcher {
 		wxStaticBox* _configurationBox;
 		wxStaticBox* _repentogonOptions;
 		wxTextCtrl* _isaacFileText;
-		wxTextCtrl* _repentogonInstallFolderText;
+		wxTextCtrl* _repentogonFileText;
 		wxButton* _launchButton;
 		wxButton* _advancedOptionsButton;
 		int _repentogonLaunchModeIdx = -1;

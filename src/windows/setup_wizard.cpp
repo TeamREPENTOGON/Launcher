@@ -91,8 +91,10 @@ void LauncherWizard::AddIsaacSetupPage() {
     wxSizerFlags flags = wxSizerFlags().Expand();
 
     std::optional<std::string> path = std::nullopt;
-    if (_installation->GetIsaacInstallation().IsValid()) {
-        path = _installation->GetIsaacInstallation().GetExePath();
+    InstallationData const& isaacInstallation = _installation->GetIsaacInstallation()
+        .GetMainInstallation();
+    if (isaacInstallation.IsValid()) {
+        path = isaacInstallation.GetExePath();
     }
 
     /* Always offer the possibility to change the location. However, the user
@@ -120,8 +122,6 @@ void LauncherWizard::AddIsaacSetupPage() {
 
     sizer->Add(selectionSizer, flags);
 
-    IsaacInstallation const& isaac = _installation->GetIsaacInstallation();
-
     wxStaticBox* infoBox = new wxStaticBox(page, wxID_ANY, "Executable information");
     wxSizer* infoSizer = new wxStaticBoxSizer(infoBox, wxVERTICAL);
 
@@ -129,7 +129,7 @@ void LauncherWizard::AddIsaacSetupPage() {
 
     wxStaticText* executableVersionText = new wxStaticText(infoBox, wxID_ANY, "Version: ");
     wxStaticText* executableVersionValueText = new wxStaticText(infoBox, wxID_ANY, "");
-    const char* version = isaac.GetVersion();
+    const char* version = isaacInstallation.GetVersion();
     if (version) {
         executableVersionValueText->SetLabel(version);
     } else {
@@ -225,14 +225,9 @@ void LauncherWizard::AddRepentogonSetupPage() {
 void LauncherWizard::ConfigureRepentogonSetupPage() {
     wxStaticText* installationText = _repentogonSetup._installationState;
     RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
-    if (repentogon.IsValid(false)) {
+    if (repentogon.IsValid()) {
         std::ostringstream stream;
         stream << "Found a valid installation of Repentogon (version " << repentogon.GetRepentogonVersion() << ")";
-        installationText->SetLabel(stream.str());
-    } else if (repentogon.IsLegacy()) {
-        std::ostringstream stream;
-        stream << "Found a legacy installation of Repentogon (version " << repentogon.GetRepentogonVersion() << "). ";
-        stream << "An update will be performed.";
         installationText->SetLabel(stream.str());
     } else {
         installationText->SetLabel("No valid installation of Repentogon found. An installation will be performed.");
@@ -327,12 +322,21 @@ void LauncherWizard::OnIsaacExecutableSelected(std::string const& path) {
         return;
     }
 
-    _isaacFound = _installation->SetIsaacExecutable(path);
+    bool standalone = false;
+    _isaacFound = _installation->SetIsaacExecutable(path, &standalone);
     if (!_isaacFound) {
         wxString message = "The executable you selected (" + path + ") is not valid";
         wxMessageDialog dialog(this, message, "Invalid executable", wxOK | wxICON_ERROR);
         dialog.ShowModal();
         return;
+    }
+
+    if (standalone) {
+        if (wxMessageBox("The executable you selected is a Repentogon-patched specific executable.\n "
+            "Proceeding with this executable is not advised. Continue with it ?",
+            "Warning", wxYES_NO | wxICON_WARNING, this) == wxNO) {
+            return;
+        }
     }
 
     UpdateIsaacPath(path);
@@ -341,23 +345,25 @@ void LauncherWizard::OnIsaacExecutableSelected(std::string const& path) {
 }
 
 void LauncherWizard::UpdateIsaacPath(std::string const& path) {
-    wxASSERT(_installation->GetIsaacInstallation().IsValid());
+    wxASSERT(_installation->GetIsaacInstallation().GetMainInstallation().IsValid());
     _isaacSetup._selectedExecutableControl->SetValue(path);
 }
 
 void LauncherWizard::UpdateIsaacExecutableInfo() {
-    wxASSERT(_installation->GetIsaacInstallation().IsValid());
-    const char* version = _installation->GetIsaacInstallation().GetVersion();
+    InstallationData const data = _installation->GetIsaacInstallation().GetMainInstallation();
+    wxASSERT(data.IsValid());
+    const char* version = data.GetVersion();
     SetupCompatibilityWithRepentogonText();
     _isaacSetup._executableVersionValueText->SetLabel(version);
 }
 
 void LauncherWizard::SetupCompatibilityWithRepentogonText() {
     IsaacInstallation const& isaac = _installation->GetIsaacInstallation();
+    InstallationData const& isaacData = isaac.GetMainInstallation();
     wxStaticText* compatibleWithRepentogon = _isaacSetup._compatibleWithRepentogonValueText;
 
-    if (isaac.IsValid()) {
-        if (isaac.IsCompatibleWithRepentogon()) {
+    if (isaacData.IsValid()) {
+        if (isaacData.IsCompatibleWithRepentogon()) {
             compatibleWithRepentogon->SetForegroundColour(wxColour(23, 122, 23));
             compatibleWithRepentogon->SetLabel("yes");
             _compatibleWithRepentogon = true;
@@ -407,7 +413,7 @@ bool LauncherWizard::CheckRepentogonCompatibilityOnPageChange() {
 
 void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
     RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
-    if (repentogon.IsValid(false)) {
+    if (repentogon.IsValid()) {
         _dirtyUnstableUpdates = !_dirtyUnstableUpdates;
         if (_dirtyUnstableUpdates) {
             _repentogonSetup._updateWarning->SetLabel("This change in options may require a Repentogon update");

@@ -13,7 +13,7 @@
 namespace Sha256 {
 	std::string Sha256F(const char* filename) {
 		WIN32_FIND_DATAA data;
-		if (!Filesystem::FileExists(filename, &data)) {
+		if (!Filesystem::FindFile(filename, &data)) {
 			std::ostringstream s;
 			s << "Updater::Sha256F: Attempt to hash non existant file " << filename;
 			throw std::runtime_error(s.str());

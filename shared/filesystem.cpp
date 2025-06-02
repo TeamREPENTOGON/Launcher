@@ -7,6 +7,7 @@
 #include "shared/externals.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
+#include "shared/utils.h"
 
 namespace Filesystem {
 	bool CreateFileHierarchy(const char* name, const char* sep) {
@@ -39,16 +40,16 @@ namespace Filesystem {
 		return true;
 	}
 
-	bool FolderExists(const char* name) {
-		return GetFileAttributesA(name) != INVALID_FILE_ATTRIBUTES;
+	bool IsFolder(const char* name) {
+		DWORD attributes = GetFileAttributesA(name);
+		return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY);
 	}
 
-	bool FileExists(const char* name) {
-		WIN32_FIND_DATAA data;
-		return FileExists(name, &data);
-	}
+	bool FindFile(const char* name, WIN32_FIND_DATAA* data) {
+		if (!data) {
+			return Exists(name);
+		}
 
-	bool FileExists(const char* name, WIN32_FIND_DATAA* data) {
 		memset(data, 0, sizeof(*data));
 		HANDLE result = FindFirstFileA(name, data);
 		bool ret = result != INVALID_HANDLE_VALUE;
@@ -57,6 +58,10 @@ namespace Filesystem {
 		}
 
 		return ret;
+	}
+
+	bool Exists(const char* name) {
+		return GetFileAttributesA(name) != INVALID_FILE_ATTRIBUTES;
 	}
 
 	std::string GetCurrentDirectory_() {
@@ -75,5 +80,46 @@ namespace Filesystem {
 
 	bool RemoveFile(const char* filename) {
 		return DeleteFileA(filename) != 0;
+	}
+
+	bool SplitIntoComponents(const char* path, std::string* drive,
+		std::string* filename, std::string* extension,
+		std::vector<std::string>* folders) {
+		char driveStr[10];
+		char foldersStr[4096];
+		char filenameStr[4096];
+		char extensionStr[4096];
+
+		if (_splitpath_s(path,
+			drive ? driveStr : nullptr, drive ? 10 : 0,
+			folders ? foldersStr : nullptr, folders ? 4096 : 0,
+			filename ? filenameStr : nullptr, filename ? 4096 : 0,
+			extension ? extensionStr : nullptr, extension ? 4096 : 0)) {
+			return false;
+		}
+
+		if (drive) {
+			*drive = driveStr;
+		}
+
+		if (filename) {
+			*filename = filenameStr;
+		}
+
+		if (extension) {
+			*extension = extensionStr;
+		}
+
+		if (!folders) {
+			return true;
+		}
+
+		TokenizePath(foldersStr, *folders);
+
+		return true;
+	}
+
+	void TokenizePath(const char* path, std::vector<std::string>& tokens) {
+		utils::Tokenize(path, "/\\", tokens);
 	}
 }

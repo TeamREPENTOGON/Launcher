@@ -75,7 +75,7 @@ namespace Github {
 		parameters.headers.push_back("User-Agent: REPENTOGON");
 
 		const char* file = "github.token";
-		if (Filesystem::FileExists(file)) {
+		if (Filesystem::Exists(file)) {
 			FILE* f = fopen(file, "r");
 			fpos_t begin = ftell(f);
 			fseek(f, 0, SEEK_END);

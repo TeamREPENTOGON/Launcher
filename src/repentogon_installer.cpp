@@ -3,12 +3,15 @@
 
 #include "launcher/cli.h"
 #include "launcher/repentogon_installer.h"
+#include "launcher/standalone_rgon_folder.h"
 #include "launcher/version.h"
 #include "shared/github_executor.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
 #include "shared/sha256.h"
 #include "shared/zip.h"
+
+namespace fs = std::filesystem;
 
 namespace Launcher {
 	static const char* RepentogonReleasesURL = "https://api.github.com/repos/TeamREPENTOGON/REPENTOGON/releases";
@@ -23,7 +26,7 @@ namespace Launcher {
 
 	RepentogonInstaller::RepentogonInstaller(Installation* installation) : _installation(installation) {
 		RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
-		if (repentogon.IsValid(true)) {
+		if (repentogon.IsValid()) {
 			_zhlVersion = repentogon.GetZHLVersion();
 			_loaderVersion = repentogon.GetZHLLoaderVersion();
 			_repentogonVersion = repentogon.GetRepentogonVersion();
@@ -33,7 +36,6 @@ namespace Launcher {
 	}
 
 	bool RepentogonInstaller::InstallRepentogonThread(rapidjson::Document& response) {
-		RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
 		if (!HandleLegacyInstallation()) {
 			_installationState.result = REPENTOGON_INSTALLATION_RESULT_DSOUND_REMOVAL_FAILED;
 			return false;
@@ -41,48 +43,122 @@ namespace Launcher {
 
 		PushNotification(false, "Downloading Repentogon release %s...", response["name"].GetString());
 
-		const char* outputDir = _installation->GetIsaacInstallation().GetFolderPath().c_str();
+		const char* outputDir;
+		fs::path path;
+		InstallationData const& isaacData = _installation->GetIsaacInstallation().GetMainInstallation();
+		if (!standalone_rgon::GenerateRepentogonPath(isaacData.GetFolderPath(),
+			path, true
+		)) { // _installation->GetIsaacInstallation().GetFolderPath().c_str();
+			Logger::Fatal("RepentogonInstaller::InstallRepentogonThread: unable to generate "
+				"Repentogon install folder name\n");
+			std::terminate();
+		}
+
+		std::string s = path.string();
+		outputDir = s.c_str();
 
 		_installationState.Clear();
 		_installationState.phase = REPENTOGON_INSTALLATION_PHASE_CHECK_ASSETS;
+		if (!outputDir) {
+			_installationState.result = REPENTOGON_INSTALLATION_RESULT_INVALID_OUTPUT_DIR;
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: no Repentogon output dir\n");
+			return false;
+		}
+
 		if (!CheckRepentogonAssets(response)) {
-			Logger::Error("RepentogonUpdater::UpdateRepentogon: invalid assets\n");
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: invalid assets\n");
 			_installationState.result = REPENTOGON_INSTALLATION_RESULT_MISSING_ASSET;
 			return false;
 		}
 
 		_installationState.phase = REPENTOGON_INSTALLATION_PHASE_DOWNLOAD;
 		if (!DownloadRepentogon()) {
-			Logger::Error("RepentogonUpdater::UpdateRepentogon: download failed\n");
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: download failed\n");
 			_installationState.result = REPENTOGON_INSTALLATION_RESULT_DOWNLOAD_ERROR;
 			return false;
 		}
 
 		_installationState.phase = REPENTOGON_INSTALLATION_PHASE_CHECK_HASH;
 		if (!CheckRepentogonIntegrity()) {
-			Logger::Error("RepentogonUpdater::UpdateRepentogon: invalid zip\n");
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: invalid zip\n");
 			_installationState.result = REPENTOGON_INSTALLATION_RESULT_BAD_HASH;
 			return false;
 		}
 
 		_installationState.phase = REPENTOGON_INSTALLATION_PHASE_UNPACK;
-		if (!outputDir) {
-			_installationState.result = REPENTOGON_INSTALLATION_RESULT_INVALID_OUTPUT_DIR;
+
+		if (!CreateRepentogonFolder(outputDir)) {
+			_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_REPENTOGON;
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create Repentogon folder\n");
 			return false;
 		}
 
 		if (!ExtractRepentogon(outputDir)) {
-			Logger::Error("RepentogonUpdater::UpdateRepentogon: extraction failed\n");
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: extraction failed\n");
 			_installationState.result = REPENTOGON_INSTALLATION_RESULT_EXTRACT_FAILED;
 			return false;
 		}
 
+		if (!CreateRepentogonMarker(outputDir)) {
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create marker\n");
+			_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_MARKER;
+			return false;
+		}
+
+		if (!standalone_rgon::CopyFiles(_installation->GetIsaacInstallation()
+			.GetMainInstallation().GetFolderPath(),
+			outputDir)) {
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to copy Isaac files\n");
+			_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_COPY;
+			return false;
+		}
+
+		if (!standalone_rgon::CreateSteamAppIDFile(outputDir)) {
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create steam_appid.txt\n");
+			_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID;
+			return false;
+		}
+
+		if (!isaacData.IsCompatibleWithRepentogon()) {
+			if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "patch").string())) {
+				Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to patch Isaac files\n");
+				_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH;
+				return false;
+
+			}
+		}
+
 		PushNotification(false, "Sucessfully installed Repentogon\n");
+		Logger::Info("RepentogonInstaller::InstallRepentogonThread: successfully installed Repentogon\n");
 
 		_installationState.phase = REPENTOGON_INSTALLATION_PHASE_DONE;
 		_installationState.result = REPENTOGON_INSTALLATION_RESULT_OK;
 
 		return _installationState.result == REPENTOGON_INSTALLATION_RESULT_OK;
+	}
+
+	bool RepentogonInstaller::CreateRepentogonFolder(const char* outputDir) {
+		DWORD result = CreateDirectoryA(outputDir, NULL);
+		return result || GetLastError() == ERROR_ALREADY_EXISTS;
+	}
+
+	bool RepentogonInstaller::CreateRepentogonMarker(const char* outputDir) {
+		if (!outputDir) {
+			Logger::Error("RepentogonInstaller::CreateRepentogonMarker: null output dir\n");
+			return false;
+		}
+
+		fs::path path(outputDir);
+		path /= RepentogonInstallation::RepentogonMarker;
+
+		HANDLE result = CreateFileA(path.string().c_str(), GENERIC_READ, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN, NULL);
+		if (result == INVALID_HANDLE_VALUE) {
+			Logger::Error("RepentogonInstaller::CreateRepentogonMarker: unable to create marker (%d)\n", GetLastError());
+			return false;
+		}
+
+		CloseHandle(result);
+		return true;
 	}
 
 	RepentogonMonitor<RepentogonInstaller::DownloadInstallRepentogonResult>
@@ -137,28 +213,18 @@ namespace Launcher {
 
 	std::string RepentogonInstaller::GetDsoundDLLPath() const {
 		IsaacInstallation const& isaac = _installation->GetIsaacInstallation();
-		return isaac.GetFolderPath() + "\\dsound.dll";
+		return isaac.GetMainInstallation().GetFolderPath() + "\\dsound.dll";
 	}
 
 	bool RepentogonInstaller::NeedRemoveDsoundDLL() const {
-		RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
-
-		if (repentogon.GetState() == REPENTOGON_INSTALLATION_STATUS_LEGACY) {
-			return true;
-		} else if (repentogon.GetState() == REPENTOGON_INSTALLATION_STATUS_NONE) {
-			if (Filesystem::FileExists(GetDsoundDLLPath().c_str())) {
-				return true;
-			}
-		}
-
-		return false;
+		return Filesystem::Exists(GetDsoundDLLPath().c_str());
 	}
 
 	bool RepentogonInstaller::HandleLegacyInstallation() {
-		bool needRemoveDsoundDLL = false;
-		RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
-
 		if (NeedRemoveDsoundDLL()) {
+			/* Note that there is a filesystem race between the check above
+			 * and the deletion below.
+			 */
 			std::string dsoundPath = GetDsoundDLLPath();
 			bool result = Filesystem::RemoveFile(dsoundPath.c_str());
 			if (!result) {
@@ -402,7 +468,7 @@ namespace Launcher {
 			return false;
 		}
 
-		if (!Filesystem::FolderExists(outputDir)) {
+		if (!Filesystem::IsFolder(outputDir)) {
 			Logger::Error("RepentogonUpdater::ExtractRepentogon: invalid output folder %s\n", outputDir);
 			return false;
 		}
@@ -418,6 +484,7 @@ namespace Launcher {
 		bool ok = true;
 		int nFiles = zip_get_num_entries(zip, 0);
 		std::string outputDirBase(outputDir);
+		outputDirBase += "/";
 		for (int i = 0; i < nFiles; ++i) {
 			zip_file_t* file = zip_fopen_index(zip, i, 0);
 			if (!file) {

@@ -72,6 +72,9 @@ namespace Launcher {
 
 class RepentogonInstallation {
 public:
+	static constexpr const char* RepentogonSubfolder = "Repentogon";
+	static constexpr const char* RepentogonMarker = ".repentogon";
+
     RepentogonInstallation(ILoggableGUI* gui);
 
     bool Validate(std::string const& installationPath);
@@ -104,13 +107,8 @@ public:
 		return _repentogonZHLVersionMatch;
 	}
 
-	inline bool IsValid(bool includeLegacy) const {
-		return _installationState == REPENTOGON_INSTALLATION_STATUS_MODERN ||
-			(includeLegacy && IsLegacy());
-	}
-
-	inline bool IsLegacy() const {
-		return _installationState == REPENTOGON_INSTALLATION_STATUS_LEGACY;
+	inline bool IsValid() const {
+		return _installationState == REPENTOGON_INSTALLATION_STATUS_MODERN;
 	}
 
 	inline std::string const& GetShadowZHLVersion() const {
@@ -173,7 +171,7 @@ private:
 	 */
 	LoadDLLState _dllStates[LOADABLE_DLL_MAX] = { LOAD_DLL_STATE_NONE };
 
-	/* Shadow variants of the version of the different components. 
+	/* Shadow variants of the version of the different components.
 	 * Used to track version changes during updates.
 	 */
 	std::string _sRepentogonVersion;

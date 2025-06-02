@@ -63,13 +63,24 @@ bool Launcher::App::OnInit() {
 	}
 
 	__installation = new Installation(&__nopLogGUI, &__configuration);
-	auto [isaacPath, repentogonOk] = __installation->Initialize(sCLI->IsaacPath());
+	std::optional<std::string> providedPath;
+	std::string cliIsaacPath = sCLI->IsaacPath();
+	if (!cliIsaacPath.empty()) {
+		providedPath = std::move(cliIsaacPath);
+	}
+
+	if (!providedPath && configurationOk) {
+		providedPath = __configuration.IsaacExecutablePath();
+	}
+
+	bool isStandalone = false;
+	auto [isaacPath, repentogonOk] = __installation->Initialize(providedPath, &isStandalone);
 
 	bool wizardOk = false, wizardRan = false;
 	bool wizardInstalledRepentogon = false;
-	bool isIsaacValid = __installation->GetIsaacInstallation().IsValid();
+	bool isIsaacValid = __installation->GetIsaacInstallation().GetMainInstallation().IsValid();
 	if (!sCLI->SkipWizard()) {
-		if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid) {
+		if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid || isStandalone) {
 			if (sCLI->ForceWizard()) {
 				Logger::Info("Force starting wizard due to command-line\n");
 			} else if (!isIsaacValid) {
@@ -81,7 +92,7 @@ bool Launcher::App::OnInit() {
 		}
 	}
 
-	if (!__installation->GetIsaacInstallation().IsValid()) {
+	if (!__installation->GetIsaacInstallation().GetMainInstallation().IsValid()) {
 		wxMessageBox("The launcher was not able to find any valid Isaac installation.\n"
 			"Either check your Steam installation, or provide the path to the executable through the --isaac option.",
 			"Fatal error", wxOK | wxICON_EXCLAMATION);

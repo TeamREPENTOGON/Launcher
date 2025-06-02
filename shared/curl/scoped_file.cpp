@@ -26,5 +26,5 @@ ScopedFile::operator FILE* () const {
 }
 
 ScopedFile::operator bool() const {
-	return _f != NULL;
+	return _f != nullptr;
 }

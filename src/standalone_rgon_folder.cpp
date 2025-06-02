@@ -1,3 +1,6 @@
+#include <WinSock2.h>
+#include <Windows.h>
+
 #include <fstream>
 #include <filesystem>
 #include <iostream>
@@ -5,9 +8,12 @@
 #include <string>
 #include <vector>
 
+#include "shared/filesystem.h"
 #include "shared/logger.h"
+#include "shared/utils.h"
 #include "launcher/diff_patcher.h"
 #include "launcher/isaac_installation.h"
+#include "launcher/repentogon_installation.h"
 #include "launcher/standalone_rgon_folder.h"
 
 #include <wx/wx.h>
@@ -46,7 +52,7 @@ namespace standalone_rgon {
         "resources/packed/sfx.a",
         "resources/packed/videos.a",
         "resources/packed/afterbirth.a",
-        "resources/packed/secret.a",
+        // "resources/packed/secret.a", // No longer present in Rep(+) it seems
         "resources/scripts/enums.lua",
         "resources/scripts/json.lua",
         "resources/scripts/licenses",
@@ -1263,107 +1269,131 @@ namespace standalone_rgon {
          "isaac-ng.exe",
     }; //the exe needs to be the last thing to get copied, so we can ensure that all files were copied without having any extra logic for it, lol
 
-    static wxFrame* waitwindow = nullptr;
-    static std::mutex windowMutex;
-
-    void createWaitWindow(const char* title, const char* text, wxWindow* parent = nullptr) {
-        std::unique_lock<std::mutex> lck(windowMutex);
-
-        if (waitwindow != nullptr)
-            return; // Already exists
-
-        waitwindow = new wxFrame(parent, wxID_ANY, title,
-            wxDefaultPosition, wxSize(250, 100),
-            wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP | wxCAPTION);
-        waitwindow->SetBackgroundColour(*wxWHITE);
-
-        new wxStaticText(waitwindow, wxID_ANY, text,
-            wxPoint(70, 35), wxDefaultSize, wxALIGN_CENTER);
-
-        waitwindow->Center();
-        waitwindow->Show();
-        waitwindow->Update();
-    }
-
-    void destroyWaitWindow() {
-        std::unique_lock<std::mutex> lck(windowMutex);
-
-        if (waitwindow) {
-            waitwindow->Destroy();
-            waitwindow = nullptr;
-        }
-    }
-
     namespace fs = std::filesystem; //so I dont go insane
 
-    bool createSteamAppIdFile(const std::string& targetPath) {
+    bool CreateSteamAppIDFile(const std::string& targetPath) {
         std::ofstream outFile(targetPath + "/steam_appid.txt");
+        if (!outFile.good()) {
+            return false;
+        }
+
         outFile << "250900";
         outFile.close();
+
         return true;
     }
 
-    bool copyFiles(const std::string& basePath, bool patch = false) {
-        createWaitWindow("Copying Files", "REPENTOGON is installing... \n Please Wait!");
+    bool Patch(const std::string& repentogonFolder, const std::string& patchPath) {
+        return diff_patcher::PatchFolder(repentogonFolder, patchPath, nullptr);
+    }
 
-        fs::path sourceBase = fs::absolute(basePath).remove_filename();
-        fs::path destBase = sourceBase / "Repentogon";
+    bool CopyFiles(const std::string& srcFolder,
+        const std::string& dstFolder) {
+        fs::path src(srcFolder);
+        fs::path dst(dstFolder);
 
-        fs::create_directories(destBase);
-        bool allgud = true;
+        fs::create_directories(dst);
         int failcount = 0;
         for (const auto& relative : tocopy) {
-            fs::path sourcePath = sourceBase / relative;
-            fs::path destPath = destBase / relative;
+            fs::path sourcePath = src / relative;
+            fs::path destPath = dst / relative;
 
             try {
-                if (!relative.starts_with("tools/")) { //no point copying these, I dont think, if modders wants them copied, they can do it manually, no point in making eevryone sit through copying those.
+                /* Skip whole folders, rely on the individual files inside the
+                 * folder instead.
+                 */
+                const char* sourceStr = sourcePath.string().c_str();
+                if (Filesystem::IsFolder(sourceStr)) {
+                    Logger::Info("standalone_rgon::CopyFiles: skipping folder %s\n",
+                        sourceStr);
+                    continue;
+                }
+
+                /* No point copying these, I dont think, if modders wants them
+                 * copied, they can do it manually, no point in making everyone
+                 * sit through copying those.
+                 */
+                if (!relative.starts_with("tools/")) {
                     fs::create_directories(destPath.parent_path());
                     fs::copy_file(sourcePath, destPath, fs::copy_options::overwrite_existing);
-                    Logger::Info("Copied: %s \n", destPath.string().c_str());
+                    Logger::Info("standalone_rgon::CopyFiles: copied %s\n", destPath.string().c_str());
                 }
             } catch (fs::filesystem_error& e) {
-                Logger::Warn("[Error] Failed to Copy: %s \n", destPath.string().c_str());
+                Logger::Error("standalone_rgon::CopyFiles: failed to copy %s (%s:%d, %s)\n",
+                    destPath.string().c_str(), e.code().category().name(), e.code().value(), e.what());
                 failcount++;
-                allgud = false;
             }
         }
-        createSteamAppIdFile(destBase.string());
-        if (allgud) {
-            Logger::Info("Finished copying files to /Repentogon without issues \n");
+
+        if (!failcount) {
+            Logger::Info("standalone_rgon::CopyFiles: finished copying files to %s "
+                "without issues\n", dstFolder.c_str());
         } else {
-            Logger::Warn("Finished copying some files to /Repentogon [[ %d ERRORS!! ]]\n", failcount);
+            Logger::Error("standalone_rgon::CopyFiles: errors (%d) where encountered "
+                "while copying files from %s to %s\n",
+                failcount, srcFolder.c_str(), dstFolder.c_str());
         }
-        if (patch) {
-            destroyWaitWindow();
-            createWaitWindow("Patching Files", "REPENTOGON is doing magic... \n Hold On!");
-            fs::path patchPath = fs::current_path() / "patch";
-            patchfolder(destBase, patchPath);
-            //patchfolder(fs::path("Z:\\diffcreator\\test"), fs::path("Z:\\diffcreator\\output"));
+
+        return failcount == 0;
+    }
+
+    bool IsStandaloneFolder(const std::string& s) {
+        std::string path = s;
+        if (!Filesystem::IsFolder(s.c_str())) {
+            if (!Filesystem::Exists(s.c_str())) {
+                return false;
+            }
+
+            fs::path p(s);
+            path = p.parent_path().string();
+
+            if (!Filesystem::IsFolder(path.c_str())) {
+                return false;
+            }
         }
-        destroyWaitWindow();
-        return allgud; //doesnt necessarily mean that execution should be stopped if false, but I feel it will be good to know if it failed or not.
-    }
 
-    fs::path getOGExePath(const fs::path& exePath) {
-        fs::path parentDir = exePath.parent_path().parent_path();
-        return parentDir / exePath.filename();
-    }
+        std::vector<std::string> tokens;
+        Filesystem::TokenizePath(path.c_str(), tokens);
 
-    fs::path getCopyExePath(const fs::path& exePath) {
-        fs::path Dir = exePath.parent_path() / "Repentogon";
-        return Dir / exePath.filename();
-    }
-
-    bool exeIsCopy(const fs::path& exePath) {
-        if (!exePath.has_filename() || exePath.extension() != ".exe") {
+        if (tokens.empty()) {
             return false;
         }
-        return fs::exists(getOGExePath(exePath));
+
+        std::stringstream identity;
+        identity << path << "/" << RepentogonInstallation::RepentogonMarker;
+
+        std::string identityStr = identity.str();
+        return tokens.back() == RepentogonInstallation::RepentogonSubfolder &&
+            Filesystem::Exists(identityStr.c_str());
     }
 
-    bool exeCopyExists(const fs::path& exePath) {
-        return fs::exists(getCopyExePath(exePath));
-    }
+    bool GenerateRepentogonPath(const std::string& base,
+        std::filesystem::path& result, bool strict) {
+        const char* baseStr = base.c_str();
+        if (!Filesystem::Exists(baseStr)) {
+            if (strict) {
+                Logger::Error("GenerateRepentogonPath: base %s does not exist\n", baseStr);
+                return false;
+            } else {
+                fs::path p(baseStr);
+                if (p.filename().empty()) {
+                    result = p / RepentogonInstallation::RepentogonSubfolder;
+                } else {
+                    result = p.parent_path() / RepentogonInstallation::RepentogonSubfolder;
+                }
 
+                return true;
+            }
+        }
+
+        fs::path p(baseStr);
+        if (Filesystem::IsFolder(baseStr)) {
+            p /= RepentogonInstallation::RepentogonSubfolder;
+            result = std::move(p);
+        } else {
+            result = p.parent_path() / RepentogonInstallation::RepentogonSubfolder;
+        }
+
+        return true;
+    }
 }

@@ -151,6 +151,26 @@ namespace Launcher {
 			break;
 		}
 
+		case REPENTOGON_INSTALLATION_RESULT_NO_REPENTOGON:
+			LogError(text, "Could not install Repentogon: unable to create the Repentogon folder\n");
+			break;
+
+		case REPENTOGON_INSTALLATION_RESULT_NO_MARKER:
+			LogError(text, "Could not install Repentogon: unable to create Repentogon marker in Repentogon folder\n");
+			break;
+
+		case REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_COPY:
+			LogError(text, "Could not install Repentogon: unable to copy source Isaac files to Repentogon folder\n");
+			break;
+
+		case REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID:
+			LogError(text, "Could not install Repentogon: unable to create steam_appid.txt in the Repentogon folder\n");
+			break;
+
+		case REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH:
+			LogError(text, "Could not install Repentogon: unable to downpatch copied Isaac files to compatible version\n");
+			break;
+
 		case REPENTOGON_INSTALLATION_RESULT_OK:
 			break;
 

@@ -19,6 +19,7 @@
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
 
 namespace srgon = standalone_rgon;
+namespace fs = std::filesystem;
 
 Version const knownVersions[] = {
 		{ "fd5b4a2ea3b397aec9f2b311ecc3be2e7e66bcd8723989096008d4d8258d92ea", "v1.9.7.10.J212 (Steam)", true },
@@ -42,10 +43,13 @@ Version const* GetIsaacVersionFromHash(const char* hash) {
 	return NULL;
 }
 
-bool IsaacInstallation::ValidateExecutable(std::string const& path) {
-	_isValid = false;
+bool InstallationData::ValidateExecutable(std::string const& path) {
+	_isValid = DoValidateExecutable(path);
+	return _isValid;
+}
 
-	if (!Filesystem::FileExists(path.c_str())) {
+bool InstallationData::DoValidateExecutable(std::string const& path) const {
+	if (!Filesystem::Exists(path.c_str())) {
 		_gui->LogError("BoI executable %s does not exist\n", path.c_str());
 		Logger::Error("Installation::CheckIsaacExecutable: executable %s does not exist\n", path.c_str());
 		return false;
@@ -64,13 +68,12 @@ bool IsaacInstallation::ValidateExecutable(std::string const& path) {
 		return false;
 	}
 
-	_isValid = true;
 	return true;
 }
 
-std::optional<std::string> IsaacInstallation::AutoDetect() {
+std::optional<std::string> IsaacInstallation::AutoDetect(bool* standalone) {
 	std::string path;
-	if (Filesystem::FileExists("isaac-ng.exe")) {
+	if (Filesystem::Exists("isaac-ng.exe")) {
 		path = Filesystem::GetCurrentDirectory_() + "\\isaac-ng.exe";
 	} else {
 		std::optional<std::string> steamPath = Steam::GetSteamInstallationPath();
@@ -81,14 +84,15 @@ std::optional<std::string> IsaacInstallation::AutoDetect() {
 		path = *steamPath + "\\steamapps\\common\\The Binding of Isaac Rebirth\\isaac-ng.exe";
 	}
 
-	if (Validate(path)) {
+	if (Validate(path, standalone)) {
 		return path;
 	}
 
 	return std::nullopt;
 }
 
-bool IsaacInstallation::Validate(std::string const& sourcePath) {
+bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
+	bool* standalone) {
 	std::string path = sourcePath;
 	if (path.empty()) {
 		Logger::Error("IsaacInstallation::Validate: received empty path\n");
@@ -115,24 +119,54 @@ bool IsaacInstallation::Validate(std::string const& sourcePath) {
 	std::filesystem::path fsPath(path);
 	fsPath.remove_filename();
 	_folderPath = fsPath.string();
+	/* Check compatibility in both cases for sanity, In case we reach a weird
+	 * state where the launcher cannot patch the Isaac executable to something
+	 * compatible.
+	 */
 	_isCompatibleWithRepentogon = CheckCompatibilityWithRepentogon();
+	/* Repentogon never needs patching. Patch the original if it is not compatible
+	 * with Repentogon.
+	 */
+	_needsPatch = repentogon ? false : !_isCompatibleWithRepentogon;
 
-	if (_isCompatibleWithRepentogon && !srgon::exeIsCopy(path)) {
-		std::filesystem::path fsTempPath(path);
-		std::filesystem::path copyexepath = srgon::getCopyExePath(fsTempPath);
-		if (!srgon::exeCopyExists(path) || !Validate(copyexepath.string())) {
-			srgon::copyFiles(path, _needspatch);
-			_isCompatibleWithRepentogon = true;
-			_version = std::move(*version);
+	if (srgon::IsStandaloneFolder(sourcePath) && !repentogon) {
+		_gui->LogWarn("The main Isaac executable is located in a Repentogon installation, this may indicate a broken configuration\n");
+		Logger::Warn("Main Isaac executable %s is located inside a Repentogon installation", path.c_str());
+
+		if (standalone) {
+			*standalone = true;
 		}
-		_exePath = copyexepath.string();
-		copyexepath.remove_filename();
-		_folderPath = copyexepath.string();
-	}
-	else if (!_isCompatibleWithRepentogon && srgon::exeIsCopy(path)) {
-		Validate(fsPath.string());
+	} else if (standalone) {
+		*standalone = false;
 	}
 
+	return true;
+}
+
+bool IsaacInstallation::Validate(std::string const& sourcePath, bool* standalone) {
+	InstallationData data;
+	data.SetGUI(_gui);
+
+	if (!data.Validate(sourcePath, false, standalone)) {
+		return false;
+	}
+
+	_mainInstallation = data;
+
+	return true;
+}
+
+bool IsaacInstallation::ValidateRepentogon(std::string const& folder) {
+	InstallationData data;
+	data.SetGUI(_gui);
+
+	fs::path exePath(_mainInstallation.GetExePath());
+
+	if (!data.Validate((folder + "\\") + exePath.filename().string(), true, nullptr)) {
+		return false;
+	}
+
+	_repentogonInstallation = data;
 	return true;
 }
 
@@ -167,7 +201,7 @@ static_assert(sizeof(SectionHeader) == 40);
 
 IsaacInstallation::IsaacInstallation(ILoggableGUI* gui) : _gui(gui) { }
 
-std::optional<std::string> IsaacInstallation::GetVersionStringFromMemory(std::string const& path) {
+std::optional<std::string> InstallationData::GetVersionStringFromMemory(std::string const& path) {
 	if (path.empty()) {
 		Logger::Error("Installation::GetVersionString: no executable\n");
 		return std::nullopt;
@@ -298,7 +332,7 @@ std::optional<std::string> IsaacInstallation::GetVersionStringFromMemory(std::st
 	return result;
 }
 
-std::optional<std::string> IsaacInstallation::ComputeVersion(std::string const& path) {
+std::optional<std::string> InstallationData::ComputeVersion(std::string const& path) {
 	std::optional<std::string> versionString = GetVersionStringFromMemory(path);
 	// Can't use a ternary because type unification is tricky here
 	if (versionString) {
@@ -308,28 +342,48 @@ std::optional<std::string> IsaacInstallation::ComputeVersion(std::string const& 
 	}
 }
 
-bool IsaacInstallation::CheckCompatibilityWithRepentogon() {
+bool InstallationData::CheckCompatibilityWithRepentogon() {
 	namespace fs = std::filesystem;
 
 	fs::path fullPath = fs::current_path() / "patch/version.txt";
+	std::string s = fullPath.string();
 	if (fs::exists(fullPath)) {
-		std::ifstream file(fullPath);
+		ScopedFile file(fopen(s.c_str(), "r"));
 		if (!file) {
-			std::cerr << "Failed to open file: " << fullPath << std::endl;
-			return "";
+			Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: failed to open patch file %s\n", s.c_str());
+			return false;
 		}
 
-		std::ostringstream ss;
-		ss << file.rdbuf();  // Read the whole file into the stringstream
-		if (ss.str() == GetVersion()) {
-			_needspatch = true;
+		fpos_t begin = ftell(file);
+		fseek(file, 0, SEEK_END);
+
+		if (ferror(file)) {
+			Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: failed to fseek\n");
+			return false;
+		}
+
+		fpos_t end = ftell(file);
+		rewind(file);
+
+		std::unique_ptr<char[]> content = std::make_unique<char[]>(end - begin + 1);
+		if (!content) {
+			Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: unable to allocate memory\n");
+			return false;
+		}
+
+		fread(content.get(), end - begin, 1, file);
+		content.get()[end - begin] = '\0';
+
+		if (!strcmp(GetVersion(), content.get())) {
+			_needsPatch = true;
 			return true;
 		}
 	}
+
 	return RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
 }
 
-std::string IsaacInstallation::StripVersion(std::string const& version) {
+std::string InstallationData::StripVersion(std::string const& version) {
 	size_t len = strlen(__versionNeedle);
 	return version.substr(len - 1, version.size() - len);
 }

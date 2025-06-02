@@ -150,7 +150,7 @@ namespace Launcher {
 		logWindow->SetBackgroundColour(*wxWHITE);
 
 		wxStaticBox* configurationBox = new wxStaticBox(this, -1, "Launcher configuration");
-		wxStaticBoxSizer* configurationSizer = new wxStaticBoxSizer(configurationBox, wxHORIZONTAL);
+		wxStaticBoxSizer* configurationSizer = new wxStaticBoxSizer(configurationBox, wxVERTICAL);
 
 		wxSizerFlags logFlags = wxSizerFlags().Expand().Proportion(5).Border(wxLEFT | wxRIGHT | wxTOP);
 		verticalSizer->Add(logWindow, logFlags);
@@ -187,18 +187,17 @@ namespace Launcher {
 			"Select Isaac executable...", NoIsaacText,
 			NoIsaacColor, isaacSelectionSizer, &_isaacFileText, WINDOW_BUTTON_SELECT_ISAAC);
 
-		/* wxBoxSizer* repentogonSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
-		AddLauncherConfigurationTextField("Indicate folder in which to download and install REPENTOGON",
-			"Select folder",
-			NoRepentogonInstallationFolderText, NoRepentogonInstallationFolderColor,
-			repentogonSelectionSizer, &_repentogonInstallFolderText, WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER); */
-
-		// isaacSelectionSizer->Add(new wxStaticLine(), 0, wxBOTTOM | wxTOP, 20);
-
-		_configurationSizer->Add(isaacSelectionSizer, 0, wxTOP | wxLEFT | wxRIGHT, 20);
+		_configurationSizer->Add(isaacSelectionSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 		// _configurationSizer->Add(new wxStaticLine(), 0, wxTOP | wxBOTTOM, 5);
-		// _configurationSizer->Add(repentogonSelectionSizer, 0, wxLEFT | wxRIGHT, 20);
-		// _configurationSizer->Add(new wxStaticLine(), 0, wxBOTTOM, 20);
+
+		wxBoxSizer* repentogonExeSizer = new wxBoxSizer(wxHORIZONTAL);
+		wxStaticText* repentogonExeText = new wxStaticText(_configurationBox, wxID_ANY, "Repentogon executable");
+		_repentogonFileText = new wxTextCtrl(_configurationBox, wxID_ANY, "", wxDefaultPosition,
+			wxDefaultSize, wxTE_READONLY);
+		repentogonExeSizer->Add(repentogonExeText);
+		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Expand().Proportion(1));
+
+		_configurationSizer->Add(repentogonExeSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 	}
 
 	void MainFrame::AddLaunchOptions() {
@@ -379,7 +378,12 @@ namespace Launcher {
 		_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize().c_str());
 
 		_configuration->Write();
-		::Launcher::Launch(&_logWindow, _isaacFileText->GetValue().c_str().AsChar(), launchingVanilla, _configuration);
+
+		wxString path = _isaacFileText->GetValue();
+		if (!launchingVanilla) {
+			path = _repentogonFileText->GetValue();
+		}
+		::Launcher::Launch(&_logWindow, path.c_str().AsChar(), launchingVanilla, _configuration);
 	}
 
 	void MainFrame::EnableInterface(bool enable) {
@@ -398,7 +402,7 @@ namespace Launcher {
 	}
 
 	bool MainFrame::SanityCheckLauncherUpdate() {
-		return !Filesystem::FileExists(Comm::UnpackedArchiveName);
+		return !Filesystem::Exists(Comm::UnpackedArchiveName);
 	}
 
 	void MainFrame::SanitizeLauncherUpdate() {
@@ -410,9 +414,10 @@ namespace Launcher {
 	}
 
 	void MainFrame::OneTimeIsaacPathInitialization() {
-		std::string const& isaacPath = _installation->GetIsaacInstallation().GetExePath();
+		std::string const& isaacPath = _installation->GetIsaacInstallation()
+			.GetMainInstallation().GetExePath();
 		if (!isaacPath.empty())
-			_isaacFileText->SetValue(_installation->GetIsaacInstallation().GetExePath());
+			_isaacFileText->SetValue(isaacPath);
 		else {
 			_logWindow.LogWarn("No Isaac installation found (this is probably a bug)\n");
 			bool abortRequested = false;
@@ -427,6 +432,16 @@ namespace Launcher {
 				Logger::Fatal("User did not provide a valid Isaac installation folder, aborting\n");
 			}
 		}
+
+		std::string const repentogonPath = _installation->GetIsaacInstallation()
+			.GetRepentogonInstallation().GetExePath();
+		if (repentogonPath.empty()) {
+			_repentogonFileText->SetForegroundColour(*wxRED);
+			_repentogonFileText->SetValue("No executable found");
+		} else {
+			_repentogonFileText->SetForegroundColour(*wxBLACK);
+			_repentogonFileText->SetValue(repentogonPath);
+		}
 	}
 
 	void MainFrame::PreInit() {
@@ -439,6 +454,7 @@ namespace Launcher {
 		_logWindow.Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::version);
 		std::string currentDir = Filesystem::GetCurrentDirectory_();
 		_logWindow.Log("Current directory is: %s", currentDir.c_str());
+		_logWindow.Log("Using configuration file %s\n", _installation->GetLauncherConfiguration()->GetConfigurationPath().c_str());
 
 		SanitizeLauncherUpdate();
 
@@ -500,7 +516,7 @@ namespace Launcher {
 		LaunchMode mode = _configuration->IsaacLaunchMode();
 		if (mode != LAUNCH_MODE_REPENTOGON && mode != LAUNCH_MODE_VANILLA) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default", mode, c::Keys::launchMode.c_str());
-			if (_installation->GetRepentogonInstallation().IsValid(false)) {
+			if (_installation->GetRepentogonInstallation().IsValid()) {
 				_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
 			} else {
 				_configuration->IsaacLaunchMode(LAUNCH_MODE_VANILLA);
@@ -508,17 +524,19 @@ namespace Launcher {
 		}
 
 		std::string luaHeapSize = _configuration->LuaHeapSize();
-		(void)std::remove_if(luaHeapSize.begin(), luaHeapSize.end(), [](char c) -> bool { return c == ' '; });
-		std::regex r("([0-9]+)([KMG]?)");
-		std::cmatch match;
-		bool hasMatch = std::regex_match(luaHeapSize.c_str(), match, r);
+		if (!luaHeapSize.empty()) {
+			(void)std::remove_if(luaHeapSize.begin(), luaHeapSize.end(), [](char c) -> bool { return std::isspace(c); });
+			std::regex r("([0-9]+)([KMG]?)");
+			std::cmatch match;
+			bool hasMatch = std::regex_match(luaHeapSize.c_str(), match, r);
 
-		if (!hasMatch) {
-			_logWindow.LogWarn("Invalid value %s for %s field in configuration file. Ignoring\n",
-				luaHeapSize.c_str(), c::Keys::luaHeapSize.c_str());
-			_configuration->LuaHeapSize("");
-		} else {
-			_configuration->LuaHeapSize(luaHeapSize);
+			if (!hasMatch) {
+				_logWindow.LogWarn("Invalid value %s for %s field in configuration file. Ignoring\n",
+					luaHeapSize.c_str(), c::Keys::luaHeapSize.c_str());
+				_configuration->LuaHeapSize("");
+			} else {
+				_configuration->LuaHeapSize(luaHeapSize);
+			}
 		}
 
 		int levelStage = _configuration->Stage();
@@ -611,18 +629,13 @@ namespace Launcher {
 		RepentogonInstallation const& repentogonInstallation = _installation->GetRepentogonInstallation();
 		IsaacInstallation const& isaacInstallation = _installation->GetIsaacInstallation();
 
-		bool isValid = repentogonInstallation.IsValid(true);
-		bool isLegacy = isValid && repentogonInstallation.IsLegacy();
-		bool isIncompatible = !isaacInstallation.IsCompatibleWithRepentogon();
+		bool isValid = repentogonInstallation.IsValid();
+		bool isIncompatible = !isaacInstallation.GetRepentogonInstallation().IsCompatibleWithRepentogon();
 
-		if (!isValid || isLegacy || isIncompatible) {
+		if (!isValid || isIncompatible) {
 			if (_repentogonLaunchModeIdx != -1) {
 				if (!isValid) {
 					_logWindow.LogWarn("Removing Repentogon start option as the Repentogon installation is broken\n");
-				}
-
-				if (isLegacy) {
-					_logWindow.LogWarn("Removing Repentogon start option due to legacy installation\n");
 				}
 
 				if (isIncompatible) {
@@ -697,9 +710,9 @@ namespace Launcher {
 	void MainFrame::AddLauncherConfigurationTextField(const char* intro,
 		const char* buttonText, const char* emptyText, wxColour const& emptyColor,
 		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
-		_configurationSizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 20);
+		sizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxRIGHT, 5);
 		wxButton* isaacSelectionButton = new wxButton(_configurationBox, windowId, buttonText);
-		_configurationSizer->Add(isaacSelectionButton, 0, wxLEFT | wxRIGHT | wxALIGN_CENTER_VERTICAL, 10);
+		sizer->Add(isaacSelectionButton, 0, wxRIGHT, 5);
 		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1), wxTE_READONLY | wxTE_RICH);
 		textCtrl->SetBackgroundColour(*wxWHITE);
 
@@ -709,7 +722,7 @@ namespace Launcher {
 		textCtrl->SetDefaultStyle(textAttr);
 
 		wxSizerFlags flags = wxSizerFlags().Expand().Proportion(1);
-		_configurationSizer->Add(textCtrl, flags);
+		sizer->Add(textCtrl, flags);
 
 		if (result) {
 			*result = textCtrl;

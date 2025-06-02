@@ -4,6 +4,7 @@
 #include <Windows.h>
 
 #include <string>
+#include <vector>
 
 namespace Filesystem {
 	/* Create the hierarchy of folders required in order to create the file @name.
@@ -16,22 +17,28 @@ namespace Filesystem {
 	/* Check if a folder with the given name exists. Return true on success,
 	 * false on failure.
 	 */
-	bool FolderExists(const char* name);
-
-	/* Check that a file with the given name exists. Return true on success,
-	 * false on failure.
-	 */
-	bool FileExists(const char* filename);
+	bool IsFolder(const char* name);
 
 	/* Check that a file with the given name exists. Fill the search
 	 * structure with the result of the search.
 	 *
 	 * Return true on success, false on failure.
 	 */
-	bool FileExists(const char* filename, WIN32_FIND_DATAA* search);
+	bool FindFile(const char* filename, WIN32_FIND_DATAA* search);
+
+	/* Check that a file with the given name exists. Return true on success,
+	 * false on failure.
+	 */
+	bool Exists(const char* filename);
 
 	std::string GetCurrentDirectory_();
 
 	/* Remove a file. Return false on failure, true on success. */
 	bool RemoveFile(const char* filename);
+
+	bool SplitIntoComponents(const char* path, std::string* drive,
+		std::string* filename, std::string* extension,
+		std::vector<std::string>* folders);
+
+	void TokenizePath(const char* path, std::vector<std::string>& tokens);
 }

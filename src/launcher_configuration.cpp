@@ -126,7 +126,7 @@ bool LauncherConfiguration::Search(LauncherConfigurationLoad* outResult) {
 
 	std::string path(homeDirectory);
 	path += "\\Documents\\My Games\\";
-	if (!Filesystem::FolderExists(path.c_str())) {
+	if (!Filesystem::IsFolder(path.c_str())) {
 		if (!Filesystem::CreateFileHierarchy(path.c_str(), "\\")) {
 
 			if (outResult)
@@ -173,7 +173,7 @@ bool LauncherConfiguration::Process(LauncherConfigurationLoad* outResult) {
 
 bool LauncherConfiguration::CheckConfigurationFileExists(LauncherConfigurationLoad* result,
 	std::string const& path) {
-	if (!Filesystem::FileExists(path.c_str())) {
+	if (!Filesystem::Exists(path.c_str())) {
 		Logger::Info("Launcher configuration file %s does not exist\n", path.c_str());
 
 		if (result)
@@ -268,7 +268,7 @@ void LauncherConfiguration::Write() {
 		fprintf(f, "%s = %ld\n", Keys::stageType.c_str(), *_stageType);
 	}
 
-	if (_luaHeapSize) {
+	if (_luaHeapSize && !_luaHeapSize->empty()) {
 		fprintf(f, "%s = %s\n", Keys::luaHeapSize.c_str(), _luaHeapSize->c_str());
 	}
 

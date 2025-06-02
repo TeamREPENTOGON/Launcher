@@ -5,9 +5,14 @@
 #include "shared/logger.h"
 
 namespace standalone_rgon {
-    bool copyFiles(const std::string& basePath, bool patch);
-    std::filesystem::path getOGExePath(const std::filesystem::path& exePath);
-    std::filesystem::path getCopyExePath(const std::filesystem::path& exePath);
-    bool exeIsCopy(const std::filesystem::path& exePath);
-    bool exeCopyExists(const std::filesystem::path& exePath);
+    bool CopyFiles(const std::string& basePath,
+        const std::string& destination);
+    bool Patch(const std::string& repentogonFolder,
+        const std::string& patchPath);
+    bool CreateSteamAppIDFile(const std::string& repentogonFolder);
+
+    bool GenerateRepentogonPath(const std::string& base,
+        std::filesystem::path& result, bool strict);
+
+    bool IsStandaloneFolder(const std::string& path);
 }

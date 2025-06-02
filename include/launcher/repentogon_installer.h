@@ -45,6 +45,16 @@ namespace Launcher {
 		REPENTOGON_INSTALLATION_RESULT_EXTRACT_FAILED,
 		/* Update failed: invalid output folder. */
 		REPENTOGON_INSTALLATION_RESULT_INVALID_OUTPUT_DIR,
+		/* Update failed: unable to create Repentogon folder. */
+		REPENTOGON_INSTALLATION_RESULT_NO_REPENTOGON,
+		/* Update failed: unable to create marker. */
+		REPENTOGON_INSTALLATION_RESULT_NO_MARKER,
+		/* Update failed: failed to copy Isaac files. */
+		REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_COPY,
+		/* Update failed: failed to create steam_appid.txt. */
+		REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID,
+		/* Update failed: failed to patch Isaac files. */
+		REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH,
 		/* Empty state. */
 		REPENTOGON_INSTALLATION_RESULT_NONE
 	};
@@ -163,6 +173,8 @@ namespace Launcher {
 		void PushFileRemovalNotification(std::string name, bool success);
 		void PushNotification(bool isError, const char* fmt, ...) _Printf_format_string_;
 		void PushFileDownloadNotification(std::string name, uint32_t size, uint32_t id);
+		bool CreateRepentogonFolder(const char* name);
+		bool CreateRepentogonMarker(const char* marker);
 
 		std::string GetDsoundDLLPath() const;
 		bool NeedRemoveDsoundDLL() const;

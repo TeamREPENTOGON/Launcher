@@ -28,12 +28,30 @@ enum ReadVersionStringResult {
 /* Global array of all known versions of the game. */
 extern Version const knownVersions[];
 
-class IsaacInstallation {
-public:
-    IsaacInstallation(ILoggableGUI* gui);
-    bool Validate(std::string const& exePath);
-    std::optional<std::string> AutoDetect();
+class InstallationData {
+private:
+    std::string _exePath;
+    std::string _folderPath;
+    std::variant<const Version*, std::string> _version;
+    bool _isCompatibleWithRepentogon = false;
+    bool _isValid = false;
+    bool _needsPatch = false;
 
+    mutable ILoggableGUI* _gui = nullptr;
+
+    static std::optional<std::string> ComputeVersion(std::string const& path);
+    static std::optional<std::string> GetVersionStringFromMemory(std::string const& path);
+    static std::string StripVersion(std::string const& version);
+
+public:
+    inline void SetGUI(ILoggableGUI* gui) {
+        _gui = gui;
+    }
+
+    bool Validate(std::string const& path, bool repentogon, bool* standalone);
+    bool ValidateExecutable(std::string const& path);
+    bool DoValidateExecutable(std::string const& path) const;
+    bool CheckCompatibilityWithRepentogon();
     inline bool IsCompatibleWithRepentogon() const {
         return _isCompatibleWithRepentogon;
     }
@@ -61,21 +79,31 @@ public:
     inline std::string const& GetFolderPath() const {
         return _folderPath;
     }
+};
+
+class IsaacInstallation {
+public:
+    IsaacInstallation(ILoggableGUI* gui);
+
+    bool Validate(std::string const& exePath, bool* standalone);
+    bool ValidateRepentogon(std::string const& folderPath);
+    std::optional<std::string> AutoDetect(bool* standalone);
+
+    InstallationData const& GetMainInstallation() const {
+        return _mainInstallation;
+    }
+
+    InstallationData const& GetRepentogonInstallation() const {
+        return _repentogonInstallation;
+    }
 
 private:
-    static std::optional<std::string> ComputeVersion(std::string const& path);
-    // static const Version* GetVersionFromHash(std::string const& path);
-    static std::optional<std::string> GetVersionStringFromMemory(std::string const& path);
-    bool CheckCompatibilityWithRepentogon();
-    static std::string StripVersion(std::string const& version);
-
-    bool ValidateExecutable(std::string const& exePath);
-
     mutable ILoggableGUI* _gui;
-    std::string _exePath;
-    std::string _folderPath;
-    std::variant<const Version*, std::string> _version;
-    bool _isCompatibleWithRepentogon = false;
-    bool _isValid = false;
-    bool _needspatch = false;
+
+    inline InstallationData& GetInstallationData(bool repentogon = false) {
+        return repentogon ? _repentogonInstallation : _mainInstallation;
+    }
+
+    InstallationData _mainInstallation;
+    InstallationData _repentogonInstallation;
 };

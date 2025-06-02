@@ -31,14 +31,24 @@ void RepentogonInstallation::ClearInstallation() {
 
 bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	std::string repentogonFolder = installationFolder;
+	repentogonFolder += "/";
 	ClearInstallation();
 	_installationState = REPENTOGON_INSTALLATION_STATUS_NONE;
 
 	_gui->Log("Checking for validity of Repentogon installation...\n");
 
 	if (repentogonFolder.empty()) {
-		_gui->LogError("Cannot check for a Repentogon installation without being given an Isaac executable\n");
-		Logger::Critical("Installation::CheckRepentogonInstallation: function called without an Isaac folder, abnormal internal state\n");
+		_gui->LogError("Cannot check for a Repentogon installation without being "
+			"given an Isaac executable\n");
+		Logger::Critical("RepentogonInstallation::Validate: function called without "
+			"an Isaac folder, abnormal internal state\n");
+		return false;
+	}
+
+	if (!Filesystem::Exists(repentogonFolder.c_str())) {
+		_gui->Log("No Repentogon installation found in %s\n", repentogonFolder.c_str());
+		Logger::Info("RepentogonInstallation::Validate: %s does not exist\n",
+			repentogonFolder.c_str());
 		return false;
 	}
 
@@ -51,10 +61,11 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 		std::string fullName = repentogonFolder + *mandatoryFile;
 		FoundFile& file = _repentogonFiles.emplace_back();
 		file.filename = *mandatoryFile;
-		file.found = Filesystem::FileExists(fullName.c_str());
+		file.found = Filesystem::Exists(fullName.c_str());
 
 		if (!file.found) {
-			Logger::Error("Updater::CheckRepentogonInstallation: %s not found\n", *mandatoryFile);
+			Logger::Error("RepentogonInstallation::Validate: %s not found (%s)\n",
+				*mandatoryFile, fullName.c_str());
 			loaderMissing = (strcmp(*mandatoryFile, Libraries::loader) == 0);
 		}
 
@@ -62,19 +73,17 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 		++mandatoryFile;
 	}
 
-	bool dsoundFound = Filesystem::FileExists((installationFolder + "\\dsound.dll").c_str());
+	bool dsoundFound = Filesystem::Exists((installationFolder + "\\dsound.dll").c_str());
 
 	if (!ok) {
-		if (loaderMissing && dsoundFound) {
-			_gui->LogWarn("Installation of Repentogon is missing the ZHL loader DLL, but dsound.dll is present: possible legacy installation\n");
-		} else {
-			_gui->LogError("No valid Repentogon installation found in %s: missing files detected\n", installationFolder.c_str());
-			return false;
-		}
+		_gui->LogError("No valid Repentogon installation found in %s: missing files detected\n", installationFolder.c_str());
+		return false;
 	}
 
-	if (!loaderMissing && dsoundFound) {
-		_gui->LogWarn("Installation of Repentogon contains both the ZHL loader and dsound.dll. For safety, the launcher will ignore the ZHL loader.\n");
+	if (dsoundFound) {
+		Logger::Error("RepentogonInstallation::Validate: found dsound.dll, malformed Repentogon installation\n");
+		_gui->LogError("Found dsound.dll in %s, Repentogon installation is malformed\n",
+			installationFolder.c_str());
 	}
 
 	ScopedModule loader = LoadModule(Libraries::loader, (repentogonFolder + Libraries::loader).c_str(), LOADABLE_DLL_ZHL_LOADER);
@@ -130,11 +139,11 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	if (_zhlVersion != _repentogonVersion || (!dsoundFound && !loaderMissing && _repentogonVersion != _zhlLoaderVersion)) {
 		if (!loaderMissing) {
 			_gui->LogError("No valid Repentogon installation found: the ZHL loader, the ZHL DLL and the Repentogon DLL are not aligned on the same version\n");
-			Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, ZHL loader version %s, Repentogon version %s)\n",
+			Logger::Error("RepentogonInstallation::Validate: ZHL / Repentogon version mismatch (ZHL version %s, ZHL loader version %s, Repentogon version %s)\n",
 				_zhlVersion.c_str(), _zhlLoaderVersion.c_str(), _repentogonVersion.c_str());
 		} else {
 			_gui->LogError("No valid Repentogon installation found: the ZHL DLL and the Repentogon DLL are not aligned on the same version\n");
-			Logger::Warn("Updater::CheckRepentogonInstallation: ZHL / Repentogon version mismatch (ZHL version %s, Repentogon version %s)\n",
+			Logger::Error("RepentogonInstallation::Validate: ZHL / Repentogon version mismatch (ZHL version %s, Repentogon version %s)\n",
 				_zhlVersion.c_str(), _repentogonVersion.c_str());
 		}
 
@@ -144,14 +153,10 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	}
 
 	_repentogonZHLVersionMatch = true;
-
-	if (dsoundFound) {
-		_gui->LogWarn("Found a valid legacy installation of Repentogon (dsound.dll found)\n");
-		_installationState = REPENTOGON_INSTALLATION_STATUS_LEGACY;
-	} else {
-		_gui->Log("Found a valid installation of Repentogon (version %s)\n", _zhlVersion.c_str());
-		_installationState = REPENTOGON_INSTALLATION_STATUS_MODERN;
-	}
+	_gui->Log("Found a valid installation of Repentogon (version %s)\n", _zhlVersion.c_str());
+	Logger::Info("RepentogonInstallation::Validate: Repentogon installation in %s is valid\n",
+		installationFolder.c_str());
+	_installationState = REPENTOGON_INSTALLATION_STATUS_MODERN;
 
 	return true;
 }
