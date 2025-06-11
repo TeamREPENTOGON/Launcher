@@ -60,10 +60,12 @@ target_include_directories (REPENTOGONLauncher PRIVATE
     "${CMAKE_SOURCE_DIR}/deps"
     "${CMAKE_SOURCE_DIR}/deps/zlib"
     "${CMAKE_SOURCE_DIR}/deps/bzip2"
-	"${CMAKE_SOURCE_DIR}/deps/bsdiff"
+    "${CMAKE_SOURCE_DIR}/deps/bsdiff"
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
     "${CMAKE_SOURCE_DIR}/include"
-    "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
+    "${CMAKE_SOURCE_DIR}/deps/rapidjson/include"
+    "${CMAKE_SOURCE_DIR}/deps/chained_futures/include"
+)
 target_compile_definitions (REPENTOGONLauncher PRIVATE UNICODE INI_SHARED_LIB "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
 target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch)
 add_custom_command(

@@ -139,6 +139,8 @@ namespace Launcher {
 
 		void EnableInterface(bool enable);
 
+		void OnIsaacCompleted(int result);
+
 		wxStaticBoxSizer* _optionsSizer;
 		wxStaticBoxSizer* _configurationSizer;
 		wxCheckBox* _console;

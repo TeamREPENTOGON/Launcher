@@ -291,8 +291,16 @@ int Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 	WaitForSingleObject(processInfo.hProcess, INFINITE);
 	Logger::Info("isaac-ng.exe completed, shutting down injector\n");
 
+	DWORD exitCode = 0;
+	BOOL ok = GetExitCodeProcess(processInfo.hProcess, &exitCode);
+	if (!ok) {
+		Logger::Error("Unable to retrieve exit code\n");
+	} else {
+		Logger::Info("isaac-ng.exe exited with exit code %d\n", exitCode);
+	}
+
 	CloseHandle(processInfo.hProcess);
 	CloseHandle(processInfo.hThread);
 
-	return 0;
+	return exitCode;
 }

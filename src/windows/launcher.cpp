@@ -16,6 +16,7 @@
 #include "wx/filectrl.h"
 #include "wx/statline.h"
 
+#include "chained_future/chained_future.h"
 #include "comm/messages.h"
 #include "curl/curl.h"
 #include "launcher/app.h"
@@ -57,6 +58,10 @@ EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::MainFrame::OnIsaacSel
 // EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::MainFrame::OnSelectRepentogonFolderClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_OPTIONS, Launcher::MainFrame::OnAdvancedOptionsClick)
 wxEND_EVENT_TABLE()
+
+int chained_future_f(int a) {
+	return a * 2;
+}
 
 namespace Launcher {
 	static std::tuple<wxFont, wxFont> MakeBoldFont(wxWindow* window);
@@ -383,11 +388,23 @@ namespace Launcher {
 		if (!launchingVanilla) {
 			path = _repentogonFileText->GetValue();
 		}
-		::Launcher::Launch(&_logWindow, path.c_str().AsChar(), launchingVanilla, _configuration);
+
+		EnableInterface(false);
+
+		chained_futures::async(&::Launcher::Launch, &_logWindow, path.c_str().AsChar(),
+			launchingVanilla, _configuration
+		).chain(std::bind_front(&MainFrame::OnIsaacCompleted, this));
+	}
+
+	void MainFrame::OnIsaacCompleted(int exitCode) {
+		_logWindow.LogInfo("Game exited with error code %d\n", exitCode);
+		EnableInterface(true);
 	}
 
 	void MainFrame::EnableInterface(bool enable) {
-		_logWindow.LogWarn("Interface freezing / unfreezing when launching the game is not yet implemented\n");
+		_configurationBox->Enable(enable);
+		_advancedOptionsButton->Enable(enable);
+		_optionsBox->Enable(enable);
 	}
 
 	bool MainFrame::SelectIsaacExecutablePath() {
