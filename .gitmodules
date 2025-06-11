@@ -16,3 +16,6 @@
 [submodule "deps/libzip"]
 	path = deps/libzip
 	url = https://github.com/nih-at/libzip.git
+[submodule "deps/chained_futures"]
+	path = deps/chained_futures
+	url = https://github.com/Sylmir/chained_futures.git
