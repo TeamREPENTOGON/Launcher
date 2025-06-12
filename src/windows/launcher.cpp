@@ -51,6 +51,7 @@ EVT_TEXT(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLaunchMod
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::MainFrame::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::MainFrame::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::MainFrame::OnOptionSelected)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_HIDE_WINDOW, Launcher::MainFrame::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, Launcher::MainFrame::OnOptionSelected)
 // EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnCharacterWritten)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::MainFrame::Launch)
@@ -200,9 +201,12 @@ namespace Launcher {
 		_repentogonFileText = new wxTextCtrl(_configurationBox, wxID_ANY, "", wxDefaultPosition,
 			wxDefaultSize, wxTE_READONLY);
 		repentogonExeSizer->Add(repentogonExeText);
-		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Expand().Proportion(1));
-
+		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Expand().Border(wxLEFT | wxRIGHT));
 		_configurationSizer->Add(repentogonExeSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
+
+		_hideWindow = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_HIDE_WINDOW,
+			"Hide launcher window while the game is running");
+		_configurationSizer->Add(_hideWindow, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 	}
 
 	void MainFrame::AddLaunchOptions() {
@@ -358,6 +362,10 @@ namespace Launcher {
 			_configuration->LuaDebug(box->GetValue());
 			break;
 
+		case WINDOW_CHECKBOX_HIDE_WINDOW:
+			_configuration->HideWindow(box->GetValue());
+			break;
+
 		default:
 			return;
 		}
@@ -391,12 +399,20 @@ namespace Launcher {
 
 		EnableInterface(false);
 
+		if (_configuration->HideWindow()) {
+			Show(false);
+		}
+
 		chained_futures::async(&::Launcher::Launch, &_logWindow, path.c_str().AsChar(),
 			launchingVanilla, _configuration
 		).chain(std::bind_front(&MainFrame::OnIsaacCompleted, this));
 	}
 
 	void MainFrame::OnIsaacCompleted(int exitCode) {
+		if (_configuration->HideWindow()) {
+			Show(true);
+		}
+
 		_logWindow.LogInfo("Game exited with error code %d\n", exitCode);
 		EnableInterface(true);
 	}
@@ -606,6 +622,7 @@ namespace Launcher {
 		_luaHeapSize->SetValue(_configuration->LuaHeapSize());
 
 		_luaDebug->SetValue(_configuration->LuaDebug());
+		_hideWindow->SetValue(_configuration->HideWindow());
 		InitializeLevelSelectFromOptions();
 		if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
 			_launchMode->SetValue(ComboBoxRepentogon);

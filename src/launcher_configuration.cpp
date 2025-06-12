@@ -20,6 +20,10 @@ static ConfigurationTuple<std::string> GetIsaacExecutablePath() {
 	return { Sections::general, Keys::isaacExecutableKey, "" };
 }
 
+static ConfigurationTuple<bool> HasHideWindow() {
+	return { Sections::general, Keys::hideWindow, Defaults::hideWindow };
+}
+
 static ConfigurationTuple<bool> HasConsole() {
 	return { Sections::repentogon, Keys::console, Defaults::console };
 }
@@ -200,6 +204,7 @@ void LauncherConfiguration::LoadFromFile(INIReader const& reader) {
 	_luaDebug = ReadBoolean(reader, HasLuaDebug);
 	_luaHeapSize = ReadString(reader, ::LuaHeapSize);
 	_roomId = ReadInteger(reader, RoomId);
+	_hideWindow = ReadBoolean(reader, HasHideWindow);
 
 	_repentogonConsole = ReadBoolean(reader, HasConsole);
 	_unstableUpdates = ReadBoolean(reader, HasUnstableUpdates);
@@ -252,6 +257,7 @@ void LauncherConfiguration::Write() {
 	fprintf(f, "[%s]\n", Sections::general.c_str());
 	fprintf(f, "%s = %s\n", Keys::isaacExecutableKey.c_str(),
 		_isaacExecutablePath.empty() ? "" : _isaacExecutablePath.c_str());
+	fprintf(f, "%s = %d\n", Keys::hideWindow.c_str(), _hideWindow ? 1 : 0);
 
 	fprintf(f, "[%s]\n", Sections::repentogon.c_str());
 	fprintf(f, "%s = %d\n", Keys::console.c_str(), _repentogonConsole);

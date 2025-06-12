@@ -28,6 +28,7 @@ namespace Configuration::Defaults {
 	const std::string luaHeapSize("1024M");
 	constexpr const bool update = true;
 	constexpr const bool unstableUpdates = false;
+	constexpr const bool hideWindow = true;
 }
 
 namespace Configuration::Sections {
@@ -41,6 +42,7 @@ namespace Configuration::Keys {
 	const std::string isaacExecutableKey("IsaacExecutable");
 
 	const std::string launchMode("LaunchMode");
+	const std::string hideWindow("HideWindow");
 
 	const std::string levelStage("LevelStage");
 	const std::string luaDebug("LuaDebug");
@@ -94,6 +96,7 @@ public:
 	CONFIGURATION_FIELD(bool, RepentogonConsole, _repentogonConsole);
 	CONFIGURATION_FIELD(bool, AutomaticUpdates, _update);
 	CONFIGURATION_FIELD(bool, LuaDebug, _luaDebug);
+	CONFIGURATION_FIELD(bool, HideWindow, _hideWindow);
 	OPTIONAL_CONFIGURATION_FIELD(long, Stage, _stage);
 	OPTIONAL_CONFIGURATION_FIELD(long, StageType, _stageType);
 	OPTIONAL_CONFIGURATION_FIELD(long, RoomID, _roomId);
@@ -121,6 +124,7 @@ private:
 
 	/* Shared options */
 	LaunchMode _launchMode = LAUNCH_MODE_REPENTOGON;
+	bool _hideWindow = true;
 
 	/* Repentogon options */
 	bool _unstableUpdates = false;
