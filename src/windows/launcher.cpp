@@ -24,6 +24,7 @@
 #include "launcher/installation.h"
 #include "launcher/isaac.h"
 #include "launcher/launcher_configuration.h"
+#include "launcher/launcher_interface.h"
 #include "launcher/log_helpers.h"
 #include "launcher/launcher_self_update.h"
 #include "launcher/windows/launcher.h"
@@ -372,6 +373,10 @@ namespace Launcher {
 	}
 
 	void MainFrame::Launch(wxCommandEvent& event) {
+		LaunchIsaac();
+	}
+
+	void MainFrame::LaunchIsaac() {
 		_logWindow.Log("Launching the game with the following options:");
 		_logWindow.Log("\tRepentogon:");
 		bool launchingVanilla = _configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA;
@@ -415,6 +420,14 @@ namespace Launcher {
 
 		_logWindow.LogInfo("Game exited with error code %d\n", exitCode);
 		EnableInterface(true);
+
+		if (exitCode == LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED) {
+			RelaunchIsaac();
+		}
+	}
+
+	void MainFrame::RelaunchIsaac() {
+		LaunchIsaac();
 	}
 
 	void MainFrame::EnableInterface(bool enable) {

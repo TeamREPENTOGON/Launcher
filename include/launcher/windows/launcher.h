@@ -140,7 +140,9 @@ namespace Launcher {
 
 		void EnableInterface(bool enable);
 
+		void LaunchIsaac();
 		void OnIsaacCompleted(int result);
+		void RelaunchIsaac();
 
 		wxStaticBoxSizer* _optionsSizer;
 		wxStaticBoxSizer* _configurationSizer;
