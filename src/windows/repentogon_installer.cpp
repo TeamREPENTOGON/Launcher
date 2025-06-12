@@ -21,7 +21,9 @@ RepentogonInstallerFrame::RepentogonInstallerFrame(Launcher::Installation* insta
 }
 
 RepentogonInstallerFrame::~RepentogonInstallerFrame() {
-
+	if (_mainFrame) {
+		_mainFrame->SetFocus();
+	}
 }
 
 void RepentogonInstallerFrame::Initialize() {
