@@ -85,6 +85,7 @@ target_include_directories (REPENTOGONLauncherUpdater PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
+target_compile_definitions (REPENTOGONLauncherUpdater PRIVATE "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
 target_compile_options (REPENTOGONLauncherUpdater PUBLIC "/MD" "/w44061")
 
 add_custom_command (TARGET REPENTOGONLauncherUpdater POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:REPENTOGONLauncherUpdater> "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
