@@ -1,7 +1,7 @@
 #pragma once
 
 /*
- * Utility functions. 
+ * Utility functions.
  */
 
 #include <Windows.h>
@@ -17,19 +17,25 @@ namespace Updater::Utils {
 
 	class ScopedHandle {
 	public:
-		ScopedHandle(HANDLE handle);
+		explicit ScopedHandle(HANDLE handle);
 		~ScopedHandle();
+
+		ScopedHandle& operator=(ScopedHandle const&) = delete;
+		ScopedHandle& operator=(ScopedHandle&& rhs);
 
 		operator HANDLE();
 
 	private:
+		void Close();
 		HANDLE _handle = NULL;
 	};
 
 	class ScopedFile {
 	public:
-		ScopedFile(FILE* f);
+		explicit ScopedFile(FILE* f);
 		~ScopedFile();
+
+		ScopedFile& operator=(ScopedFile const&) = delete;
 
 		operator FILE*();
 

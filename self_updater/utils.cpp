@@ -285,8 +285,21 @@ namespace Updater::Utils {
 	}
 
 	ScopedHandle::ScopedHandle(HANDLE handle) : _handle(handle) { }
-	ScopedHandle::~ScopedHandle() { if (_handle != NULL && _handle != INVALID_HANDLE_VALUE) CloseHandle(_handle); }
+	ScopedHandle::~ScopedHandle() { Close(); }
 	ScopedHandle::operator HANDLE() { return _handle; }
+
+	ScopedHandle& ScopedHandle::operator=(ScopedHandle&& rhs) {
+		_handle = rhs._handle;
+		rhs._handle = NULL;
+		return *this;
+	}
+
+	void ScopedHandle::Close() {
+		if (_handle != NULL && _handle != INVALID_HANDLE_VALUE) {
+			CloseHandle(_handle);
+			_handle = NULL;
+		}
+	}
 
 	ScopedFile::ScopedFile(FILE* f) : _f(f) { }
 	ScopedFile::~ScopedFile() { if (_f) fclose(_f); }
