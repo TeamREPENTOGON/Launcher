@@ -441,6 +441,7 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 
 	// Start up a progress bar window on a separate thread so that we can show some not-frozen UI to the user.
 	std::thread progressBarThread(Updater::ProgressBarThread);
+	progressBarThread.detach();
 
 	Updater::UpdateLauncherResult result = Updater::TryUpdateLauncher(cli);
 
