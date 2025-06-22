@@ -214,6 +214,7 @@ void LauncherWizard::AddRepentogonSetupPage() {
     _repentogonSetup._autoUpdates = automaticUpdates;
     _repentogonSetup._unstableUpdates = unstableUpdates;
     _repentogonSetup._topText = topText;
+    _repentogonSetup._updateWarning = warningText;
 
     ConfigureRepentogonSetupPage();
 
