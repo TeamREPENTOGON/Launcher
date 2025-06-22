@@ -5,12 +5,14 @@
 #include "self_updater/logger.h"
 #include "self_updater/unpacker.h"
 #include "self_updater/utils.h"
+#include "shared/filesystem.h"
 
 namespace Unpacker {
 	struct FileContent {
 		char* name = NULL;
 		char* buffer = NULL;
 		size_t buffLen = 0;
+		bool isFolder = false;
 
 		FileContent() {
 
@@ -24,15 +26,17 @@ namespace Unpacker {
 		FileContent(FileContent const&) = delete;
 		FileContent& operator=(FileContent const&) = delete;
 
-		FileContent(FileContent&& other) : name(other.name), buffer(other.buffer), buffLen(other.buffLen) {
+		FileContent(FileContent&& other) noexcept : name(other.name), buffer(other.buffer),
+			buffLen(other.buffLen), isFolder(other.isFolder) {
 			other.name = other.buffer = NULL;
 			other.buffLen = 0;
 		}
 
-		FileContent& operator=(FileContent&& other) {
+		FileContent& operator=(FileContent&& other) noexcept {
 			name = other.name;
 			buffer = other.buffer;
 			buffLen = other.buffLen;
+			isFolder = other.isFolder;
 
 			other.name = other.buffer = NULL;
 			other.buffLen = 0;
@@ -87,18 +91,23 @@ bool Unpacker::MemoryUnpack(const char* name, std::vector<Unpacker::FileContent>
 			return false;
 		}
 
-		file.buffer = (char*)malloc(fileSize + 1);
-		if (!file.buffer) {
-			Logger::Error("Unable to allocate memory to store file content\n");
-			return false;
+		if (fileSize != 0) {
+			file.buffer = (char*)malloc(fileSize + 1);
+			if (!file.buffer) {
+				Logger::Error("Unable to allocate memory to store file content\n");
+				return false;
+			}
+
+			if (fread(file.buffer, fileSize, 1, f) != 1) {
+				Logger::Error("Error while reading content of file\n");
+				return false;
+			}
+
+			file.buffer[fileSize] = '\0';
 		}
 
-		if (fread(file.buffer, fileSize, 1, f) != 1) {
-			Logger::Error("Error while reading content of file\n");
-			return false;
-		}
-
-		file.buffer[fileSize] = '\0';
+		file.isFolder = fileSize == 0 &&
+			(file.name[fileSize - 1] == '/' || file.name[fileSize - 1] == '\\');
 		file.buffLen = fileSize;
 		Logger::Info("Read %s of size %d\n", file.name, fileSize);
 		files.push_back(std::move(file));
@@ -118,28 +127,47 @@ bool Unpacker::MemoryToDisk(std::vector<FileContent> const& files) {
 	Updater::Utils::ScopedHandle scopedHandle(transaction);
 
 	for (FileContent const& content : files) {
-		HANDLE file = CreateFileTransactedA(content.name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 
-			FILE_ATTRIBUTE_NORMAL, NULL, transaction, 0, NULL);
-		if (file == INVALID_HANDLE_VALUE) {
+		HANDLE file = INVALID_HANDLE_VALUE;
+		bool createdFolder = false;
+
+		if (content.isFolder && Filesystem::Exists(content.name)) {
+			if (!Filesystem::DeleteFolder(content.name, transaction)) {
+				Logger::Error("Unpacker::MemoryToDisk: unable to delete folder %s\n", content.name);
+			} else {
+				BOOL ok = CreateDirectoryTransactedA(NULL, content.name, NULL, transaction);
+				createdFolder = (ok != 0);
+
+				if (!ok) {
+					Logger::Error("Unpacker::MemoryToDisk: unable to create folder %s (%d)\n", content.name, GetLastError());
+				}
+			}
+		} else {
+			file = CreateFileTransactedA(content.name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+				FILE_ATTRIBUTE_NORMAL, NULL, transaction, 0, NULL);
+		}
+
+		if (file == INVALID_HANDLE_VALUE && !createdFolder) {
 			Logger::Error("Unpacker::MemoryToDisk: error while creating file %s (%d)\n", content.name, GetLastError());
 			RollbackTransaction(transaction);
 			return false;
 		}
 
-		DWORD bytesWritten = 0;
-		if (!WriteFile(file, content.buffer, content.buffLen, &bytesWritten, NULL)) {
-			Logger::Error("Unpacker::MemoryToDisk: error while writing file %s (%d)\n", content.name, GetLastError());
-			CloseHandle(file);
-			RollbackTransaction(transaction);
-			return false;
-		}
+		if (content.buffLen != 0) {
+			DWORD bytesWritten = 0;
+			if (!WriteFile(file, content.buffer, content.buffLen, &bytesWritten, NULL)) {
+				Logger::Error("Unpacker::MemoryToDisk: error while writing file %s (%d)\n", content.name, GetLastError());
+				CloseHandle(file);
+				RollbackTransaction(transaction);
+				return false;
+			}
 
-		if (bytesWritten != content.buffLen) {
-			Logger::Error("Unpacker::MemoryToDisk: incorrect amount of bytes written for file %s (expected %d, got %d)\n",
-				content.name, content.buffLen, bytesWritten);
-			CloseHandle(file);
-			RollbackTransaction(transaction);
-			return false;
+			if (bytesWritten != content.buffLen) {
+				Logger::Error("Unpacker::MemoryToDisk: incorrect amount of bytes written for file %s (expected %d, got %d)\n",
+					content.name, content.buffLen, bytesWritten);
+				CloseHandle(file);
+				RollbackTransaction(transaction);
+				return false;
+			}
 		}
 
 		CloseHandle(file);
