@@ -4,6 +4,8 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <sstream>
+
 #include "shared/externals.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
@@ -78,8 +80,72 @@ namespace Filesystem {
 		return result;
 	}
 
-	bool RemoveFile(const char* filename) {
-		return DeleteFileA(filename) != 0;
+	bool RemoveFile(const char* filename, HANDLE transaction) {
+		if (transaction) {
+			return DeleteFileTransactedA(filename, transaction) != 0;
+		} else {
+			return DeleteFileA(filename) != 0;
+		}
+	}
+
+	bool DeleteFolder(const char* path, HANDLE transaction) {
+		std::ostringstream stream;
+		stream << path << "\\*";
+		std::string realPath = stream.str();
+
+		WIN32_FIND_DATAA data;
+		HANDLE searchHandle;
+		memset(&data, 0, sizeof(data));
+
+		if (transaction) {
+			searchHandle = FindFirstFileTransactedA(realPath.c_str(),
+				FindExInfoBasic, &data, FindExSearchNameMatch,
+				NULL, 0, transaction);
+		} else {
+			searchHandle = FindFirstFileA(realPath.c_str(), &data);
+		}
+
+		if (searchHandle == INVALID_HANDLE_VALUE) {
+			Logger::Error("DeleteFolder %s: FindFirstFile(Transacted)A = %d (transaction = %p)\n",
+				path, GetLastError(), transaction);
+			return false;
+		}
+
+		do {
+			std::ostringstream fullPath;
+			fullPath << path << "\\" << data.cFileName;
+			if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+				if (!strcmp(data.cFileName, ".") || !strcmp(data.cFileName, "..")) {
+					continue;
+				}
+
+				if (!DeleteFolder(fullPath.str().c_str(), transaction)) {
+					Logger::Error("DeleteFolder %s: failed to recursively delete subfolder %s\n",
+						path, fullPath.str().c_str());
+					return false;
+				}
+			} else {
+				if (!RemoveFile(fullPath.str().c_str(), transaction)) {
+					Logger::Error("DeleteFolder %s: failed to delete file %s\n",
+						path, fullPath.str().c_str());
+					return false;
+				}
+			}
+		} while (FindNextFileA(searchHandle, &data));
+		DWORD error = GetLastError();
+
+		FindClose(searchHandle);
+
+		if (error == ERROR_NO_MORE_FILES) {
+			if (transaction) {
+				return RemoveDirectoryTransactedA(path, transaction) != 0;
+			} else {
+				return RemoveDirectoryA(path) != 0;
+			}
+		} else {
+			Logger::Error("DeleteFolder %s: FindNextFileA = %d\n", path, error);
+			return false;
+		}
 	}
 
 	bool SplitIntoComponents(const char* path, std::string* drive,

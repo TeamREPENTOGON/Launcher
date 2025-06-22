@@ -33,8 +33,22 @@ namespace Filesystem {
 
 	std::string GetCurrentDirectory_();
 
-	/* Remove a file. Return false on failure, true on success. */
-	bool RemoveFile(const char* filename);
+	/* Remove a file. Return false on failure, true on success.
+	 *
+	 * If the function fails, and a transaction was given, the transaction is
+	 * not rolled back.
+	 */
+	bool RemoveFile(const char* filename, HANDLE transaction = NULL);
+
+	/* Remove a folder, regardless of whether it is empty or not.
+	 * If the handle is not null, the operation is transacted inside the given
+	 * transaction.
+	 *
+	 * Return true on success, false if the function fails at any point. Failure
+	 * at any point immediately stops the function; transacted operations are
+	 * not rolled back.
+	 */
+	bool DeleteFolder(const char* path, HANDLE transaction = NULL);
 
 	bool SplitIntoComponents(const char* path, std::string* drive,
 		std::string* filename, std::string* extension,
