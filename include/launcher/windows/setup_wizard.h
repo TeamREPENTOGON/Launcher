@@ -32,7 +32,7 @@ public:
     void OnCancel(wxWizardEvent& event);
 
     inline bool WasRepentogonInstalled(bool allowCancel) const {
-        std::unique_lock<std::mutex> lck(_installerMutex);
+        std::unique_lock<std::recursive_mutex> lck(_installerMutex);
         return _installer && _installer->HasCompleted(allowCancel);
     }
 
@@ -112,7 +112,7 @@ private:
     wxIcon _questionMark;
     wxBitmap _questionMarkBitmap;
 
-    mutable std::mutex _installerMutex;
+    mutable std::recursive_mutex _installerMutex;
     std::unique_ptr<RepentogonInstallerHelper> _installer;
 
     wxDECLARE_EVENT_TABLE();

@@ -273,7 +273,7 @@ void LauncherWizard::OnPageChanged(wxWizardEvent& event) {
         ConfigureRepentogonSetupPage();
     }  else if (source == _repentogonInstallationPage) {
         UpdateRepentogonInstallationNavigationButtons();
-        std::unique_lock<std::mutex> lck(_installerMutex);
+        std::unique_lock<std::recursive_mutex> lck(_installerMutex);
         if (!_installer) {
             StartRepentogonInstallation();
         }
@@ -291,7 +291,7 @@ void LauncherWizard::UpdateRepentogonInstallationNavigationButtons() {
     wxWindow* prev = FindWindowById(wxID_BACKWARD, this);
     wxWindow* next = FindWindowById(wxID_FORWARD, this);
 
-    std::unique_lock<std::mutex> lck(_installerMutex);
+    std::unique_lock<std::recursive_mutex> lck(_installerMutex);
     bool hasCompleted = _installer && _installer->HasCompleted(true);
     if (prev) {
         prev->Enable(hasCompleted);
@@ -307,7 +307,7 @@ void LauncherWizard::OnRepentogonInstallationCompleted(bool finished) {
 }
 
 void LauncherWizard::StartRepentogonInstallation() {
-    std::unique_lock<std::mutex> lck(_installerMutex);
+    std::unique_lock<std::recursive_mutex> lck(_installerMutex);
     _installer = std::make_unique<RepentogonInstallerHelper>(this, _installation,
         _repentogonSetup._unstableUpdates, false, _repentogonInstallation._logText);
     _installer->Install(std::bind_front(&LauncherWizard::OnRepentogonInstallationCompleted, this));
@@ -424,7 +424,7 @@ void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
 }
 
 void LauncherWizard::OnCancel(wxWizardEvent& event) {
-    std::unique_lock<std::mutex> lck(_installerMutex);
+    std::unique_lock<std::recursive_mutex> lck(_installerMutex);
     if (_installer) {
         switch (_installer->Terminate()) {
         case RepentogonInstallerHelper::TERMINATE_CANCEL_REJECTED:
