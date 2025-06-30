@@ -159,7 +159,7 @@ void RepentogonInstallerHelper::InstallerThread() {
 
 	Launcher::RepentogonInstaller installer(_installation);
 	auto [future, monitor] = installer.InstallLatestRepentogon(
-		_forceUpdate, _installation->GetLauncherConfiguration()->UnstableUpdates());
+		_forceUpdate, _allowUnstable);
 	bool shouldContinue = true;
 	NotificationVisitor visitor(_logWindow, sCLI->RepentogonInstallerRefreshRate());
 	while (shouldContinue) {
