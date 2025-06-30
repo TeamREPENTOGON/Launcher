@@ -107,7 +107,7 @@ bool Unpacker::MemoryUnpack(const char* name, std::vector<Unpacker::FileContent>
 		}
 
 		file.isFolder = fileSize == 0 &&
-			(file.name[fileSize - 1] == '/' || file.name[fileSize - 1] == '\\');
+			(file.name[nameLen - 1] == '/' || file.name[nameLen - 1] == '\\');
 		file.buffLen = fileSize;
 		Logger::Info("Read %s of size %d\n", file.name, fileSize);
 		files.push_back(std::move(file));
