@@ -7,8 +7,8 @@
 
 #include "comm/messages.h"
 #include "shared/github_executor.h"
+#include "shared/logger.h"
 #include "self_updater/self_updater.h"
-#include "self_updater/logger.h"
 #include "self_updater/utils.h"
 #include "self_updater/launcher_update_manager.h"
 #include "self_updater/unique_window.h"
@@ -434,7 +434,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(LPSTR cli) {
 }
 
 int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
-	Logger::Init("updater.log");
+	Logger::Init("updater.log", true);
 	Logger::Info("%s started with command-line args: %s\n", Updater::UpdaterProcessName, cli);
 
 	sGithubExecutor->Start();

@@ -2,7 +2,7 @@
 #include <ktmw32.h>
 #include <vector>
 
-#include "self_updater/logger.h"
+#include "shared/logger.h"
 #include "self_updater/unpacker.h"
 #include "self_updater/utils.h"
 #include "shared/filesystem.h"

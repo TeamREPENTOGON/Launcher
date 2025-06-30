@@ -4,7 +4,7 @@
 
 #include <Windows.h>
 
-#include "self_updater/logger.h"
+#include "shared/logger.h"
 
 namespace Updater {
 	UniqueWindow::UniqueWindow(LPCSTR lpClassName, LPCSTR lpWindowName, DWORD dwStyle, int x, int y, int w, int h, HINSTANCE hInstance) {

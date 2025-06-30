@@ -1,4 +1,4 @@
-#include "self_updater/logger.h"
+#include "shared/logger.h"
 #include "self_updater/self_updater.h"
 #include "self_updater/utils.h"
 
