@@ -146,24 +146,20 @@ bool Launcher::App::OnInit() {
 	 *	a) The user requested a forced update
 	 *  b) The wizard did not run and the user requested automatic updates in the configuration,
 	 * or there is no installation of Repentogon available
-	 *  c) The wizard ran and exited without performing an installation of Repentogon
 	 */
 	bool forcedUpdate = sCLI->ForceRepentogonUpdate();
 	bool wizardLess = !wizardRan && (!repentogonOk || __installation->GetLauncherConfiguration()->AutomaticUpdates());
-	bool wizardFull = wizardRan && !wizardOk && !wizardInstalledRepentogon;
 
-	if (!sCLI->SkipRepentogonUpdate() && (forcedUpdate || wizardLess || wizardFull)) {
+	if (!sCLI->SkipRepentogonUpdate() && (forcedUpdate || wizardLess)) {
 		if (forcedUpdate) {
 			Logger::Info("Forcibly updating Repentogon\n");
-		} else if (wizardLess) {
+		} else {
 			if (!repentogonOk) {
 				Logger::Info("Installing Repentogon: wizard was skipped and Isaac installation "
 					"contains no valid Repentogon installation\n");
 			} else {
 				Logger::Info("Updating Repentogon due to auto-updates\n");
 			}
-		} else {
-			Logger::Info("Installing Repentogon: wizard was exited without installing Repentogon\n");
 		}
 
 		installerFrame = CreateRepentogonInstallerWindow(sCLI->ForceRepentogonUpdate(),
