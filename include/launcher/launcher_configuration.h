@@ -6,13 +6,17 @@
 #include "inih/cpp/INIReader.h"
 #include "shared/loggable_gui.h"
 
+enum LauncherConfigurationInitialize {
+	LAUNCHER_CONFIGURATION_INIT_NO_USERPROFILE,
+	LAUNCHER_CONFIGURATION_INIT_GET_USER_DIRECTORY,
+	LAUNCHER_CONFIGURATION_INIT_HIERARCHY,
+	LAUNCHER_CONFIGURATION_INIT_INVALID_PATH
+};
+
 enum LauncherConfigurationLoad {
-	LAUNCHER_CONFIGURATION_LOAD_NO_USERPROFILE,
-	LAUNCHER_CONFIGURATION_LOAD_GET_USER_DIRECTORY,
-	LAUNCHER_CONFIGURATION_LOAD_HIERARCHY,
-	LAUNCHER_CONFIGURATION_LOAD_NOT_FOUND,
 	LAUNCHER_CONFIGURATION_LOAD_OPEN,
-	LAUNCHER_CONFIGURATION_LOAD_PARSE_ERROR
+	LAUNCHER_CONFIGURATION_LOAD_PARSE_ERROR,
+	LAUNCHER_CONFIGURATION_LOAD_NO_ISAAC
 };
 
 enum LaunchMode {
@@ -78,15 +82,22 @@ class LauncherConfiguration {
 public:
 	LauncherConfiguration();
 
+	static bool InitializeConfigurationPath(LauncherConfigurationInitialize* result,
+		std::optional<std::string> const& hint);
+
+	static inline bool WasConfigurationPathInitialized() {
+		return !_configurationPath.empty();
+	}
+
+	static inline const char* GetConfigurationPath() {
+		return _configurationPath.c_str();
+	}
+
 	inline bool Loaded() const {
 		return _isLoaded;
 	}
 
-    bool Load(LauncherConfigurationLoad* result, std::optional<std::string> const& path);
-
-	inline std::string const& GetConfigurationPath() const {
-		return _configurationPath;
-	}
+    bool Load(LauncherConfigurationLoad* result);
 
 	void Write();
 
@@ -105,14 +116,13 @@ public:
 private:
 	bool Search(LauncherConfigurationLoad* result);
 	bool Process(LauncherConfigurationLoad* result);
-	bool CheckConfigurationFileExists(LauncherConfigurationLoad* result,
-		std::string const& path);
+	bool CheckConfigurationFileExists();
 	void Load(INIReader const& reader);
 	void LoadFromFile(INIReader const& reader);
 	void LoadFromCLI();
 
 	/* Path to the folder containing the configuration of the launcher. */
-	std::string _configurationPath;
+	static std::string _configurationPath;
 	/* Eventual line in the launcher configuration file that resulted
 	 * in a parse error.
 	 */

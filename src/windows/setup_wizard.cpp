@@ -18,7 +18,8 @@
 enum {
     LAUNCHER_WIZARD_CONTROL_WIZARD,
     LAUNCHER_WIZARD_CONTROL_ISAAC_SETUP_BUTTON,
-    LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX
+    LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX,
+    LAUNCHER_WIZARD_CONTROL_AUTOMATIC_UPDATES_CHECKBOX
 };
 
 wxBEGIN_EVENT_TABLE(LauncherWizard, wxWizard)
@@ -26,11 +27,14 @@ EVT_WIZARD_PAGE_CHANGED(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::OnPageCh
 EVT_BUTTON(LAUNCHER_WIZARD_CONTROL_ISAAC_SETUP_BUTTON, LauncherWizard::OnIsaacExecutableSelected)
 EVT_WIZARD_BEFORE_PAGE_CHANGED(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::BeforePageChanged)
 EVT_CHECKBOX(LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX, LauncherWizard::OnUnstableUpdatesCheckBoxClicked)
+EVT_CHECKBOX(LAUNCHER_WIZARD_CONTROL_AUTOMATIC_UPDATES_CHECKBOX, LauncherWizard::OnAutomaticUpdatesCheckBoxClicked)
 EVT_WIZARD_CANCEL(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::OnCancel)
 wxEND_EVENT_TABLE()
 
-LauncherWizard::LauncherWizard(Launcher::Installation* installation) :
-    _installation(installation), _questionMark(L"wxICON_QUESTION", wxBITMAP_TYPE_ICO_RESOURCE),
+LauncherWizard::LauncherWizard(Launcher::Installation* installation,
+    LauncherConfiguration* configuration) :
+    _installation(installation), _configuration(configuration),
+    _questionMark(L"wxICON_QUESTION", wxBITMAP_TYPE_ICO_RESOURCE),
     wxWizard(NULL, LAUNCHER_WIZARD_CONTROL_WIZARD, "REPENTOGON Launcher Setup") {
     _questionMarkBitmap.CopyFromIcon(_questionMark);
     wxBitmap::Rescale(_questionMarkBitmap, wxSize(16, 16));
@@ -179,8 +183,11 @@ void LauncherWizard::AddRepentogonSetupPage() {
         "Press Next once you are done.");
 
     wxStaticText* installationText = new wxStaticText(page, wxID_ANY, wxEmptyString);
-    wxCheckBox* automaticUpdates = new wxCheckBox(page, wxID_ANY, "Automatic updates (recommended)");
-    wxCheckBox* unstableUpdates = new wxCheckBox(page, LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX,
+    wxCheckBox* automaticUpdates = new wxCheckBox(page,
+        LAUNCHER_WIZARD_CONTROL_AUTOMATIC_UPDATES_CHECKBOX,
+        "Automatic updates (recommended)");
+    wxCheckBox* unstableUpdates = new wxCheckBox(page,
+        LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX,
         "Unstable releases (not recommended)");
 
     wxSizer* automaticUpdatesSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -234,10 +241,12 @@ void LauncherWizard::ConfigureRepentogonSetupPage() {
         installationText->SetLabel("No valid installation of Repentogon found. An installation will be performed.");
     }
 
-    LauncherConfiguration const* configuration = _installation->GetLauncherConfiguration();
-    if (configuration && configuration->Loaded()) {
-        _repentogonSetup._autoUpdates->SetValue(configuration->AutomaticUpdates());
-        _repentogonSetup._unstableUpdates->SetValue(configuration->UnstableUpdates());
+    if (_configuration->Loaded()) {
+        _repentogonSetup._autoUpdates->SetValue(_configuration->AutomaticUpdates());
+        _repentogonSetup._unstableUpdates->SetValue(_configuration->UnstableUpdates());
+    } else {
+        _configuration->AutomaticUpdates(_repentogonSetup._autoUpdates->GetValue());
+        _configuration->UnstableUpdates(_repentogonSetup._unstableUpdates->GetValue());
     }
 }
 
@@ -310,7 +319,7 @@ void LauncherWizard::OnRepentogonInstallationCompleted(bool finished) {
 void LauncherWizard::StartRepentogonInstallation() {
     std::unique_lock<std::recursive_mutex> lck(_installerMutex);
     _installer = std::make_unique<RepentogonInstallerHelper>(this, _installation,
-        _repentogonSetup._unstableUpdates, false, _repentogonInstallation._logText);
+        _repentogonSetup._unstableUpdates->GetValue(), false, _repentogonInstallation._logText);
     _installer->Install(std::bind_front(&LauncherWizard::OnRepentogonInstallationCompleted, this));
 }
 
@@ -417,11 +426,18 @@ void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
     if (repentogon.IsValid()) {
         _dirtyUnstableUpdates = !_dirtyUnstableUpdates;
         if (_dirtyUnstableUpdates) {
-            _repentogonSetup._updateWarning->SetLabel("This change in options may require a Repentogon update");
+            _repentogonSetup._updateWarning->SetLabel("This change in options "
+                "may require an update to your existing Repentogon installation");
         } else {
             _repentogonSetup._updateWarning->SetLabel("");
         }
     }
+
+    _configuration->UnstableUpdates(((wxCheckBox*)event.GetEventObject())->GetValue());
+}
+
+void LauncherWizard::OnAutomaticUpdatesCheckBoxClicked(wxCommandEvent& event) {
+    _configuration->AutomaticUpdates(((wxCheckBox*)event.GetEventObject())->GetValue());
 }
 
 void LauncherWizard::OnCancel(wxWizardEvent& event) {

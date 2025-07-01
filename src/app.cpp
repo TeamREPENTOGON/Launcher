@@ -18,7 +18,7 @@ static Launcher::Installation* __installation;
 static NopLogGUI __nopLogGUI;
 
 bool Launcher::App::RunWizard(bool* installedRepentogon) {
-	LauncherWizard* wizard = new LauncherWizard(__installation);
+	LauncherWizard* wizard = new LauncherWizard(__installation, &__configuration);
 	wizard->AddPages(false);
 	bool wizardOk = wizard->Run();
 	*installedRepentogon = wizard->WasRepentogonInstalled(false);
@@ -50,16 +50,55 @@ bool Launcher::App::OnInit() {
 	}
 
 	if (!sCLI->SkipSelfUpdate()) {
-		// Check for an available self-update.
-		// If one is initiated, the launcher should get terminated by the updater.
+		/* Check for an available self-update.
+		 * If one is initiated, the launcher should get terminated by the updater.
+		 */
 		if (!Launcher::CheckForSelfUpdate(false)) {
 			MessageBoxA(NULL, "Failed check for self-update. Check the log file for more details.\n", "REPENTOGON Launcher", MB_ICONERROR);
 		}
 	}
 
-	bool configurationOk = __configuration.Load(nullptr, sCLI->ConfigurationPath());
-	if (!configurationOk) {
-		Logger::Warn("Unable to load configuration file, starting wizard\n");
+	LauncherConfigurationInitialize initializationResult;
+	std::optional<std::string> const& configurationHint = sCLI->ConfigurationPath();
+	bool configurationPathOk = LauncherConfiguration::InitializeConfigurationPath(
+		&initializationResult, configurationHint);
+
+	if (!configurationPathOk) {
+		std::ostringstream stream;
+		if (configurationHint) {
+			stream << "The specified configuration file " << *configurationHint <<
+				" does not exist / cannot be created";
+		} else {
+			stream << "The launcher was unable to locate and/or create the default "
+				"configuration file. Make sure you have the right to create files in "
+				"\"%USERPROFILE%/Documents/My Games\".";
+		}
+
+		stream << std::endl << std::endl <<
+			"The launcher will be unable to save its configuration and will prompt "
+			"you again the next time.";
+
+		MessageBoxA(NULL, stream.str().c_str(), "REPENTOGON Launcher", MB_ICONERROR);
+	}
+	LauncherConfigurationLoad loadResult;
+	bool configurationOk = false;
+
+	if (configurationPathOk) {
+		configurationOk = __configuration.Load(&loadResult);
+	}
+
+	if (configurationPathOk && !configurationOk) {
+		if (loadResult != LAUNCHER_CONFIGURATION_LOAD_NO_ISAAC) {
+			std::ostringstream stream;
+			stream << "The launcher was unable to process the configuration file " <<
+				LauncherConfiguration::GetConfigurationPath() << ". It will run "
+				"the setup wizard again." << std::endl;
+			MessageBoxA(NULL, stream.str().c_str(), "REPENTOGON Launcher", MB_ICONERROR);
+			Logger::Warn("Unable to load configuration file, starting wizard\n");
+		} else {
+			Logger::Info("No Isaac path specified in the configuration file, "
+				"assuming first time installation / clear configuration file.\n");
+		}
 	}
 
 	__installation = new Installation(&__nopLogGUI, &__configuration);

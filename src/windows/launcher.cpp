@@ -437,7 +437,7 @@ namespace Launcher {
 	}
 
 	bool MainFrame::SelectIsaacExecutablePath() {
-		LauncherWizard* wizard = new LauncherWizard(_installation);
+		LauncherWizard* wizard = new LauncherWizard(_installation, _configuration);
 		wizard->AddPages(true);
 		bool ok = wizard->Run();
 		if (ok) {
@@ -500,7 +500,7 @@ namespace Launcher {
 		_logWindow.Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::version);
 		std::string currentDir = Filesystem::GetCurrentDirectory_();
 		_logWindow.Log("Current directory is: %s", currentDir.c_str());
-		_logWindow.Log("Using configuration file %s\n", _installation->GetLauncherConfiguration()->GetConfigurationPath().c_str());
+		_logWindow.Log("Using configuration file %s\n", LauncherConfiguration::GetConfigurationPath());
 
 		SanitizeLauncherUpdate();
 

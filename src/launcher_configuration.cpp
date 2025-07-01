@@ -12,6 +12,7 @@
 using namespace Configuration;
 
 static constexpr const char* launcherConfigFile = "repentogon_launcher.ini";
+std::string LauncherConfiguration::_configurationPath;
 
 template<typename T>
 using ConfigurationTuple = std::tuple<std::string, std::string, T>;
@@ -75,23 +76,81 @@ static int ReadInteger(INIReader const& reader, ConfigurationTuple<int>(*fn)()) 
 	return reader.GetInteger(section, key, def);
 }
 
+bool LauncherConfiguration::InitializeConfigurationPath(
+	LauncherConfigurationInitialize* outResult, std::optional<std::string> const& hint) {
+	std::string tentativePath;
+	if (hint) {
+		tentativePath = *hint;
+	} else {
+		char homeDirectory[4096];
+		DWORD homeLen = 4096;
+		HANDLE token = GetCurrentProcessToken();
+
+		if (!Externals::pGetUserProfileDirectoryA) {
+			DWORD result = GetEnvironmentVariableA("USERPROFILE", homeDirectory, 4096);
+			if (result < 0) {
+				Logger::Error("Installation::GetIsaacSaveFolder: no GetUserProfileDirectoryA and no %USERPROFILE\n");
+
+				if (outResult)
+					*outResult = LAUNCHER_CONFIGURATION_INIT_NO_USERPROFILE;
+				return false;
+			}
+		} else {
+			BOOL result = Externals::pGetUserProfileDirectoryA(token, homeDirectory, &homeLen);
+
+			if (!result) {
+				Logger::Error("Installation::GetIsaacSaveFolder: unable to find user profile directory: %d\n", GetLastError());
+
+				if (outResult)
+					*outResult = LAUNCHER_CONFIGURATION_INIT_GET_USER_DIRECTORY;
+				return false;
+			}
+		}
+
+		std::string path(homeDirectory);
+		path += "\\Documents\\My Games\\";
+		if (!Filesystem::IsFolder(path.c_str())) {
+			if (!Filesystem::CreateFileHierarchy(path.c_str(), "\\")) {
+
+				if (outResult)
+					*outResult = LAUNCHER_CONFIGURATION_INIT_HIERARCHY;
+				return false;
+			}
+		}
+		path += launcherConfigFile;
+
+		tentativePath = std::move(path);
+	}
+
+	FILE* file = fopen(tentativePath.c_str(), "a");
+	if (!file) {
+		if (outResult)
+			*outResult = LAUNCHER_CONFIGURATION_INIT_INVALID_PATH;
+		return false;
+	}
+
+	fclose(file);
+
+	_configurationPath = std::move(tentativePath);
+	return true;
+}
+
 LauncherConfiguration::LauncherConfiguration() {
 
 }
 
-bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult,
-	std::optional<std::string> const& path) {
-	if (!path) {
-		if (!Search(outResult)) {
-			return false;
-		}
-	} else {
-		if (!CheckConfigurationFileExists(outResult, *path)) {
-			Logger::Error("Configuration file %s does not exist\n", path->c_str());
-			return false;
-		}
+bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult) {
+	if (_configurationPath.empty()) {
+		Logger::Fatal("Attempting to load configuration while when none was found");
+		std::terminate();
+		return false;
+	}
 
-		_configurationPath = *path;
+	if (!CheckConfigurationFileExists()) {
+		// Fatal: the file should exist. Worst case scenario, it's empty.
+		Logger::Fatal("Configuration file %s does not exist\n", _configurationPath.c_str());
+		std::terminate();
+		return false;
 	}
 
 	if (!Process(outResult)) {
@@ -99,53 +158,6 @@ bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult,
 	}
 
 	_isLoaded = true;
-	return true;
-}
-
-bool LauncherConfiguration::Search(LauncherConfigurationLoad* outResult) {
-	char homeDirectory[4096];
-	DWORD homeLen = 4096;
-	HANDLE token = GetCurrentProcessToken();
-
-	if (!Externals::pGetUserProfileDirectoryA) {
-		DWORD result = GetEnvironmentVariableA("USERPROFILE", homeDirectory, 4096);
-		if (result < 0) {
-			Logger::Error("Installation::GetIsaacSaveFolder: no GetUserProfileDirectoryA and no %USERPROFILE\n");
-
-			if (outResult)
-				*outResult = LAUNCHER_CONFIGURATION_LOAD_NO_USERPROFILE;
-			return false;
-		}
-	} else {
-		BOOL result = Externals::pGetUserProfileDirectoryA(token, homeDirectory, &homeLen);
-
-		if (!result) {
-			Logger::Error("Installation::GetIsaacSaveFolder: unable to find user profile directory: %d\n", GetLastError());
-
-			if (outResult)
-				*outResult = LAUNCHER_CONFIGURATION_LOAD_GET_USER_DIRECTORY;
-			return false;
-		}
-	}
-
-	std::string path(homeDirectory);
-	path += "\\Documents\\My Games\\";
-	if (!Filesystem::IsFolder(path.c_str())) {
-		if (!Filesystem::CreateFileHierarchy(path.c_str(), "\\")) {
-
-			if (outResult)
-				*outResult = LAUNCHER_CONFIGURATION_LOAD_HIERARCHY;
-			return false;
-		}
-	}
-	path += launcherConfigFile;
-
-	if (!CheckConfigurationFileExists(outResult, path)) {
-		return false;
-	}
-
-	_configurationPath = std::move(path);
-	Logger::Info("Found launcher configuration file %s\n", _configurationPath.c_str());
 	return true;
 }
 
@@ -172,16 +184,20 @@ bool LauncherConfiguration::Process(LauncherConfigurationLoad* outResult) {
 
 	Logger::Info("Successfully opened and parsed launcher configuration file %s\n", _configurationPath.c_str());
 	Load(reader);
+
+	if (_isaacExecutablePath.empty()) {
+		if (outResult)
+			*outResult = LAUNCHER_CONFIGURATION_LOAD_NO_ISAAC;
+		return false;
+	}
+
 	return true;
 }
 
-bool LauncherConfiguration::CheckConfigurationFileExists(LauncherConfigurationLoad* result,
-	std::string const& path) {
-	if (!Filesystem::Exists(path.c_str())) {
-		Logger::Info("Launcher configuration file %s does not exist\n", path.c_str());
-
-		if (result)
-			*result = LAUNCHER_CONFIGURATION_LOAD_NOT_FOUND;
+bool LauncherConfiguration::CheckConfigurationFileExists() {
+	const char* path = GetConfigurationPath();
+	if (!Filesystem::Exists(path)) {
+		Logger::Info("Launcher configuration file %s does not exist\n", path);
 		return false;
 	}
 

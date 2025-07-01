@@ -20,7 +20,8 @@
 
 class LauncherWizard : public wxWizard {
 public:
-    LauncherWizard(Launcher::Installation* installation);
+    LauncherWizard(Launcher::Installation* installation,
+        LauncherConfiguration* configuration);
 
     void AddPages(bool skipIntroduction);
     bool Run();
@@ -29,6 +30,7 @@ public:
     void BeforePageChanged(wxWizardEvent& event);
     void OnIsaacExecutableSelected(wxCommandEvent& event);
     void OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event);
+    void OnAutomaticUpdatesCheckBoxClicked(wxCommandEvent& event);
     void OnCancel(wxWizardEvent& event);
 
     inline bool WasRepentogonInstalled(bool allowCancel) const {
@@ -82,6 +84,7 @@ private:
     wxWizardPageSimple* _completionPage = nullptr;
 
     Launcher::Installation* _installation = nullptr;
+    LauncherConfiguration* _configuration = nullptr;
 
     struct {
         wxStaticText* _topText = nullptr;
