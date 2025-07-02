@@ -282,11 +282,15 @@ void LauncherWizard::OnPageChanged(wxWizardEvent& event) {
         UpdateIsaacSetupNextButton();
     } else if (source == _repentogonSetupPage) {
         ConfigureRepentogonSetupPage();
-    }  else if (source == _repentogonInstallationPage) {
+    } else if (source == _repentogonInstallationPage) {
         UpdateRepentogonInstallationNavigationButtons();
         std::unique_lock<std::recursive_mutex> lck(_installerMutex);
         if (!_installer) {
             StartRepentogonInstallation();
+        }
+    } else if (source == _introductionPage) {
+        if (wxWindow* button = FindWindowById(wxID_FORWARD, this)) {
+            button->Enable(true);
         }
     }
 }
