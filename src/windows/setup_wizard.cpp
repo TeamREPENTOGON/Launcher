@@ -186,6 +186,7 @@ void LauncherWizard::AddRepentogonSetupPage() {
     wxCheckBox* automaticUpdates = new wxCheckBox(page,
         LAUNCHER_WIZARD_CONTROL_AUTOMATIC_UPDATES_CHECKBOX,
         "Automatic updates (recommended)");
+    automaticUpdates->SetValue(true);
     wxCheckBox* unstableUpdates = new wxCheckBox(page,
         LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX,
         "Unstable releases (not recommended)");
