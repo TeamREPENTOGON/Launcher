@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <filesystem>
+#include <regex>
 #include <stdexcept>
 
 #include "launcher/isaac_installation.h"
@@ -71,17 +72,89 @@ bool InstallationData::DoValidateExecutable(std::string const& path) const {
 	return true;
 }
 
+// Parses alternate Steam library paths from a config.vdf file (IE, libraries on different drives than the Steam installation itself).
+std::vector<std::string> ParseLibraryPathsFromSteamConfigFile(const std::string& steamConfigPath) {
+	std::vector<std::string> out;
+
+	std::ifstream file(steamConfigPath);
+	if (file.is_open()) {
+		std::string line;
+		while (std::getline(file, line)) {
+			const std::regex rgx(R"(\s*\"BaseInstallFolder_\d+\"\s+\"([^\s"]+)\"*)");
+			std::smatch match;
+			if (std::regex_search(line, match, rgx) && match.size() > 1) {
+				const std::string path = match[1];
+				// Replace `\\` in the path with `\`
+				const std::string normalizedPath = std::regex_replace(path, std::regex(R"(\\\\)"), "\\");
+				out.push_back(normalizedPath);
+			}
+		}
+		file.close();
+	} else {
+		Logger::Error("ParseLibraryPathsFromSteamConfigFile: Failed to open %s\n", steamConfigPath.c_str());
+	}
+
+	return out;
+}
+
+// Attempts to locate an isaac-ng.exe file from Steam. First checks Steam's install directory,
+// then checks for alternate Steam Libraries on other drives.
+std::optional<std::string> LocateSteamIsaacExecutable() {
+	// Get the installation path of Steam itself.
+	std::optional<std::string> steamInstallPath = Steam::GetSteamInstallationPath();
+	if (!steamInstallPath) {
+		Logger::Info("LocateSteamIsaacExecutable: No Steam installation path found.\n");
+		return std::nullopt;
+	}
+	Logger::Info("LocateSteamIsaacExecutable: Found Steam installation @ %s\n", steamInstallPath->c_str());
+
+	constexpr char isaacRelativePath[] = "\\steamapps\\common\\The Binding of Isaac Rebirth\\isaac-ng.exe";
+
+	// Check for an isaac-ng.exe under the Steam installation directory.
+	const std::string steamInstallIsaacPath = *steamInstallPath + isaacRelativePath;
+
+	if (Filesystem::Exists(steamInstallIsaacPath.c_str())) {
+		Logger::Info("LocateSteamIsaacExecutable: isaac-ng.exe found @ %s\n", steamInstallIsaacPath.c_str());
+		return steamInstallIsaacPath;
+	}
+	Logger::Info("LocateSteamIsaacExecutable: isaac-ng.exe not found under Steam installation directory.\n");
+
+	// Parse Steam's config.vdf file to locate Steam Libraries located on other drives, and look for isaac-ng.exe in those.
+	const std::string steamConfigPath = *steamInstallPath + "\\config\\config.vdf";
+
+	if (!Filesystem::Exists(steamConfigPath.c_str())) {
+		Logger::Info("LocateSteamIsaacExecutable: config.vdf not found @ %s\n", steamConfigPath.c_str());
+		return std::nullopt;
+	}
+
+	Logger::Info("LocateSteamIsaacExecutable: Checking config.vdf for alternate Steam libraries...\n");
+
+	for (const std::string steamLibraryPath : ParseLibraryPathsFromSteamConfigFile(steamConfigPath)) {
+		Logger::Info("LocateSteamIsaacExecutable: Checking Steam library @ %s\n", steamLibraryPath.c_str());
+
+		const std::string steamLibraryIsaacPath = steamLibraryPath + isaacRelativePath;
+
+		if (Filesystem::Exists(steamLibraryIsaacPath.c_str())) {
+			Logger::Info("LocateSteamIsaacExecutable: isaac-ng.exe found @ %s\n", steamLibraryIsaacPath.c_str());
+			return steamLibraryIsaacPath;
+		}
+	}
+
+	Logger::Info("LocateSteamIsaacExecutable: Could not locate isaac-ng.exe\n");
+	return std::nullopt;
+}
+
 std::optional<std::string> IsaacInstallation::AutoDetect(bool* standalone) {
 	std::string path;
 	if (Filesystem::Exists("isaac-ng.exe")) {
 		path = Filesystem::GetCurrentDirectory_() + "\\isaac-ng.exe";
 	} else {
-		std::optional<std::string> steamPath = Steam::GetSteamInstallationPath();
-		if (!steamPath) {
+		std::optional<std::string> steamIsaacPath = LocateSteamIsaacExecutable();
+		if (!steamIsaacPath) {
 			return std::nullopt;
 		}
 
-		path = *steamPath + "\\steamapps\\common\\The Binding of Isaac Rebirth\\isaac-ng.exe";
+		path = *steamIsaacPath;
 	}
 
 	if (Validate(path, standalone)) {
