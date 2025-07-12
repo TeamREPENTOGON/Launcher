@@ -235,6 +235,7 @@ namespace diff_patcher {
             std::error_code err;
             for (auto const& v : doc["delete"].GetArray()) {
                 std::string name = v.GetString();
+                Logger::Info("PatchFolder: Deleting file: %s\n", name.c_str());
                 fs::remove(rootFolderToPatch / name, err);
                 if (err) {
                     Logger::Error("PatchFolder: unable to delete %s\n", name.c_str());
@@ -259,6 +260,7 @@ namespace diff_patcher {
                 }
 
                 std::string name = m.value.GetString();
+                Logger::Info("PatchFolder: Creating file: %s\n", name.c_str());
                 fs::copy_file(rootPatchesFolder / name, dst, fs::copy_options::overwrite_existing, err);
                 if (err) {
                     Logger::Error("PatchFolder: unable to create file %s\n", name.c_str());
@@ -276,6 +278,8 @@ namespace diff_patcher {
                 fs::path temporary = original;
                 temporary += ".patched";
 
+                Logger::Info("PatchFolder: Patching `%s` using patch file `%s`\n", original.string().c_str(), patch.string().c_str());
+
                 try {
                     bspatch_stream(original.string().c_str(), patch.string().c_str(),
                         temporary.string().c_str());
@@ -287,8 +291,17 @@ namespace diff_patcher {
                     PushError(errors, name, OP_PATCH, err);
                     ok = false;
                 }
-                fs::remove(original);
-                fs::rename(temporary, original);
+
+                if (ok) {
+                    if (fs::exists(temporary)) {
+                        if (fs::exists(original)) {
+                            fs::remove(original);
+                        }
+                        fs::rename(temporary, original);
+                    }
+                } else if (fs::exists(temporary)) {
+                    fs::remove(temporary);
+                }
             }
         }
 
