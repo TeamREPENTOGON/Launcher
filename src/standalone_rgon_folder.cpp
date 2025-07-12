@@ -1284,7 +1284,7 @@ namespace standalone_rgon {
     }
 
     bool Patch(const std::string& repentogonFolder, const std::string& patchPath) {
-        return diff_patcher::PatchFolder(repentogonFolder, patchPath, nullptr);
+        return diff_patcher::PatchFolder(repentogonFolder, patchPath, nullptr) == diff_patcher::PATCH_OK;
     }
 
     bool CopyFiles(const std::string& srcFolder,
