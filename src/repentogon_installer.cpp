@@ -119,7 +119,8 @@ namespace Launcher {
 			return false;
 		}
 
-		if (!isaacData.IsCompatibleWithRepentogon()) {
+		if (isaacData.NeedsPatch()) {
+			PushNotification(false, "Patching Isaac files...");
 			if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "patch").string())) {
 				Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to patch Isaac files\n");
 				_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH;

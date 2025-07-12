@@ -43,6 +43,9 @@ private:
     static std::optional<std::string> GetVersionStringFromMemory(std::string const& path);
     static std::string StripVersion(std::string const& version);
 
+    // Returns true if a patch is available to convert this version into a supported one.
+    bool PatchIsAvailable() const;
+
 public:
     inline void SetGUI(ILoggableGUI* gui) {
         _gui = gui;
@@ -51,9 +54,13 @@ public:
     bool Validate(std::string const& path, bool repentogon, bool* standalone);
     bool ValidateExecutable(std::string const& path);
     bool DoValidateExecutable(std::string const& path) const;
-    bool CheckCompatibilityWithRepentogon();
+
     inline bool IsCompatibleWithRepentogon() const {
         return _isCompatibleWithRepentogon;
+    }
+
+    inline bool NeedsPatch() const {
+        return _needsPatch;
     }
 
     inline bool IsValid() const {

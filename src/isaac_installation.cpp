@@ -192,15 +192,14 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 	std::filesystem::path fsPath(path);
 	fsPath.remove_filename();
 	_folderPath = fsPath.string();
-	/* Check compatibility in both cases for sanity, In case we reach a weird
-	 * state where the launcher cannot patch the Isaac executable to something
-	 * compatible.
+
+	/* Consider the installation compatible if it is the supported version,
+	 * OR if a patch exists to convert it to the supported version.
+	 * 
+	 * Existing Repentogon installations should not need patching.
 	 */
-	_isCompatibleWithRepentogon = CheckCompatibilityWithRepentogon();
-	/* Repentogon never needs patching. Patch the original if it is not compatible
-	 * with Repentogon.
-	 */
-	_needsPatch = repentogon ? false : !_isCompatibleWithRepentogon;
+	_needsPatch = !repentogon && PatchIsAvailable();
+	_isCompatibleWithRepentogon = _needsPatch || RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
 
 	if (srgon::IsStandaloneFolder(sourcePath) && !repentogon) {
 		_gui->LogWarn("The main Isaac executable is located in a Repentogon installation, this may indicate a broken configuration\n");
@@ -415,7 +414,7 @@ std::optional<std::string> InstallationData::ComputeVersion(std::string const& p
 	}
 }
 
-bool InstallationData::CheckCompatibilityWithRepentogon() {
+bool InstallationData::PatchIsAvailable() const {
 	namespace fs = std::filesystem;
 
 	fs::path fullPath = fs::current_path() / "patch/version.txt";
@@ -448,12 +447,11 @@ bool InstallationData::CheckCompatibilityWithRepentogon() {
 		content.get()[end - begin] = '\0';
 
 		if (!strcmp(GetVersion(), content.get())) {
-			_needsPatch = true;
 			return true;
 		}
 	}
 
-	return RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
+	return false;
 }
 
 std::string InstallationData::StripVersion(std::string const& version) {
