@@ -111,46 +111,48 @@ namespace Filesystem {
 			searchHandle = FindFirstFileA(realPath.c_str(), &data);
 		}
 
-		if (searchHandle == INVALID_HANDLE_VALUE) {
+		if (searchHandle == INVALID_HANDLE_VALUE && GetLastError() != ERROR_FILE_NOT_FOUND && GetLastError() != ERROR_PATH_NOT_FOUND) {
 			Logger::Error("DeleteFolder %s: FindFirstFile(Transacted)A = %d (transaction = %p)\n",
 				path, GetLastError(), transaction);
 			return false;
 		}
 
-		do {
-			std::ostringstream fullPath;
-			fullPath << path << "\\" << data.cFileName;
-			if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-				if (!strcmp(data.cFileName, ".") || !strcmp(data.cFileName, "..")) {
-					continue;
-				}
+		if (searchHandle != INVALID_HANDLE_VALUE) {
+			do {
+				std::ostringstream fullPath;
+				fullPath << path << "\\" << data.cFileName;
+				if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+					if (!strcmp(data.cFileName, ".") || !strcmp(data.cFileName, "..")) {
+						continue;
+					}
 
-				if (!DeleteFolder(fullPath.str().c_str(), transaction)) {
-					Logger::Error("DeleteFolder %s: failed to recursively delete subfolder %s\n",
-						path, fullPath.str().c_str());
-					return false;
+					if (!DeleteFolder(fullPath.str().c_str(), transaction)) {
+						Logger::Error("DeleteFolder %s: failed to recursively delete subfolder %s\n",
+							path, fullPath.str().c_str());
+						return false;
+					}
+				} else {
+					if (!RemoveFile(fullPath.str().c_str(), transaction)) {
+						Logger::Error("DeleteFolder %s: failed to delete file %s\n",
+							path, fullPath.str().c_str());
+						return false;
+					}
 				}
-			} else {
-				if (!RemoveFile(fullPath.str().c_str(), transaction)) {
-					Logger::Error("DeleteFolder %s: failed to delete file %s\n",
-						path, fullPath.str().c_str());
-					return false;
-				}
+			} while (FindNextFileA(searchHandle, &data));
+			DWORD error = GetLastError();
+
+			FindClose(searchHandle);
+
+			if (error != ERROR_SUCCESS && error != ERROR_NO_MORE_FILES) {
+				Logger::Error("DeleteFolder %s: FindNextFileA = %d\n", path, error);
+				return false;
 			}
-		} while (FindNextFileA(searchHandle, &data));
-		DWORD error = GetLastError();
+		}
 
-		FindClose(searchHandle);
-
-		if (error == ERROR_NO_MORE_FILES) {
-			if (transaction) {
-				return RemoveDirectoryTransactedA(path, transaction) != 0;
-			} else {
-				return RemoveDirectoryA(path) != 0;
-			}
+		if (transaction) {
+			return RemoveDirectoryTransactedA(path, transaction) != 0;
 		} else {
-			Logger::Error("DeleteFolder %s: FindNextFileA = %d\n", path, error);
-			return false;
+			return RemoveDirectoryA(path) != 0;
 		}
 	}
 
