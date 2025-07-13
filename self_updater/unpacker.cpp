@@ -127,26 +127,19 @@ bool Unpacker::MemoryToDisk(std::vector<FileContent> const& files) {
 	Updater::Utils::ScopedHandle scopedHandle(transaction);
 
 	for (FileContent const& content : files) {
-		HANDLE file = INVALID_HANDLE_VALUE;
-		bool createdFolder = false;
-
-		if (content.isFolder && Filesystem::Exists(content.name)) {
-			if (!Filesystem::DeleteFolder(content.name, transaction)) {
+		if (content.isFolder) {
+			if (Filesystem::Exists(content.name, transaction) && !Filesystem::DeleteFolder(content.name, transaction)) {
 				Logger::Error("Unpacker::MemoryToDisk: unable to delete folder %s\n", content.name);
-			} else {
-				BOOL ok = CreateDirectoryTransactedA(NULL, content.name, NULL, transaction);
-				createdFolder = (ok != 0);
-
-				if (!ok) {
-					Logger::Error("Unpacker::MemoryToDisk: unable to create folder %s (%d)\n", content.name, GetLastError());
-				}
+			} else if (!CreateDirectoryTransactedA(NULL, content.name, NULL, transaction)) {
+				Logger::Error("Unpacker::MemoryToDisk: unable to create folder %s (%d)\n", content.name, GetLastError());
 			}
-		} else {
-			file = CreateFileTransactedA(content.name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-				FILE_ATTRIBUTE_NORMAL, NULL, transaction, 0, NULL);
+			continue;
 		}
 
-		if (file == INVALID_HANDLE_VALUE && !createdFolder) {
+		HANDLE file = CreateFileTransactedA(content.name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL, NULL, transaction, 0, NULL);
+
+		if (file == INVALID_HANDLE_VALUE) {
 			Logger::Error("Unpacker::MemoryToDisk: error while creating file %s (%d)\n", content.name, GetLastError());
 			RollbackTransaction(transaction);
 			return false;
