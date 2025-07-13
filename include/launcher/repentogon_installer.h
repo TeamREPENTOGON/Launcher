@@ -120,6 +120,7 @@ namespace Launcher {
 		RepentogonInstaller(Installation* installation);
 
 		enum DownloadInstallRepentogonResult {
+			DOWNLOAD_INSTALL_REPENTOGON_NONE,
 			DOWNLOAD_INSTALL_REPENTOGON_OK,
 			DOWNLOAD_INSTALL_REPENTOGON_UTD,
 			DOWNLOAD_INSTALL_REPENTOGON_ERR,

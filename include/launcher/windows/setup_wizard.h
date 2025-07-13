@@ -38,6 +38,15 @@ public:
         return _installer && _installer->HasCompleted(allowCancel);
     }
 
+    inline bool WasInstallationCanceled() const {
+        return !_installerFinished;
+    }
+
+    inline Launcher::RepentogonInstaller::DownloadInstallRepentogonResult
+        GetDownloadInstallResult() const {
+        return _downloadInstallResult;
+    }
+
 private:
     void AddIntroductionPage();
     void AddIsaacSetupPage();
@@ -57,6 +66,8 @@ private:
     void UpdateIsaacPath(std::string const& path);
     void UpdateIsaacExecutableInfo();
     void UpdateRepentogonInstallationNavigationButtons();
+    void UpdateFinalPage(bool finished,
+        Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result);
     void SetupCompatibilityWithRepentogonText();
 
     /* Called when the user changes from the Isaac setup page to the Repentogon
@@ -73,7 +84,8 @@ private:
     void PromptIsaacExecutable();
 
     void OnIsaacExecutableSelected(std::string const& path);
-    void OnRepentogonInstallationCompleted(bool success);
+    void OnRepentogonInstallationCompleted(bool success,
+        Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result);
 
     void StartRepentogonInstallation();
 
@@ -109,6 +121,10 @@ private:
         wxGauge* _gauge = nullptr;
     } _repentogonInstallation;
 
+    struct {
+        wxStaticText* _text;
+    } _finalPage;
+
     bool _isaacFound = false;
     bool _compatibleWithRepentogon = false;
     bool _dirtyUnstableUpdates = false;
@@ -117,6 +133,10 @@ private:
 
     mutable std::recursive_mutex _installerMutex;
     std::unique_ptr<RepentogonInstallerHelper> _installer;
+
+    bool _installerFinished = false;
+    Launcher::RepentogonInstaller::DownloadInstallRepentogonResult _downloadInstallResult =
+        Launcher::RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_NONE;
 
     wxDECLARE_EVENT_TABLE();
 };

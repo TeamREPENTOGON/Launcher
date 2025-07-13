@@ -126,7 +126,7 @@ bool RepentogonInstallerHelper::ReCancel() {
 	return !_forceCancel;
 }
 
-void RepentogonInstallerHelper::Install(std::function<void(bool)> callback) {
+void RepentogonInstallerHelper::Install(std::function<void(bool, Launcher::RepentogonInstaller::DownloadInstallRepentogonResult)> callback) {
 	std::unique_lock<std::mutex> lck(_terminationMutex);
 
 	if (_status != STATUS_NONE) {
@@ -144,7 +144,7 @@ void RepentogonInstallerHelper::InstallerThread() {
 		std::unique_lock<std::mutex> lck(_terminationMutex);
 		if (_status != STATUS_NONE) {
 			if (_status == STATUS_CANCELLED) {
-				_callback(false);
+				_callback(false, Launcher::RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_NONE);
 				return;
 			}
 
@@ -187,7 +187,7 @@ void RepentogonInstallerHelper::InstallerThread() {
 			installer.CancelInstallation();
 			_logWindow->AppendText("Download thread observed cancellation request\n");
 			Logger::Info("RepentogonInstallerHelper::Install: cancel requested\n");
-			_callback(false);
+			_callback(false, Launcher::RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_NONE);
 			return;
 		}
 
@@ -234,6 +234,6 @@ void RepentogonInstallerHelper::InstallerThread() {
 		}
 
 		_installation->CheckRepentogonInstallation();
-		_callback(true);
+		_callback(true, result);
 	}
 }

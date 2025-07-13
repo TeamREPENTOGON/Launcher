@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "launcher/installation.h"
+#include "launcher/repentogon_installer.h"
 
 #include "wx/textctrl.h"
 
@@ -48,7 +49,7 @@ public:
         return _status != STATUS_NONE;
     }
 
-    void Install(std::function<void(bool)> callback);
+    void Install(std::function<void(bool, Launcher::RepentogonInstaller::DownloadInstallRepentogonResult)> callback);
     TerminateResult Terminate();
 
 private:
@@ -76,5 +77,5 @@ private:
 
     mutable std::mutex _terminationMutex;
 
-    std::function<void(bool)> _callback;
+    std::function<void(bool, Launcher::RepentogonInstaller::DownloadInstallRepentogonResult)> _callback;
 };

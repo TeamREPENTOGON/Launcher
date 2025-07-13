@@ -69,7 +69,8 @@ void RepentogonInstallerFrame::InstallRepentogon() {
 	_helper->Install(std::bind_front(&RepentogonInstallerFrame::OnRepentogonInstalled, this));
 }
 
-void RepentogonInstallerFrame::OnRepentogonInstalled(bool finished) {
+void RepentogonInstallerFrame::OnRepentogonInstalled(bool,
+	Launcher::RepentogonInstaller::DownloadInstallRepentogonResult) {
 	if (_mainFrame) {
 		_mainFrame->PreInit();
 		_mainFrame->Show();

@@ -33,7 +33,8 @@ public:
 	}
 
 private:
-	void OnRepentogonInstalled(bool finished);
+	void OnRepentogonInstalled(bool finished,
+		Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result);
 
 	/* Pointer to the main window.
 	 *

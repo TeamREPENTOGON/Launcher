@@ -5,6 +5,8 @@
 #include "launcher/repentogon_installer.h"
 #include "launcher/windows/setup_wizard.h"
 
+#include "shared/logger.h"
+
 #include "wx/button.h"
 #include "wx/filedlg.h"
 #include "wx/msgdlg.h"
@@ -272,6 +274,7 @@ void LauncherWizard::AddRepentogonInstallationPage() {
 void LauncherWizard::AddCompletionPage() {
     wxWizardPageSimple* page = new wxWizardPageSimple(this);
     wxSizerFlags flags = wxSizerFlags().Expand();
+    _finalPage._text = new wxStaticText(page, wxID_ANY, "");
     _completionPage = page;
 }
 
@@ -317,8 +320,52 @@ void LauncherWizard::UpdateRepentogonInstallationNavigationButtons() {
     }
 }
 
-void LauncherWizard::OnRepentogonInstallationCompleted(bool finished) {
+void LauncherWizard::OnRepentogonInstallationCompleted(bool finished,
+    Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result) {
+    _installerFinished = finished;
+    _downloadInstallResult = result;
+
+    UpdateFinalPage(finished, result);
     UpdateRepentogonInstallationNavigationButtons();
+}
+
+void LauncherWizard::UpdateFinalPage(bool finished,
+    Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result) {
+    if (!finished) {
+        _finalPage._text->SetLabel("The installation of Repentogon was cancelled.\n");
+    } else {
+        using r = Launcher::RepentogonInstaller;
+        switch (result) {
+            case r::DOWNLOAD_INSTALL_REPENTOGON_ERR:
+            case r::DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES:
+                _finalPage._text->SetLabel("An error occured during the installation of Repentogon.\n"
+                    "Please check the log file for more information.");
+                break;
+
+            case r::DOWNLOAD_INSTALL_REPENTOGON_OK:
+                _finalPage._text->SetLabel("Repentogon has been successfully installed.");
+                break;
+
+            case r::DOWNLOAD_INSTALL_REPENTOGON_UTD:
+                _finalPage._text->SetLabel("The provided installation of Isaac already contained an up-to-date\n"
+                    "installation of Repentogon, no operation has been performed.");
+                break;
+
+            case r::DOWNLOAD_INSTALL_REPENTOGON_NONE:
+                wxMessageBox("There appears to be a bug somewhere, the Repentogon installer seemingly did not run.\n"
+                    "Please open a ticket on Github and provide the launcher.log file.",
+                    "Internal error", wxOK, this);
+                break;
+
+            default:
+                Logger::Error("LauncherWizard::UpdateFinalPage: Unexpected error "
+                    "code from the Repentogon installer: %d\n", result);
+                wxMessageBox("There appears to be a bug somewhere, the Repentogon installer exited with an unexpected\n"
+                    "error code. Please open a ticket on Github and provide the launcer.log file.",
+                    "Internal error", wxOK, this);
+                break;
+        }
+    }
 }
 
 void LauncherWizard::StartRepentogonInstallation() {
