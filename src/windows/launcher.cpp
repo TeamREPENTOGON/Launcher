@@ -441,10 +441,36 @@ namespace Launcher {
 		LauncherWizard* wizard = new LauncherWizard(_installation, _configuration);
 		wizard->AddPages(true);
 		bool ok = wizard->Run();
-		if (ok) {
-
-		}
 		wizard->Destroy();
+
+		IsaacInstallation const& isaacInstallation = _installation->GetIsaacInstallation();
+		RepentogonInstallation const& repentogonInstallation = _installation->GetRepentogonInstallation();
+
+		InstallationData const& mainData = isaacInstallation.GetMainInstallation();
+		if (mainData.IsValid()) {
+			_isaacFileText->SetForegroundColour(*wxBLACK);
+			_isaacFileText->SetValue(mainData.GetExePath());
+			_launchButton->Enable();
+		} else {
+			_isaacFileText->SetForegroundColour(*wxRED);
+			_isaacFileText->SetValue("No valid Isaac installation specified");
+			_logWindow.LogError("No valid Isaac installation provided, "
+				"cannot start until a correct value is provided !");
+			_launchButton->Disable();
+		}
+
+		if (repentogonInstallation.IsValid()) {
+			InstallationData const& repData = isaacInstallation.GetRepentogonInstallation();
+			_repentogonFileText->SetForegroundColour(*wxBLACK);
+			_repentogonFileText->SetValue(repData.GetExePath());
+		} else {
+			_repentogonFileText->SetForegroundColour(*wxRED);
+			_repentogonFileText->SetValue("No valid Repentogon installation found");
+			_logWindow.LogWarn("No valid Repentogon installation found");
+		}
+
+		UpdateRepentogonOptionsFromInstallation();
+
 		return ok;
 	}
 
