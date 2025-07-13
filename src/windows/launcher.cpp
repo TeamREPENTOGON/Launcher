@@ -28,6 +28,7 @@
 #include "launcher/log_helpers.h"
 #include "launcher/launcher_self_update.h"
 #include "launcher/windows/launcher.h"
+#include "launcher/windows/repentogon_installer.h"
 #include "launcher/windows/setup_wizard.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/version.h"
@@ -715,10 +716,24 @@ namespace Launcher {
 	void MainFrame::ForceRepentogonUpdate(bool allowPreReleases) {
 		_logWindow.Log("Forcibly updating Repentogon to the latest version");
 
-		RepentogonInstaller repentogonUpdateMgr(_installation);
-		auto [future, monitor] = repentogonUpdateMgr.InstallLatestRepentogon(true, allowPreReleases);
+		EnableInterface(false);
+		std::shared_ptr<RepentogonInstallerFrame> updater(
+			new RepentogonInstallerFrame(this, true, _installation, true, allowPreReleases)
+		);
+		updater->Initialize();
+		updater->Show();
+		chained_future<void> future = chained_futures::async(&RepentogonInstallerFrame::InstallRepentogon,
+			updater.get()).chain(std::bind_front(&MainFrame::OnForceUpdateCompleted, this, updater));
+	}
 
-		RepentogonInstaller::DownloadInstallRepentogonResult result = future.get();
+	void MainFrame::OnForceUpdateCompleted(std::shared_ptr<RepentogonInstallerFrame> frame) {
+		bool completed = frame->InstallationCompleted();
+		Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result =
+			frame->GetDownloadInstallResult();
+
+		frame->Destroy();
+		SetFocus();
+		EnableInterface(true);
 
 		if (result == RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_ERR ||
 			result == RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES) {

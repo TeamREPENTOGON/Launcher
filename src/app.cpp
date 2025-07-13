@@ -29,8 +29,8 @@ bool Launcher::App::RunWizard(bool* installedRepentogon) {
 
 RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(bool forceUpdate,
 	bool allowUnstable) {
-	RepentogonInstallerFrame* frame = new RepentogonInstallerFrame(__installation,
-		forceUpdate, allowUnstable);
+	RepentogonInstallerFrame* frame = new RepentogonInstallerFrame(nullptr,
+		false, __installation, forceUpdate, allowUnstable);
 	frame->Initialize();
 	return frame;
 }

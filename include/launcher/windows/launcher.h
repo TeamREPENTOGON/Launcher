@@ -109,6 +109,8 @@ namespace Launcher {
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
 
+		void OnForceUpdateCompleted(std::shared_ptr<RepentogonInstallerFrame> ptr);
+
 		void ForceRepentogonUpdate(bool allowPreReleases);
 		void ForceLauncherUpdate(bool allowPreReleases);
 

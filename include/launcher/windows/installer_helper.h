@@ -52,6 +52,8 @@ public:
     void Install(std::function<void(bool, Launcher::RepentogonInstaller::DownloadInstallRepentogonResult)> callback);
     TerminateResult Terminate();
 
+    void Wait();
+
 private:
     bool Cancel();
     bool ReCancel();

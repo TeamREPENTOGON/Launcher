@@ -13,9 +13,10 @@ wxBEGIN_EVENT_TABLE(RepentogonInstallerFrame, wxFrame)
 EVT_CLOSE(RepentogonInstallerFrame::OnClose)
 wxEND_EVENT_TABLE()
 
-RepentogonInstallerFrame::RepentogonInstallerFrame(Launcher::Installation* installation,
-	bool forceUpdate, bool allowUnstable) :
-		wxFrame(nullptr, wxID_ANY, "Repentogon updater"), _installation(installation),
+RepentogonInstallerFrame::RepentogonInstallerFrame(wxWindow* parent,
+	bool synchronous, Launcher::Installation* installation, bool forceUpdate,
+	bool allowUnstable) : wxFrame(parent, wxID_ANY, "Repentogon updater"),
+		_synchronous(synchronous), _installation(installation),
 		_forceUpdate(forceUpdate), _allowUnstable(allowUnstable) {
 
 }
@@ -67,16 +68,23 @@ void RepentogonInstallerFrame::InstallRepentogon() {
 	_helper = std::make_unique<RepentogonInstallerHelper>(this, _installation,
 		_allowUnstable, _forceUpdate, _logWindow);
 	_helper->Install(std::bind_front(&RepentogonInstallerFrame::OnRepentogonInstalled, this));
+
+	if (_synchronous) {
+		_helper->Wait();
+	}
 }
 
-void RepentogonInstallerFrame::OnRepentogonInstalled(bool,
-	Launcher::RepentogonInstaller::DownloadInstallRepentogonResult) {
+void RepentogonInstallerFrame::OnRepentogonInstalled(bool completed,
+	Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result) {
+	_installerCompleted = completed;
+	_downloadInstallResult = result;
+
 	if (_mainFrame) {
 		_mainFrame->PreInit();
 		_mainFrame->Show();
 	}
 
-	if (!sCLI->RepentogonInstallerWait()) {
+	if (!sCLI->RepentogonInstallerWait() && !_synchronous) {
 		Destroy();
 	}
 }

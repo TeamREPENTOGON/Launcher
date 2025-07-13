@@ -16,7 +16,8 @@ namespace Launcher {
 
 class RepentogonInstallerFrame : public wxFrame {
 public:
-	RepentogonInstallerFrame(Launcher::Installation* installation, bool forceUpdate,
+	RepentogonInstallerFrame(wxWindow* parent, bool synchronous,
+		Launcher::Installation* installation, bool forceUpdate,
 		bool allowUnstable);
 	virtual ~RepentogonInstallerFrame();
 
@@ -30,6 +31,15 @@ public:
 
 	inline Launcher::MainFrame* GetMainFrame() const {
 		return _mainFrame;
+	}
+
+	inline bool InstallationCompleted() const {
+		return _installerCompleted;
+	}
+
+	inline Launcher::RepentogonInstaller::DownloadInstallRepentogonResult
+		GetDownloadInstallResult() const {
+		return _downloadInstallResult;
 	}
 
 private:
@@ -49,9 +59,14 @@ private:
 	wxTextCtrl* _logWindow = nullptr;
 	bool _forceUpdate = false;
 	bool _allowUnstable = false;
+	bool _synchronous = false;
 
 	std::mutex _installerMutex;
 	std::unique_ptr<RepentogonInstallerHelper> _helper;
+
+	bool _installerCompleted = false;
+	Launcher::RepentogonInstaller::DownloadInstallRepentogonResult _downloadInstallResult =
+		Launcher::RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_NONE;
 
 	Launcher::Installation* _installation = nullptr;
 

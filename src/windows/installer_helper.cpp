@@ -237,3 +237,7 @@ void RepentogonInstallerHelper::InstallerThread() {
 		_callback(true, result);
 	}
 }
+
+void RepentogonInstallerHelper::Wait() {
+	_installationThread.join();
+}
