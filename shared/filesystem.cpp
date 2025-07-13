@@ -62,8 +62,14 @@ namespace Filesystem {
 		return ret;
 	}
 
-	bool Exists(const char* name) {
-		return GetFileAttributesA(name) != INVALID_FILE_ATTRIBUTES;
+	bool Exists(const char* name, HANDLE transaction) {
+		if (transaction) {
+			WIN32_FILE_ATTRIBUTE_DATA data;
+			return GetFileAttributesTransactedA(name, GetFileExInfoStandard, &data, transaction) != 0
+				&& data.dwFileAttributes != INVALID_FILE_ATTRIBUTES;
+		} else {
+			return GetFileAttributesA(name) != INVALID_FILE_ATTRIBUTES;
+		}
 	}
 
 	std::string GetCurrentDirectory_() {

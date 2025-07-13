@@ -29,7 +29,7 @@ namespace Filesystem {
 	/* Check that a file with the given name exists. Return true on success,
 	 * false on failure.
 	 */
-	bool Exists(const char* filename);
+	bool Exists(const char* filename, HANDLE transaction = NULL);
 
 	std::string GetCurrentDirectory_();
 
