@@ -12,17 +12,17 @@ char* Steam::GetSteamInstallationPath() {
 		return path;
 	}
 
-	DWORD valueType = -1;
+	DWORD valueType = 0;
 	char buffer[4096];
 	DWORD bufferLen = 4096;
-	DWORD result = RegGetValueA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Valve\\Steam", "InstallPath", 
+	DWORD result = RegGetValueA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Valve\\Steam", "InstallPath",
 		RRF_RT_REG_SZ, &valueType, buffer, &bufferLen);
 	if (result == ERROR_MORE_DATA) {
 		Logger::Error("Steam::GetSteamInstallationPath: steam installation path is abnormally long\n");
 		return nullptr;
 	} else if (result == ERROR_FILE_NOT_FOUND) {
 		Logger::Warn("Steam::GetSteamInstallationPath: attempting Wow6432Node as alternative\n");
-		result = RegGetValueA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Wow6432Node\\Valve\\Steam", "InstallPath", 
+		result = RegGetValueA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Wow6432Node\\Valve\\Steam", "InstallPath",
 			RRF_RT_REG_SZ, &valueType, buffer, &bufferLen);
 		if (result != 0) {
 			Logger::Error("Steam::GetSteamInstallationPath: error %d while querying Wow6432Node\n", result);
@@ -41,14 +41,6 @@ char* Steam::GetSteamInstallationPath() {
 
 	strcpy(resultStr, buffer);
 
-	/* If someone else calls GetSteamInstallationPath in parallel, we may end up 
-	 * in a situation where someone performs the compare exchange before us. If
-	 * that happens, our compare exchange fails and loads the new value in
-	 * resultStr, resulting in its original value becoming lost. Backup it
-	 * before the compare exchange and free the original pointer if cmpxchg
-	 * fails.
-	 */
-	char* backup = resultStr;
 	char* expected = nullptr;
 	if (!__steamInstallationPath.compare_exchange_strong(expected, resultStr, std::memory_order_acq_rel, std::memory_order_acquire)) {
 		free(resultStr);

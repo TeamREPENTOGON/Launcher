@@ -307,7 +307,7 @@ namespace Launcher {
 		}
 
 		bool hasHash = false, hasZip = false;
-		for (int i = 0; i < assets.Size() && (!hasHash || !hasZip); ++i) {
+		for (unsigned int i = 0; i < assets.Size() && (!hasHash || !hasZip); ++i) {
 			if (!assets[i].IsObject())
 				continue;
 
@@ -475,10 +475,10 @@ namespace Launcher {
 		}
 
 		std::vector<std::tuple<std::string, bool>>& filesState = _installationState.unzipedFiles;
-		int error;
-		zip_t* zip = zip_open(RepentogonZipName, ZIP_RDONLY | ZIP_CHECKCONS, &error);
+		int zipError;
+		zip_t* zip = zip_open(RepentogonZipName, ZIP_RDONLY | ZIP_CHECKCONS, &zipError);
 		if (!zip) {
-			Logger::Error("RepentogonUpdater::ExtractRepentogon: error %d while opening %s\n", error, RepentogonZipName);
+			Logger::Error("RepentogonUpdater::ExtractRepentogon: error %d while opening %s\n", zipError, RepentogonZipName);
 			return false;
 		}
 
@@ -499,7 +499,8 @@ namespace Launcher {
 			const char* name = zip_get_name(zip, i, 0);
 			if (!name) {
 				zip_error_t* error = zip_get_error(zip);
-				Logger::Error("RepentogonUpdater::ExtractRepentogon: error getting name of file %d in archive (%s)\n", i, zip_error_strerror(error));
+				Logger::Error("RepentogonUpdater::ExtractRepentogon: error getting name of file %d in archive (%s)\n",
+					i, zip_error_strerror(error));
 				ok = false;
 				zip_fclose(file);
 				filesState.push_back(std::make_tuple("", false));

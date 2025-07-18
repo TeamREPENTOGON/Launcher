@@ -33,11 +33,12 @@ EVT_CHECKBOX(LAUNCHER_WIZARD_CONTROL_AUTOMATIC_UPDATES_CHECKBOX, LauncherWizard:
 EVT_WIZARD_CANCEL(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::OnCancel)
 wxEND_EVENT_TABLE()
 
-LauncherWizard::LauncherWizard(Launcher::Installation* installation,
+LauncherWizard::LauncherWizard(Launcher::MainFrame* mainWindow,
+    Launcher::Installation* installation,
     LauncherConfiguration* configuration) :
     _installation(installation), _configuration(configuration),
     _questionMark(L"wxICON_QUESTION", wxBITMAP_TYPE_ICO_RESOURCE),
-    wxWizard(NULL, LAUNCHER_WIZARD_CONTROL_WIZARD, "REPENTOGON Launcher Setup") {
+    wxWizard(mainWindow, LAUNCHER_WIZARD_CONTROL_WIZARD, "REPENTOGON Launcher Setup") {
     _questionMarkBitmap.CopyFromIcon(_questionMark);
     wxBitmap::Rescale(_questionMarkBitmap, wxSize(16, 16));
 }
@@ -375,7 +376,7 @@ void LauncherWizard::StartRepentogonInstallation() {
     _installer->Install(std::bind_front(&LauncherWizard::OnRepentogonInstallationCompleted, this));
 }
 
-void LauncherWizard::OnIsaacExecutableSelected(wxCommandEvent& event) {
+void LauncherWizard::OnIsaacExecutableSelected(wxCommandEvent&) {
     PromptIsaacExecutable();
 }
 

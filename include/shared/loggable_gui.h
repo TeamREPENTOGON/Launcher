@@ -11,7 +11,7 @@ public:
 };
 
 class NopLogGUI : public ILoggableGUI {
-	void Log(const char*, bool nl, const char* fmt, ...) { }
+	void Log(const char*, bool, const char*, ...) { }
 	void Log(const char*, ...) { }
 	void LogInfo(const char*, ...) { }
 	void LogNoNL(const char*, ...) { }

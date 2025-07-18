@@ -22,6 +22,8 @@
 const char* Updater::ForcedArg = "--force";
 const char* Updater::UnstableArg = "--unstable";
 const char* Updater::LauncherProcessIdArg = "--launcherpid";
+const char* Updater::ReleaseURL = "--url";
+const char* Updater::UpgradeVersion = "--version";
 
 namespace Updater {
 	static const char* LauncherExePath = "./REPENTOGONLauncher.exe";
@@ -33,14 +35,14 @@ namespace Updater {
 	static const char* UpdaterExeFilename = "REPENTOGONLauncherUpdater.exe";
 	static const char* RenamedUpdaterExeFilename = "REPENTOGONLauncherUpdater.exe.bak";
 
-	static const std::unordered_map<UpdaterState, const char*> UpdaterStateProgressBarLabels = {
+	const std::unordered_map<UpdaterState, const char*> UpdaterStateProgressBarLabels = {
 		{ UPDATER_CHECKING_FOR_UPDATE, "REPENTOGON Launcher Updater: Checking for update..." },
 		{ UPDATER_DOWNLOADING_UPDATE, "REPENTOGON Launcher Updater: Downloading update..." },
 		{ UPDATER_INSTALLING_UPDATE, "REPENTOGON Launcher Updater: Installing update..." },
 		{ UPDATER_STARTING_LAUNCHER, "REPENTOGON Launcher Updater: Starting launcher..." },
 	};
 
-	static std::atomic<UpdaterState> _currentState = UPDATER_STARTUP;
+	std::atomic<UpdaterState> _currentState = UPDATER_STARTUP;
 }
 
 Updater::UpdaterState Updater::GetCurrentUpdaterState() {
@@ -143,6 +145,10 @@ bool Updater::VerifyLauncherNotRunning() {
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 			continue;
 		}
+
+		/* Cannot have a parent window here as we may be in the process of
+		 * destroying the launcher.
+		 */
 		int response = MessageBoxA(NULL, "Cannot update the REPENTOGON Launcher, as it is currently running.\nPlease close it and try again.\n", UpdaterProcessName, MB_ICONINFORMATION | MB_RETRYCANCEL);
 		if (response == IDRETRY || response == IDOK || response == IDTRYAGAIN) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -175,7 +181,9 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow() {
 	}
 
 	// Create main window
-	auto window = std::make_unique<UniqueWindow>(windowClass.lpszClassName, Updater::UpdaterProcessName, WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU, 0, 0, 450, 95, windowClass.hInstance);
+	auto window = std::make_unique<UniqueWindow>(nullptr, windowClass.lpszClassName,
+		Updater::UpdaterProcessName, WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU, 0,
+		0, 450, 95, windowClass.hInstance);
 	HWND windowHandle = window->GetHandle();
 	if (windowHandle == NULL) {
 		Logger::Error("Error creating progress bar window (%d)\n", GetLastError());
@@ -219,7 +227,6 @@ void Updater::ProgressBarThread() {
 	UpdaterState state = UPDATER_STARTUP;
 
 	MSG msg = {};
-	BOOL bRet = 0;
 
 	while (true) {
 		while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
@@ -269,17 +276,13 @@ void Updater::StartLauncher() {
 	BOOL created = CreateProcessA(LauncherExePath, cli, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
 	if (!created) {
 		Logger::Error("Failed to start launcher.\n");
-		ExitProcess(-1);
+		ExitProcess(1);
 	} else {
 		ExitProcess(0);
 	}
 }
 
-Updater::UpdateLauncherResult Updater::TryUpdateLauncher(LPSTR cli) {
-	// Parse command-line inputs.
-	int argc = 0;
-	char** argv = Utils::CommandLineToArgvA(cli, &argc);
-
+Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) {
 	// Open a handle for the active launcher process, if provided by the launcher itself.
 	HANDLE launcherHandle = TryOpenLauncherProcessHandle(argc, argv);
 
@@ -294,7 +297,8 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(LPSTR cli) {
 		if (!isForced) {
 			if (lockResult == Utils::LOCK_UPDATER_ERR_INTERNAL) {
 				MessageBoxA(NULL, "Unable to check if another instance of the updater is already running\n"
-					"Check the log file (you may need to launch Isaac normaly at least once; otherwise rerun with --force)\n", UpdaterProcessName, MB_ICONERROR);
+					"Check the log file (you may need to launch Isaac normaly at least once; otherwise rerun with --force)\n",
+					UpdaterProcessName, MB_ICONERROR);
 				Logger::Error("Error while attempting to lock the updater\n");
 			}
 			else {
@@ -325,30 +329,45 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(LPSTR cli) {
 	if (allowUnstable) {
 		Logger::Info("Fetching unstable releases is enabled.\n");
 	}
+
+	const char* versionGiven = Utils::GetUpdateVersion(argc, argv);
+	const char* urlGiven = Utils::GetUpdateURL(argc, argv);
+
 	std::string version;
 	std::string url;
-	lu::SelfUpdateCheckResult checkResult = updateManager.CheckSelfUpdateAvailability(allowUnstable, version, url);
 
-	switch (checkResult) {
-	case lu::SELF_UPDATE_CHECK_UP_TO_DATE:
-		Logger::Info("launcher is already up-to-date.\n");
-		return UPDATE_ALREADY_UP_TO_DATE;
+	if (urlGiven) {
+		url = urlGiven;
+	}
 
-	case lu::SELF_UPDATE_CHECK_ERR_GENERIC:
-		SetCurrentUpdaterState(UPDATER_FAILED);
-		MessageBoxA(NULL, "An error was encountered while checking for the availability of updates. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
-		Logger::Error("Error while checking for updates.\n");
-		return UPDATE_ERROR;
+	if (versionGiven) {
+		version = versionGiven;
+	}
 
-	case lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE:
-		Logger::Info("Found available update version: %s (from %s)\n", version.c_str(), url.c_str());
-		break;
+	if (!urlGiven) {
+		lu::SelfUpdateCheckResult checkResult = updateManager.CheckSelfUpdateAvailability(allowUnstable, version, url);
 
-	default:
-		SetCurrentUpdaterState(UPDATER_FAILED);
-		MessageBoxA(NULL, "An unknown error was encountered while checking for the availability of updates. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
-		Logger::Error("Recieved unexpected error code %d while checking for availability of self updates. Please report this as a bug.\n", checkResult);
-		return UPDATE_ERROR;
+		switch (checkResult) {
+		case lu::SELF_UPDATE_CHECK_UP_TO_DATE:
+			Logger::Info("launcher is already up-to-date.\n");
+			return UPDATE_ALREADY_UP_TO_DATE;
+
+		case lu::SELF_UPDATE_CHECK_ERR_GENERIC:
+			SetCurrentUpdaterState(UPDATER_FAILED);
+			MessageBoxA(NULL, "An error was encountered while checking for the availability of updates. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
+			Logger::Error("Error while checking for updates.\n");
+			return UPDATE_ERROR;
+
+		case lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE:
+			Logger::Info("Found available update version: %s (from %s)\n", version.c_str(), url.c_str());
+			break;
+
+		default:
+			SetCurrentUpdaterState(UPDATER_FAILED);
+			MessageBoxA(NULL, "An unknown error was encountered while checking for the availability of updates. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
+			Logger::Error("Recieved unexpected error code %d while checking for availability of self updates. Please report this as a bug.\n", checkResult);
+			return UPDATE_ERROR;
+		}
 	}
 
 	// Check for a renamed updater exe from a previous update and try to delete it if found.
@@ -360,15 +379,17 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(LPSTR cli) {
 
 	SetCurrentUpdaterState(UPDATER_PROMPTING_USER);
 
-	// An appropriate update is available. Prompt the user about it.
-	const std::string updatePrompt = (std::ostringstream() << "An update is available for the launcher.\n" <<
-		"It will update from version " << Launcher::version << " to version " << version << ".\n\n" <<
-		"Do you want to update now?").str();
+	if (!urlGiven) {
+		// An appropriate update is available. Prompt the user about it.
+		const std::string updatePrompt = (std::ostringstream() << "An update is available for the launcher.\n" <<
+			"It will update from version " << Launcher::version << " to version " << version << ".\n\n" <<
+			"Do you want to update now?").str();
 
-	int updatePromptResult = MessageBoxA(NULL, updatePrompt.c_str(), UpdaterProcessName, MB_ICONINFORMATION | MB_YESNO);
-	if (updatePromptResult != IDOK && updatePromptResult != IDYES) {
-		Logger::Info("Launcher updated rejected by user\n");
-		return UPDATE_SKIPPED;
+		int updatePromptResult = MessageBoxA(NULL, updatePrompt.c_str(), UpdaterProcessName, MB_ICONINFORMATION | MB_YESNO);
+		if (updatePromptResult != IDOK && updatePromptResult != IDYES) {
+			Logger::Info("Launcher updated rejected by user\n");
+			return UPDATE_SKIPPED;
+		}
 	}
 
 	SetCurrentUpdaterState(UPDATER_DOWNLOADING_UPDATE);
@@ -437,13 +458,16 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 	Logger::Init("updater.log", true);
 	Logger::Info("%s started with command-line args: %s\n", Updater::UpdaterProcessName, cli);
 
+	int argc = 0;
+	char** argv = Updater::Utils::CommandLineToArgvA(cli, &argc);
+
 	sGithubExecutor->Start();
 
 	// Start up a progress bar window on a separate thread so that we can show some not-frozen UI to the user.
 	std::thread progressBarThread(Updater::ProgressBarThread);
 	progressBarThread.detach();
 
-	Updater::UpdateLauncherResult result = Updater::TryUpdateLauncher(cli);
+	Updater::UpdateLauncherResult result = Updater::TryUpdateLauncher(argc, argv);
 
 	int res = -1;
 

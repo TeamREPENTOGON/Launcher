@@ -103,7 +103,7 @@ namespace Sha256 {
 			throw std::runtime_error(s.str());
 		}
 
-		for (int i = 0; i < hashSize; ++i) {
+		for (DWORD i = 0; i < hashSize; ++i) {
 			sprintf(hashHex.get() + 2 * i, "%02hhx", hash[i]);
 		}
 
@@ -125,7 +125,7 @@ namespace Sha256 {
 
 	char* Trim(char* str) {
 		size_t length = strlen(str);
-		int i = 0;
+		size_t i = 0;
 		for (; i < length; ++i) {
 			char value = str[i];
 			if (!isspace(value) && value != '\t')

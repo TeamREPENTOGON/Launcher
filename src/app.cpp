@@ -1,3 +1,5 @@
+#include "chained_future/chained_future.h"
+
 #include "shared/externals.h"
 #include "launcher/app.h"
 #include "launcher/cli.h"
@@ -5,20 +7,17 @@
 #include "launcher/launcher_self_update.h"
 #include "launcher/windows/launcher.h"
 #include "launcher/windows/setup_wizard.h"
-#include "shared/externals.h"
 #include "shared/github_executor.h"
 #include "shared/logger.h"
 #include "shared/loggable_gui.h"
-#include "shared/github_executor.h"
-#include "launcher/windows/setup_wizard.h"
 #include "launcher/windows/repentogon_installer.h"
 
 static LauncherConfiguration __configuration;
 static Launcher::Installation* __installation;
 static NopLogGUI __nopLogGUI;
 
-bool Launcher::App::RunWizard(bool* installedRepentogon) {
-	LauncherWizard* wizard = new LauncherWizard(__installation, &__configuration);
+bool Launcher::App::RunWizard(Launcher::MainFrame* mainWindow, bool* installedRepentogon) {
+	LauncherWizard* wizard = new LauncherWizard(mainWindow, __installation, &__configuration);
 	wizard->AddPages(false);
 	bool wizardOk = wizard->Run();
 	*installedRepentogon = wizard->WasRepentogonInstalled(false);
@@ -27,9 +26,9 @@ bool Launcher::App::RunWizard(bool* installedRepentogon) {
 	return wizardOk;
 }
 
-RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(bool forceUpdate,
-	bool allowUnstable) {
-	RepentogonInstallerFrame* frame = new RepentogonInstallerFrame(nullptr,
+RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(
+	MainFrame* mainWindow, bool forceUpdate, bool allowUnstable) {
+	RepentogonInstallerFrame* frame = new RepentogonInstallerFrame(mainWindow,
 		false, __installation, forceUpdate, allowUnstable);
 	frame->Initialize();
 	return frame;
@@ -49,13 +48,13 @@ bool Launcher::App::OnInit() {
 		Logger::Error("Syntax error while parsing command line\n");
 	}
 
+	__installation = new Installation(&__nopLogGUI, &__configuration);
+	_mainFrame = CreateMainWindow();
+	_mainFrame->EnableInterface(false);
+	_mainFrame->Show();
+
 	if (!sCLI->SkipSelfUpdate()) {
-		/* Check for an available self-update.
-		 * If one is initiated, the launcher should get terminated by the updater.
-		 */
-		if (!Launcher::CheckForSelfUpdate(false)) {
-			MessageBoxA(NULL, "Failed check for self-update. Check the log file for more details.\n", "REPENTOGON Launcher", MB_ICONERROR);
-		}
+		HandleSelfUpdate(_mainFrame, false, false);
 	}
 
 	LauncherConfigurationInitialize initializationResult;
@@ -78,7 +77,7 @@ bool Launcher::App::OnInit() {
 			"The launcher will be unable to save its configuration and will prompt "
 			"you again the next time.";
 
-		MessageBoxA(NULL, stream.str().c_str(), "REPENTOGON Launcher", MB_ICONERROR);
+		MessageBoxA(_mainFrame->GetHWND(), stream.str().c_str(), "REPENTOGON Launcher", MB_ICONERROR);
 	}
 	LauncherConfigurationLoad loadResult;
 	bool configurationOk = false;
@@ -101,7 +100,6 @@ bool Launcher::App::OnInit() {
 		}
 	}
 
-	__installation = new Installation(&__nopLogGUI, &__configuration);
 	std::optional<std::string> providedPath;
 	std::string cliIsaacPath = sCLI->IsaacPath();
 	if (!cliIsaacPath.empty()) {
@@ -126,7 +124,7 @@ bool Launcher::App::OnInit() {
 				Logger::Info("Starting wizard as no valid Isaac installation has been found\n");
 			}
 
-			wizardOk = RunWizard(&wizardInstalledRepentogon);
+			wizardOk = RunWizard(_mainFrame, &wizardInstalledRepentogon);
 			wizardRan = true;
 		}
 	}
@@ -134,13 +132,12 @@ bool Launcher::App::OnInit() {
 	if (!__installation->GetIsaacInstallation().GetMainInstallation().IsValid()) {
 		wxMessageBox("The launcher was not able to find any valid Isaac installation.\n"
 			"Either check your Steam installation, or provide the path to the executable through the --isaac option.",
-			"Fatal error", wxOK | wxICON_EXCLAMATION);
+			"Fatal error", wxOK | wxICON_EXCLAMATION, _mainFrame);
 		Logger::Fatal("No valid Isaac installation found\n");
 		return false;
 	}
 
 	RepentogonInstallerFrame* installerFrame = nullptr;
-	MainFrame* mainWindow = CreateMainWindow();
 
 	/* Install Repentogon in the following cases:
 	 *	a) The user requested a forced update
@@ -162,20 +159,22 @@ bool Launcher::App::OnInit() {
 			}
 		}
 
-		installerFrame = CreateRepentogonInstallerWindow(sCLI->ForceRepentogonUpdate(),
-			__configuration.UnstableUpdates());
-		installerFrame->SetMainFrame(mainWindow);
+		installerFrame = CreateRepentogonInstallerWindow(_mainFrame,
+			sCLI->ForceRepentogonUpdate(), __configuration.UnstableUpdates());
+		installerFrame->SetMainFrame(_mainFrame);
 		installerFrame->InstallRepentogon();
 		installerFrame->Show();
 	} else {
-		mainWindow->PreInit();
-		mainWindow->Show();
+		_mainFrame->PreInit();
+		_mainFrame->SetFocus();
+		_mainFrame->EnableInterface(true);
 	}
 
 	return true;
 }
 
 int Launcher::App::OnExit() {
+	_initThread.join();
 	delete __installation;
 	Externals::End();
 	return 0;

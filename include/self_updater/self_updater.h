@@ -15,6 +15,10 @@ namespace Updater {
 	extern const char* UnstableArg;
 	/* Name of the CLI flag for the launcher to pass its current process ID to the updater, so that the updater can verify/terminate it. */
 	extern const char* LauncherProcessIdArg;
+	/* URL of the release to download. */
+	extern const char* ReleaseURL;
+	/* Version to which we are upgrading. */
+	extern const char* UpgradeVersion;
 
 	// Represents the final state of an attempted execution.
 	enum UpdateLauncherResult {
@@ -80,5 +84,5 @@ namespace Updater {
 	[[noreturn]] void StartLauncher();
 
 	// "Main" function that initiates the self-update process.
-	UpdateLauncherResult TryUpdateLauncher(LPSTR cli);
+	UpdateLauncherResult TryUpdateLauncher(int argc, char** argv);
 }

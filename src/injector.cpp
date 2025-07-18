@@ -88,7 +88,6 @@ DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* 
 	DWORD result = CreateProcessA(path, cli, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, filepath.parent_path().string().c_str(), &startupInfo, processInfo);
 	if (result == 0) {
 		Logger::Error("Failed to create process: %d\n", GetLastError());
-		return -1;
 	} else {
 		Logger::Info("Started isaac-ng.exe in suspended state, processID = %d\n", processInfo->dwProcessId);
 	}
@@ -98,7 +97,7 @@ DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* 
 
 // #pragma code_seg(push, r1, ".trampo")
 int UpdateMemory(LauncherConfiguration const* configuration, HANDLE process,
-	PROCESS_INFORMATION const* processInfo, void** page, size_t* functionOffset,
+	PROCESS_INFORMATION const*, void** page, size_t* functionOffset,
 	size_t* paramOffset) {
 	HMODULE self = GetModuleHandle(NULL);
 	PIMAGE_NT_HEADERS ntHeaders = ImageNtHeader(self);
@@ -185,7 +184,7 @@ int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const*
 	PROCESS_INFORMATION* processInfo) {
 	Logger::Info("Starting injector\n");
 	DWORD processId = CreateIsaac(path, isLegacy, configuration, processInfo);
-	if (processId == -1) {
+	if (processId == 0) {
 		return -1;
 	}
 

@@ -6,7 +6,6 @@ wxTextCtrlLog::wxTextCtrlLog(wxTextCtrl* ctrl) : _control(ctrl) {
 
 void wxTextCtrlLog::Log(const char* prefix, bool nl, const char* fmt, ...) {
 	char buffer[4096] = { 0 };
-	size_t prefixLen = strlen(prefix);
 	strncpy(buffer, prefix, 4096);
 
 	{

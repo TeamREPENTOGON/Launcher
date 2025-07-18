@@ -55,6 +55,14 @@ namespace Updater::Utils {
 		return GetParamValue(argc, argv, Updater::LauncherProcessIdArg);
 	}
 
+	const char* GetUpdateURL(int argc, char** argv) {
+		return GetParamValue(argc, argv, Updater::ReleaseURL);
+	}
+
+	const char* GetUpdateVersion(int argc, char** argv) {
+		return GetParamValue(argc, argv, Updater::UpgradeVersion);
+	}
+
 	void ReplaceQuotes(char* str, size_t* len) {
 		bool escaped = false;
 		char* cur = str;

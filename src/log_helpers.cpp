@@ -111,7 +111,7 @@ void NotificationVisitor::NotifyAllDownloads(bool checkFreshness) {
 
 namespace Launcher {
 
-	void DumpRepentogonInstallationState(Launcher::Installation const* installation,
+	void DumpRepentogonInstallationState(Launcher::Installation const*,
 		Launcher::RepentogonInstaller const& installer, wxTextCtrl* text) {
 		Launcher::RepentogonInstallationState const& state = installer.GetState();
 

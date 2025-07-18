@@ -77,9 +77,9 @@ namespace Github {
 		const char* file = "github.token";
 		if (Filesystem::Exists(file)) {
 			FILE* f = fopen(file, "r");
-			fpos_t begin = ftell(f);
+			long begin = ftell(f);
 			fseek(f, 0, SEEK_END);
-			fpos_t end = ftell(f);
+			long end = ftell(f);
 			fseek(f, begin, SEEK_SET);
 
 			const char* base = "Authorization: Bearer ";

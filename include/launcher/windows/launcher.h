@@ -78,6 +78,8 @@ namespace Launcher {
 		 */
 		void PreInit();
 
+		void EnableInterface(bool enable);
+
 	private:
 		/* Window building. */
 		void AddLauncherConfigurationOptions();
@@ -139,8 +141,6 @@ namespace Launcher {
 		void SanitizeLauncherUpdate();
 
 		bool SelectIsaacExecutablePath();
-
-		void EnableInterface(bool enable);
 
 		void LaunchIsaac();
 		void OnIsaacCompleted(int result);

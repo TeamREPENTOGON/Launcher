@@ -1,5 +1,3 @@
-#include "self_updater/self_updater_resources.h"
-
 #include "comm/messages.h"
 #include "launcher/version.h"
 #include "rapidjson/document.h"
@@ -59,7 +57,7 @@ namespace Shared {
 	}
 
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
-		bool force, std::string& version, std::string& url) {
+		bool, std::string& version, std::string& url) {
 		if (!releases.IsArray()) {
 			rapidjson::StringBuffer buffer;
 			rapidjson::PrettyWriter<rapidjson::StringBuffer> writer(buffer);
@@ -85,7 +83,7 @@ namespace Shared {
 		rapidjson::Document releases;
 
 		curl::DownloadStringResult releasesResult;
-		bool ok = FetchReleases(&releasesResult, releases);
+		FetchReleases(&releasesResult, releases);
 		if (releasesResult != curl::DOWNLOAD_STRING_OK) {
 			result.base = SELF_UPDATE_UPDATE_CHECK_FAILED;
 			result.detail = releasesResult;

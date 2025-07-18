@@ -49,5 +49,7 @@ namespace Updater::Utils {
 	bool IsForced(int argc, char** argv);
 	bool AllowUnstable(int argc, char** argv);
 	char* GetLauncherProcessIdArg(int argc, char** argv);
+	const char* GetUpdateURL(int argc, char** argv);
+	const char* GetUpdateVersion(int argc, char** argv);
 	bool GetLockFilePath(char** path);
 }

@@ -143,14 +143,12 @@ bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult) {
 	if (_configurationPath.empty()) {
 		Logger::Fatal("Attempting to load configuration while when none was found");
 		std::terminate();
-		return false;
 	}
 
 	if (!CheckConfigurationFileExists()) {
 		// Fatal: the file should exist. Worst case scenario, it's empty.
 		Logger::Fatal("Configuration file %s does not exist\n", _configurationPath.c_str());
 		std::terminate();
-		return false;
 	}
 
 	if (!Process(outResult)) {

@@ -85,7 +85,7 @@ bool Unpacker::MemoryUnpack(const char* name, std::vector<Unpacker::FileContent>
 
 		file.name[nameLen] = '\0';
 
-		uint64_t fileSize = 0;
+		size_t fileSize = 0;
 		if (fread(&fileSize, sizeof(fileSize), 1, f) != 1) {
 			Logger::Error("Error while reading length of file\n");
 			return false;

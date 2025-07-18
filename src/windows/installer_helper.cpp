@@ -193,7 +193,7 @@ void RepentogonInstallerHelper::InstallerThread() {
 
 		while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get()) {
 			// Sub-efficient, but less likely to cause a cancellation request to be missed
-			std::unique_lock<std::mutex> lck(_logWindowMutex);
+			std::unique_lock<std::mutex> windowLck(_logWindowMutex);
 			std::visit(visitor, notification->_data);
 		}
 

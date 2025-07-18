@@ -15,12 +15,14 @@
 #include "wx/wizard.h"
 
 #include "launcher/installation.h"
-#include "shared/curl_request.h"
 #include "launcher/windows/installer_helper.h"
+#include "launcher/windows/launcher.h"
+#include "shared/curl_request.h"
 
 class LauncherWizard : public wxWizard {
 public:
-    LauncherWizard(Launcher::Installation* installation,
+    LauncherWizard(Launcher::MainFrame* mainWindow,
+        Launcher::Installation* installation,
         LauncherConfiguration* configuration);
 
     void AddPages(bool skipIntroduction);

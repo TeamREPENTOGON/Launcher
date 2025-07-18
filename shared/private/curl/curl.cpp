@@ -154,7 +154,7 @@ namespace curl::detail {
 
 	bool MonitorNotifyOnDataReceived(Threading::Monitor<DownloadNotification>* monitor,
 		const char* name, std::atomic<bool>* cancel,
-		uint32_t id, bool first, void* data, size_t n, size_t count) {
+		uint32_t id, bool, void*, size_t n, size_t count) {
 		DownloadNotification notification;
 		bool keepGoing = true;
 		if (cancel->load(std::memory_order_acquire)) {

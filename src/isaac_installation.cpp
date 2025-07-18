@@ -56,7 +56,7 @@ bool InstallationData::DoValidateExecutable(std::string const& path) const {
 		return false;
 	}
 
-	DWORD subsystem = -1;
+	DWORD subsystem = 0;
 	if (!GetBinaryTypeA(path.c_str(), &subsystem)) {
 		_gui->LogError("BoI executable %s is not executable !\n", path.c_str());
 		Logger::Error("Installation::CheckIsaacExecutable: file %s is not executable\n", path.c_str());
@@ -188,6 +188,8 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 	}
 
 	_version = std::move(*version);
+	Logger::Info("InstallationData::Validate: validated executable %s (version '%s') (repentogon = %d)\n",
+		path.c_str(), GetVersion(), repentogon);
 	_exePath = path;
 	std::filesystem::path fsPath(path);
 	fsPath.remove_filename();
@@ -195,7 +197,7 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 
 	/* Consider the installation compatible if it is the supported version,
 	 * OR if a patch exists to convert it to the supported version.
-	 * 
+	 *
 	 * Existing Repentogon installations should not need patching.
 	 */
 	_needsPatch = !repentogon && PatchIsAvailable();
@@ -376,8 +378,8 @@ std::optional<std::string> InstallationData::GetVersionStringFromMemory(std::str
 	}
 
 	size_t limit = rdataSectionHeader->SizeOfRawData - needleLen;
-	uint32_t offset = -1;
-	for (uint32_t i = 0; i < limit; ++i) {
+	int32_t offset = -1;
+	for (int32_t i = 0; i < limit; ++i) {
 		if (memcmp(sectionStart + i, __versionNeedle, needleLen))
 			continue;
 		offset = i;
@@ -426,7 +428,7 @@ bool InstallationData::PatchIsAvailable() const {
 			return false;
 		}
 
-		fpos_t begin = ftell(file);
+		long begin = ftell(file);
 		fseek(file, 0, SEEK_END);
 
 		if (ferror(file)) {
@@ -434,7 +436,7 @@ bool InstallationData::PatchIsAvailable() const {
 			return false;
 		}
 
-		fpos_t end = ftell(file);
+		long end = ftell(file);
 		rewind(file);
 
 		std::unique_ptr<char[]> content = std::make_unique<char[]>(end - begin + 1);

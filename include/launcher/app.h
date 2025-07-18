@@ -14,9 +14,12 @@ namespace Launcher {
 		int OnExit() override;
 
 	private:
-		bool RunWizard(bool* installedRepentogon);
-		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(bool forceUpdate,
-			bool allowUnstable);
+		bool RunWizard(MainFrame* mainWindow, bool* installedRepentogon);
+		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(
+			MainFrame* mainWindow, bool forceUpdate, bool allowUnstable);
 		MainFrame* CreateMainWindow();
+
+		MainFrame* _mainFrame;
+		std::thread _initThread;
 	};
 }

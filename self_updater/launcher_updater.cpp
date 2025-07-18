@@ -76,7 +76,7 @@ namespace Updater {
 		auto assets = _releaseInfo["assets"].GetArray();
 		bool foundZip = false, foundHash = false;
 
-		for (int i = 0; i < assets.Size(); ++i) {
+		for (unsigned int i = 0; i < assets.Size(); ++i) {
 			auto const& value = assets[i];
 			std::string name = value["name"].GetString();
 			std::string url = value["browser_download_url"].GetString();
@@ -115,7 +115,7 @@ namespace Updater {
 		data->_zipUrl = _zipUrl;
 	}
 
-	ExtractArchiveResult LauncherUpdater::ExtractArchive(const char* name) {
+	ExtractArchiveResult LauncherUpdater::ExtractArchive(const char* filename) {
 		class ScopedZip {
 		public:
 			ScopedZip(zip_t* zip) : _zip(zip) { }
@@ -128,7 +128,7 @@ namespace Updater {
 		ExtractArchiveResult result;
 
 		int error = 0;
-		zip_t* zip = zip_open(name, ZIP_RDONLY | ZIP_CHECKCONS, &error);
+		zip_t* zip = zip_open(filename, ZIP_RDONLY | ZIP_CHECKCONS, &error);
 		ScopedZip scopedZip(zip);
 
 		if (zip == NULL) {

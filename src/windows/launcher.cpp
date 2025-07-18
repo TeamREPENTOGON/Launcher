@@ -115,7 +115,7 @@ namespace Launcher {
 		return true;
 	}
 
-	bool LuaHeapSizeValidator::Validate(wxWindow* parent) {
+	bool LuaHeapSizeValidator::Validate(wxWindow*) {
 		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(GetWindow());
 		wxString str = ctrl->GetValue();
 
@@ -256,7 +256,6 @@ namespace Launcher {
 		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxRIGHT, 5);
 		repentogonBoxSizer->Add(unstable, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
-
 		_repentogonOptions = repentogonBox;
 		_optionsSizer->Add(repentogonBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
 	}
@@ -289,7 +288,7 @@ namespace Launcher {
 		_optionsSizer->Add(vanillaBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
 	}
 
-	void MainFrame::OnIsaacSelectClick(wxCommandEvent& event) {
+	void MainFrame::OnIsaacSelectClick(wxCommandEvent&) {
 		SelectIsaacExecutablePath();
 	}
 
@@ -373,7 +372,7 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::Launch(wxCommandEvent& event) {
+	void MainFrame::Launch(wxCommandEvent&) {
 		LaunchIsaac();
 	}
 
@@ -438,7 +437,7 @@ namespace Launcher {
 	}
 
 	bool MainFrame::SelectIsaacExecutablePath() {
-		LauncherWizard* wizard = new LauncherWizard(_installation, _configuration);
+		LauncherWizard* wizard = new LauncherWizard(this, _installation, _configuration);
 		wizard->AddPages(true);
 		bool ok = wizard->Run();
 		wizard->Destroy();
@@ -753,7 +752,6 @@ namespace Launcher {
 	}
 
 	void MainFrame::OnForceUpdateCompleted(std::shared_ptr<RepentogonInstallerFrame> frame) {
-		bool completed = frame->InstallationCompleted();
 		Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result =
 			frame->GetDownloadInstallResult();
 
@@ -779,11 +777,7 @@ namespace Launcher {
 
 	void MainFrame::ForceLauncherUpdate(bool allowUnstable) {
 		_logWindow.Log("Performing self-update (forcibly triggered)...");
-		if (Launcher::CheckForSelfUpdate(allowUnstable)) {
-			_logWindow.Log("No update available.");
-		} else {
-			_logWindow.LogError("Failed to launch self-updater executable\n");
-		}
+		Launcher::HandleSelfUpdate(this, allowUnstable, true);
 	}
 
 	std::string MainFrame::PromptIsaacInstallation() {
@@ -826,7 +820,7 @@ namespace Launcher {
 		return result == wxID_YES || result == wxID_OK;
 	}
 
-	void MainFrame::OnAdvancedOptionsClick(wxCommandEvent& event) {
+	void MainFrame::OnAdvancedOptionsClick(wxCommandEvent&) {
 		AdvancedOptionsWindow window(this);
 		int result = window.ShowModal();
 

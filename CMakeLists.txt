@@ -34,8 +34,10 @@ add_subdirectory(deps/bzip2)
 add_subdirectory(deps/bsdiff)
 
 # Generate the resource file
-set (RESOURCE_PATH "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
-configure_file (${CMAKE_SOURCE_DIR}/self_updater/self_updater.rc.in ${CMAKE_SOURCE_DIR}/self_updater/self_updater.rc)
+# set (RESOURCE_PATH "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
+# configure_file (${CMAKE_SOURCE_DIR}/self_updater/self_updater.rc.in ${CMAKE_SOURCE_DIR}/self_updater/self_updater.rc)
+
+set (MSVC_EXTRA_WARNINGS "/W4")
 
 file (GLOB_RECURSE SHARED_FILES shared/*.cpp "include/shared/*.h")
 add_library (shared STATIC ${SHARED_FILES})
@@ -44,16 +46,16 @@ target_include_directories (shared PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
-target_compile_options (shared PUBLIC "/MD" "/w44061")
+target_compile_options (shared PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
 target_link_libraries (shared libcurl zip)
 
 target_link_libraries (bspatch bzip2)
 target_include_directories (bspatch PRIVATE 
     "${CMAKE_SOURCE_DIR}/deps/bzip2")
 
-file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h" self_updater/self_updater.rc)
+file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h")
 add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES})
-target_compile_options (REPENTOGONLauncher PUBLIC "/MD" "/w44061")
+target_compile_options (REPENTOGONLauncher PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
 target_include_directories (REPENTOGONLauncher PRIVATE 
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
     "${CMAKE_SOURCE_DIR}/deps/wxWidgets/include"
@@ -86,9 +88,9 @@ target_include_directories (REPENTOGONLauncherUpdater PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
 target_compile_definitions (REPENTOGONLauncherUpdater PRIVATE "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
-target_compile_options (REPENTOGONLauncherUpdater PUBLIC "/MD" "/w44061")
+target_compile_options (REPENTOGONLauncherUpdater PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
 
-add_custom_command (TARGET REPENTOGONLauncherUpdater POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:REPENTOGONLauncherUpdater> "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
+# add_custom_command (TARGET REPENTOGONLauncherUpdater POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:REPENTOGONLauncherUpdater> "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
 
 if (LAUNCHER_UNSTABLE)
     # add_subdirectory (testing)

@@ -13,7 +13,7 @@ namespace Zip {
 		return result;
 	}
 
-	ExtractFileResult ExtractFile(zip_t* zip, int index, zip_file_t* file, FILE* output) {
+	ExtractFileResult ExtractFile(zip_t*, int, zip_file_t* file, FILE* output) {
 		char buffer[4096];
 		zip_int64_t read = 0;
 		while ((read = zip_fread(file, buffer, 4096)) > 0) {
