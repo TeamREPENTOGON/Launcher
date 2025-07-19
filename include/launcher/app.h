@@ -20,6 +20,5 @@ namespace Launcher {
 		MainFrame* CreateMainWindow();
 
 		MainFrame* _mainFrame;
-		std::thread _initThread;
 	};
 }

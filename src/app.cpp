@@ -174,7 +174,6 @@ bool Launcher::App::OnInit() {
 }
 
 int Launcher::App::OnExit() {
-	_initThread.join();
 	delete __installation;
 	Externals::End();
 	return 0;
