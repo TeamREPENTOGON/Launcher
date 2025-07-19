@@ -37,12 +37,27 @@ void RepentogonInstallerHelper::HandleThreadTermination() noexcept {
 	default:
 		if (std::this_thread::get_id() == _installationThread.get_id()) {
 			Logger::Warn("RepentogonInstallerHelper: destructor called from within the installer thread\n");
-			_installationThread.detach();
-		} else {
-			Logger::Info("RepentogonInstallerHelper: joining installation thread\n");
-			_installationThread.join();
-			Logger::Info("RepentogonInstallerHelper: joined installation thread\n");
 		}
+
+		/* There is a subtle deadlock possible if we join due to a race
+		 * condition that is very hard to solve without refactoring a lot.
+		 *
+		 * The destructor of RepentogonInstallerHelper is called as part of the
+		 * Destroy() sequence of RepentogonInstallerFrame, because a
+		 * RepentogonInstallerFrame is always the parent window of a
+		 * RepenntogonInstallerHerlper. The Destroy() comes from a different
+		 * thread, but it needs to wait for the event to be processed. If we
+		 * call join() here, Destroy() deadlocks because this destructor is
+		 * called within the main event loop, and as such the join() blocks
+		 * the processing of events.
+		 *
+		 * I think detach() is acceptable here because the destructor is called
+		 * as part of the destruction sequence of the window and of the thread
+		 * itself: Destroy() is the last operation performed by
+		 * _installationThread, therefore we are detaching a thread that is
+		 * done.
+		 */
+		_installationThread.detach();
 		break;
 	}
 }
@@ -74,12 +89,10 @@ RepentogonInstallerHelper::TerminateResult RepentogonInstallerHelper::Terminate(
 		}
 
 	default:
-		wxASSERT(false);
-		__assume(0);
+		std::terminate();
 	}
 
-	__assume(0);
-	return TERMINATE_OK;
+	std::terminate();
 }
 
 void RepentogonInstallerHelper::TerminateInternal() {
