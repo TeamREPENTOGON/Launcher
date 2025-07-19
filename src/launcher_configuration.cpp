@@ -21,6 +21,10 @@ static ConfigurationTuple<std::string> GetIsaacExecutablePath() {
 	return { Sections::general, Keys::isaacExecutableKey, "" };
 }
 
+static ConfigurationTuple<bool> HasRanWizard() {
+	return { Sections::general, Keys::ranWizard, Defaults::ranWizard };
+}
+
 static ConfigurationTuple<bool> HasHideWindow() {
 	return { Sections::general, Keys::hideWindow, Defaults::hideWindow };
 }
@@ -141,7 +145,7 @@ LauncherConfiguration::LauncherConfiguration() {
 
 bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult) {
 	if (_configurationPath.empty()) {
-		Logger::Fatal("Attempting to load configuration while when none was found");
+		Logger::Fatal("Attempting to load configuration when none was found");
 		std::terminate();
 	}
 
@@ -209,9 +213,9 @@ void LauncherConfiguration::Load(INIReader const& reader) {
 
 void LauncherConfiguration::LoadFromFile(INIReader const& reader) {
 	_isaacExecutablePath = ReadString(reader, GetIsaacExecutablePath);
+	_ranWizard = ReadBoolean(reader, HasRanWizard);
 
 	_launchMode = (LaunchMode)ReadInteger(reader, GetLaunchMode);
-
 
 	_stage = ReadInteger(reader, ::Stage);
 	_stageType = ReadInteger(reader, ::StageType);
@@ -229,6 +233,12 @@ void LauncherConfiguration::LoadFromCLI() {
 	std::string const& isaacPath = sCLI->IsaacPath();
 	if (!isaacPath.empty()) {
 		_isaacExecutablePath = isaacPath;
+	}
+
+	if (sCLI->SkipWizard()) {
+		_ranWizard = true;
+	} else if (sCLI->ForceWizard()) {
+		_ranWizard = false;
 	}
 
 	_launchMode = sCLI->GetLaunchMode();
@@ -271,6 +281,8 @@ void LauncherConfiguration::Write() {
 	fprintf(f, "[%s]\n", Sections::general.c_str());
 	fprintf(f, "%s = %s\n", Keys::isaacExecutableKey.c_str(),
 		_isaacExecutablePath.empty() ? "" : _isaacExecutablePath.c_str());
+	fprintf(f, "%s = %d\n", Keys::ranWizard.c_str(),
+		_ranWizard ? 1 : 0);
 	fprintf(f, "%s = %d\n", Keys::hideWindow.c_str(), _hideWindow ? 1 : 0);
 
 	fprintf(f, "[%s]\n", Sections::repentogon.c_str());

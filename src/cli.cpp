@@ -13,7 +13,7 @@ CLIParser::CLIParser() {
 int CLIParser::Parse(int argc, wxChar** argv) {
     wxCmdLineParser parser(argc, argv);
     // parser.AddSwitch(helpShort, help, "Display this help", wxCMD_LINE_OPTION_HELP);
-    parser.AddLongSwitch(Options::skipWizard, "Skip the wizard");
+    parser.AddLongSwitch(Options::skipWizard, "Skip the wizard, even if it should run");
     parser.AddLongSwitch(Options::forceWizard, "Force the wizard to run, even if it should not");
     parser.AddLongSwitch(Options::skipRepentogonUpdate, "Skip the Repentogon update");
     parser.AddLongSwitch(Options::forceRepentogonUpdate, "Force a Repentogon update at startup");

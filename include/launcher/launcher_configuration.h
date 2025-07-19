@@ -33,6 +33,7 @@ namespace Configuration::Defaults {
 	constexpr const bool update = true;
 	constexpr const bool unstableUpdates = false;
 	constexpr const bool hideWindow = true;
+	constexpr const bool ranWizard = false;
 }
 
 namespace Configuration::Sections {
@@ -44,6 +45,7 @@ namespace Configuration::Sections {
 
 namespace Configuration::Keys {
 	const std::string isaacExecutableKey("IsaacExecutable");
+	const std::string ranWizard("RanWizard");
 
 	const std::string launchMode("LaunchMode");
 	const std::string hideWindow("HideWindow");
@@ -97,6 +99,18 @@ public:
 		return _isLoaded;
 	}
 
+	/**
+	 * Load the configuration file.
+	 *
+	 * @pre InitializeConfigurationPath must have been called and its return
+	 * value must have been @a true.
+	 *
+	 * The function returns true if the configuration file is successfully
+	 * opened, parsed and there is an entry for the Isaac installation
+	 * inside it. The validity of the Isaac installation is **NOT** checked.
+	 *
+	 * Additional information can be found in @a result if the function fails.
+	 */
     bool Load(LauncherConfigurationLoad* result);
 
 	void Write();
@@ -108,6 +122,7 @@ public:
 	CONFIGURATION_FIELD(bool, AutomaticUpdates, _update);
 	CONFIGURATION_FIELD(bool, LuaDebug, _luaDebug);
 	CONFIGURATION_FIELD(bool, HideWindow, _hideWindow);
+	CONFIGURATION_FIELD(bool, RanWizard, _ranWizard);
 	OPTIONAL_CONFIGURATION_FIELD(long, Stage, _stage);
 	OPTIONAL_CONFIGURATION_FIELD(long, StageType, _stageType);
 	OPTIONAL_CONFIGURATION_FIELD(long, RoomID, _roomId);
@@ -131,6 +146,15 @@ private:
 
 	/* General options */
 	std::string _isaacExecutablePath;
+	/**
+	 * Indicate whether the wizard ran to the point where the user selected
+	 * their options when it comes to the configuration of Repentogon (i.e.
+	 * automatic updates and unstable updates).
+	 *
+	 * This variable does NOT indicate whether the wizard ran successfully.
+	 * Only the above.
+	 */
+	bool _ranWizard = false;
 
 	/* Shared options */
 	LaunchMode _launchMode = LAUNCH_MODE_REPENTOGON;

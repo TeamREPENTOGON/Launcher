@@ -17,6 +17,14 @@ static Launcher::Installation* __installation;
 static NopLogGUI __nopLogGUI;
 
 bool Launcher::App::RunWizard(Launcher::MainFrame* mainWindow, bool* installedRepentogon) {
+	/* Do not do the same in the main window : if we reach the main window,
+	 * the wizard has run. This doesn't change even if the user chooses to
+	 * rerun the wizard from the main window.
+	 *
+	 * This is the only place where we are 100% sure the wizard has not run
+	 * yet.
+	 */
+	__configuration.RanWizard(false);
 	LauncherWizard* wizard = new LauncherWizard(mainWindow, __installation, &__configuration);
 	wizard->AddPages(false);
 	bool wizardOk = wizard->Run();
@@ -79,24 +87,24 @@ bool Launcher::App::OnInit() {
 
 		MessageBoxA(_mainFrame->GetHWND(), stream.str().c_str(), "REPENTOGON Launcher", MB_ICONERROR);
 	}
-	LauncherConfigurationLoad loadResult;
 	bool configurationOk = false;
 
 	if (configurationPathOk) {
+		LauncherConfigurationLoad loadResult;
 		configurationOk = __configuration.Load(&loadResult);
-	}
 
-	if (configurationPathOk && !configurationOk) {
-		if (loadResult != LAUNCHER_CONFIGURATION_LOAD_NO_ISAAC) {
-			std::ostringstream stream;
-			stream << "The launcher was unable to process the configuration file " <<
-				LauncherConfiguration::GetConfigurationPath() << ". It will run "
-				"the setup wizard again." << std::endl;
-			MessageBoxA(NULL, stream.str().c_str(), "REPENTOGON Launcher", MB_ICONERROR);
-			Logger::Warn("Unable to load configuration file, starting wizard\n");
-		} else {
-			Logger::Info("No Isaac path specified in the configuration file, "
-				"assuming first time installation / clear configuration file.\n");
+		if (!configurationOk) {
+			if (loadResult != LAUNCHER_CONFIGURATION_LOAD_NO_ISAAC) {
+				std::ostringstream stream;
+				stream << "The launcher was unable to process the configuration file " <<
+					LauncherConfiguration::GetConfigurationPath() << ". It will run "
+					"the setup wizard again." << std::endl;
+				MessageBoxA(NULL, stream.str().c_str(), "REPENTOGON Launcher", MB_ICONERROR);
+				Logger::Warn("Unable to load configuration file, starting wizard\n");
+			} else {
+				Logger::Info("No Isaac path specified in the configuration file, "
+					"assuming first time installation / clear configuration file.\n");
+			}
 		}
 	}
 
@@ -117,7 +125,7 @@ bool Launcher::App::OnInit() {
 	bool wizardInstalledRepentogon = false;
 	bool isIsaacValid = __installation->GetIsaacInstallation().GetMainInstallation().IsValid();
 	if (!sCLI->SkipWizard()) {
-		if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid || isStandalone) {
+		if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid || isStandalone || !__configuration.RanWizard()) {
 			if (sCLI->ForceWizard()) {
 				Logger::Info("Force starting wizard due to command-line\n");
 			} else if (!isIsaacValid) {

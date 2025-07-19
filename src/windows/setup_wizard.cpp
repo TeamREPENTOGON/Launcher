@@ -370,6 +370,7 @@ void LauncherWizard::UpdateFinalPage(bool finished,
 }
 
 void LauncherWizard::StartRepentogonInstallation() {
+    _configuration->RanWizard(true);
     std::unique_lock<std::recursive_mutex> lck(_installerMutex);
     _installer = std::make_unique<RepentogonInstallerHelper>(this, _installation,
         _repentogonSetup._unstableUpdates->GetValue(), false, _repentogonInstallation._logText);
