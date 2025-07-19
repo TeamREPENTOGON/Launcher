@@ -85,20 +85,25 @@ bool Unpacker::MemoryUnpack(const char* name, std::vector<Unpacker::FileContent>
 
 		file.name[nameLen] = '\0';
 
-		size_t fileSize = 0;
+		uint64_t fileSize = 0;
 		if (fread(&fileSize, sizeof(fileSize), 1, f) != 1) {
 			Logger::Error("Error while reading length of file\n");
 			return false;
 		}
 
+		if (fileSize >= UINT32_MAX) {
+			Logger::Error("Invalid file size %llu\n", fileSize);
+			return false;
+		}
+
 		if (fileSize != 0) {
-			file.buffer = (char*)malloc(fileSize + 1);
+			file.buffer = (char*)malloc((size_t)fileSize + 1);
 			if (!file.buffer) {
 				Logger::Error("Unable to allocate memory to store file content\n");
 				return false;
 			}
 
-			if (fread(file.buffer, fileSize, 1, f) != 1) {
+			if (fread(file.buffer, (size_t)fileSize, 1, f) != 1) {
 				Logger::Error("Error while reading content of file\n");
 				return false;
 			}
@@ -108,7 +113,7 @@ bool Unpacker::MemoryUnpack(const char* name, std::vector<Unpacker::FileContent>
 
 		file.isFolder = fileSize == 0 &&
 			(file.name[nameLen - 1] == '/' || file.name[nameLen - 1] == '\\');
-		file.buffLen = fileSize;
+		file.buffLen = (size_t)fileSize;
 		Logger::Info("Read %s of size %d\n", file.name, fileSize);
 		files.push_back(std::move(file));
 	}
