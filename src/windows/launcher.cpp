@@ -469,6 +469,8 @@ namespace Launcher {
 		}
 
 		UpdateRepentogonOptionsFromInstallation();
+		_updates->SetValue(_configuration->AutomaticUpdates());
+		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
 
 		return ok;
 	}
