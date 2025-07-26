@@ -212,29 +212,37 @@ namespace Launcher {
 		return CHECK_REPENTOGON_UPDATES_ERR;
 	}
 
-	std::string RepentogonInstaller::GetDsoundDLLPath() const {
-		IsaacInstallation const& isaac = _installation->GetIsaacInstallation();
-		return isaac.GetMainInstallation().GetFolderPath() + "\\dsound.dll";
-	}
+	std::vector<std::tuple<bool, std::string>> RepentogonInstaller::GetDsoundDLLState() const {
+		IsaacInstallation const& installation = _installation->GetIsaacInstallation();
+		std::vector<std::string> paths;
+		paths.push_back(installation.GetMainInstallation().GetFolderPath() + "\\dsound.dll");
+		paths.push_back(installation.GetRepentogonInstallation().GetFolderPath() + "\\dsound.dll");
 
-	bool RepentogonInstaller::NeedRemoveDsoundDLL() const {
-		return Filesystem::Exists(GetDsoundDLLPath().c_str());
+		std::vector<std::tuple<bool, std::string>> result;
+		for (std::string& path : paths) {
+			bool exists = Filesystem::Exists(path.c_str());
+			result.push_back(std::make_tuple(exists, std::move(path)));
+		}
+
+		return result;
 	}
 
 	bool RepentogonInstaller::HandleLegacyInstallation() {
-		if (NeedRemoveDsoundDLL()) {
-			/* Note that there is a filesystem race between the check above
-			 * and the deletion below.
-			 */
-			std::string dsoundPath = GetDsoundDLLPath();
-			bool result = Filesystem::RemoveFile(dsoundPath.c_str());
-			if (!result) {
-				Logger::Error("Unable to delete dsound.dll: %d\n", GetLastError());
-			} else {
-				Logger::Info("Successfully deleted dsound.dll\n");
+		std::vector<std::tuple<bool, std::string>> dsounds = GetDsoundDLLState();
+		for (auto& [exists, dsoundPath] : dsounds) {
+			if (exists) {
+				/* Note that there is a filesystem race between the check above
+				 * and the deletion below.
+				 */
+				bool result = Filesystem::RemoveFile(dsoundPath.c_str());
+				if (!result && GetLastError() != ERROR_FILE_NOT_FOUND) {
+					Logger::Error("Unable to delete %s: %d\n", dsoundPath.c_str(), GetLastError());
+				} else {
+					Logger::Info("Successfully deleted %s\n", dsoundPath.c_str());
+				}
+				PushFileRemovalNotification(std::move(dsoundPath), result);
+				return result;
 			}
-			PushFileRemovalNotification(std::move(dsoundPath), result);
-			return result;
 		}
 
 		return true;

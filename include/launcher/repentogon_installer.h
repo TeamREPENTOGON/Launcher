@@ -177,8 +177,7 @@ namespace Launcher {
 		bool CreateRepentogonFolder(const char* name);
 		bool CreateRepentogonMarker(const char* marker);
 
-		std::string GetDsoundDLLPath() const;
-		bool NeedRemoveDsoundDLL() const;
+		std::vector<std::tuple<bool, std::string>> GetDsoundDLLState() const;
 
 		DownloadInstallRepentogonResult InstallLatestRepentogonThread(bool force, bool allowPreReleases);
 		CheckRepentogonUpdatesResult CheckRepentogonUpdatesThread(rapidjson::Document& document, bool allowPreReleases, bool force);
