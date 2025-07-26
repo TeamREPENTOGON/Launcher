@@ -28,7 +28,7 @@ namespace Launcher {
 		curl::DownloadStringResult result;
 		if (checker.IsSelfUpdateAvailable(allowUnstable, force, version, url, &result)) {
 			std::ostringstream stream;
-			stream << "A new version of the launcher is available (version" <<
+			stream << "A new version of the launcher is available (version " <<
 				version << ", from version " << Launcher::version << ").\n" <<
 				"Do you want to update the launcher ?";
 			int msgResult = wxMessageBox(stream.str(), "New launcher release available",
