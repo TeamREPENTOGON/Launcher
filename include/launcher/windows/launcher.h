@@ -80,6 +80,11 @@ namespace Launcher {
 
 		void EnableInterface(bool enable);
 
+		/* The window must has been initialized. */
+		inline bool GetRepentogonUnstableUpdatesState() const {
+			return _unstableRepentogon->GetValue();
+		}
+
 	private:
 		/* Window building. */
 		void AddLauncherConfigurationOptions();
@@ -110,6 +115,8 @@ namespace Launcher {
 		// void OnCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
+
+		void OnRepentogonUnstableStateSwitched();
 
 		void OnForceUpdateCompleted(std::shared_ptr<RepentogonInstallerFrame> ptr);
 
@@ -166,6 +173,8 @@ namespace Launcher {
 		int _repentogonLaunchModeIdx = -1;
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
 		LuaHeapSizeValidator _validator;
+		bool _initialUnstableUpdates = false;
+		bool _canPromptOnUnstableSwitch = true;
 
 		wxTextCtrlLog _logWindow;
 		Installation* _installation;

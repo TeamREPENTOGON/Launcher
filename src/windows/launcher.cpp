@@ -357,6 +357,9 @@ namespace Launcher {
 
 		case WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES:
 			_configuration->UnstableUpdates(box->GetValue());
+			if (box->GetValue() != _initialUnstableUpdates) {
+				OnRepentogonUnstableStateSwitched();
+			}
 			break;
 
 		case WINDOW_CHECKBOX_VANILLA_LUADEBUG:
@@ -369,6 +372,28 @@ namespace Launcher {
 
 		default:
 			return;
+		}
+	}
+
+	void LauncherMainWindow::OnRepentogonUnstableStateSwitched() {
+		if (_canPromptOnUnstableSwitch) {
+			int result = wxMessageBox("You have switched the Repentogon stability option. "
+				"Do you want to immediately install the corresponding release ?\n"
+				"\n"
+				"If you answer \"No\", the launcher will not prompt you again on repeat switches. "
+				"You can use the \"Advanced Options\" to forcibly trigger the installation later.",
+				"Repentogon stability option changed",
+				wxYES_NO, this);
+
+			if (result == wxYES || result == wxOK) {
+				ForceRepentogonUpdate(_unstableRepentogon->GetValue());
+			} else {
+				_canPromptOnUnstableSwitch = false;
+			}
+		} else {
+			_logWindow.LogWarn("You previously chose to not install Repentogon after "
+				"switching the unstable Repentogon option. If you want to force an "
+				"update, use the \"Advanced Options\" button below.\n");
 		}
 	}
 
@@ -659,6 +684,7 @@ namespace Launcher {
 		_console->SetValue(_configuration->RepentogonConsole());
 		_updates->SetValue(_configuration->AutomaticUpdates());
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
+		_initialUnstableUpdates = _unstableRepentogon->GetValue();
 
 		_luaHeapSize->SetValue(_configuration->LuaHeapSize());
 
@@ -774,6 +800,9 @@ namespace Launcher {
 			_logWindow.Log("State of the Repentogon installation:\n");
 			Launcher::DisplayRepentogonFilesVersion(_installation, 1, true, _logWindow.Get());
 			UpdateRepentogonOptionsFromInstallation();
+
+			_initialUnstableUpdates = _unstableRepentogon->GetValue();
+			_canPromptOnUnstableSwitch = true;
 		}
 	}
 
@@ -832,20 +861,12 @@ namespace Launcher {
 		case ADVANCED_EVENT_NONE:
 			break;
 
-		case ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE:
-			ForceLauncherUpdate(true);
-			break;
-
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE:
 			ForceLauncherUpdate(false);
 			break;
 
-		case ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE:
-			ForceRepentogonUpdate(true);
-			break;
-
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE:
-			ForceRepentogonUpdate(false);
+			ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
 			break;
 
 		default:

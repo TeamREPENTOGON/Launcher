@@ -4,13 +4,13 @@
 #include "launcher/windows/launcher.h"
 
 wxBEGIN_EVENT_TABLE(Launcher::AdvancedOptionsWindow, wxDialog)
-EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UNSTABLE_UPDATE, 
+EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UNSTABLE_UPDATE,
 	Launcher::AdvancedOptionsWindow::OnButtonSelect)
-EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UPDATE, 
+EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UPDATE,
 	Launcher::AdvancedOptionsWindow::OnButtonSelect)
-EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_STABLE_SELF_UPDATE, 
+EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_STABLE_SELF_UPDATE,
 	Launcher::AdvancedOptionsWindow::OnButtonSelect)
-EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_UNSTABLE_SELF_UPDATE, 
+EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_UNSTABLE_SELF_UPDATE,
 	Launcher::AdvancedOptionsWindow::OnButtonSelect)
 wxEND_EVENT_TABLE()
 
@@ -28,20 +28,12 @@ namespace Launcher {
 		int result = LauncherMainWindow::ADVANCED_EVENT_NONE;
 
 		switch (id) {
-		case Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UNSTABLE_UPDATE:
-			result = LauncherMainWindow::ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE;
-			break;
-
 		case Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UPDATE:
 			result = LauncherMainWindow::ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE;
 			break;
 
 		case Controls::ADVANCED_CONTROLS_BUTTON_STABLE_SELF_UPDATE:
 			result = LauncherMainWindow::ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE;
-			break;
-
-		case Controls::ADVANCED_CONTROLS_BUTTON_UNSTABLE_SELF_UPDATE:
-			result = LauncherMainWindow::ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE;
 			break;
 
 		default:
@@ -52,39 +44,24 @@ namespace Launcher {
 	}
 
 	void AdvancedOptionsWindow::Build() {
-		wxSizer* mainSizer = new wxBoxSizer(wxHORIZONTAL);
+		wxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
 		SetSizer(mainSizer);
 
-		wxStaticBox* launcherOptions = new wxStaticBox(this, -1, "Launcher options");
-		wxSizer* launcherSizer = new wxStaticBoxSizer(launcherOptions, wxVERTICAL);
-		// launcherOptions->SetSizer(launcherSizer);
+		wxButton* selfUpdateButton = new wxButton(this, ADVANCED_CONTROLS_BUTTON_STABLE_SELF_UPDATE,
+			"Update the launcher (force)");
+		mainSizer->Add(selfUpdateButton, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
 
-		wxStaticBox* repentogonOptions = new wxStaticBox(this, -1, "REPENTOGON options");
-		wxSizer* repentogonSizer = new wxStaticBoxSizer(repentogonOptions, wxVERTICAL);
-		// repentogonOptions->SetSizer(repentogonSizer);
-
-		// wxButton* dummy = new wxButton(launcherOptions, -1);
-		// dummy->Hide();
-		// launcherSizer->Add(dummy, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 10);
-
-		wxButton* selfUpdateButton = new wxButton(launcherOptions, ADVANCED_CONTROLS_BUTTON_STABLE_SELF_UPDATE, 
-			"Self-update (force, stable version)");
-		launcherSizer->Add(selfUpdateButton, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP, 5);
-
-		wxButton* unstableSelfUpdateButton = new wxButton(launcherOptions, ADVANCED_CONTROLS_BUTTON_UNSTABLE_SELF_UPDATE, 
-			"Self-update (force, unstable version)");
-		launcherSizer->Add(unstableSelfUpdateButton, 0, wxEXPAND | wxLEFT | wxBOTTOM | wxRIGHT, 5);
-
-		wxButton* updateButton = new wxButton(repentogonOptions, ADVANCED_CONTROLS_BUTTON_FORCE_UPDATE, 
-			"Update Repentogon (force, stable version)");
-		repentogonSizer->Add(updateButton, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, 5);
-
-		wxButton* unstableUpdateButton = new wxButton(repentogonOptions, ADVANCED_CONTROLS_BUTTON_FORCE_UNSTABLE_UPDATE, 
-			"Update Repentogon (force, unstable version)");
-		repentogonSizer->Add(unstableUpdateButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
-
-		mainSizer->Add(launcherSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxBOTTOM | wxRIGHT, 10);
-		mainSizer->Add(repentogonSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxBOTTOM | wxRIGHT, 10);
+		std::ostringstream str;
+		str << "Update the Repentogon installation (force, ";
+		if (_mainFrame->GetRepentogonUnstableUpdatesState()) {
+			str << "unstable";
+		} else {
+			str << "stable";
+		}
+		str << " version)";
+		wxButton* updateButton = new wxButton(this, ADVANCED_CONTROLS_BUTTON_FORCE_UPDATE,
+			str.str());
+		mainSizer->Add(updateButton, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT, 5);
 
 		Fit();
 	}
