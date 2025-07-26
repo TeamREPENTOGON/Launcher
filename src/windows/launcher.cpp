@@ -427,18 +427,41 @@ namespace Launcher {
 			path = _repentogonFileText->GetValue();
 		}
 
+		std::string pathStr = path.ToStdString();
+		_exePath = new char[pathStr.size() + 1];
+		if (!_exePath) {
+			_logWindow.LogError("Unable to allocate memory to launch the game\n");
+			Logger::Error("Unable to allocate memory for executable path\n");
+			return;
+		}
+
+		strcpy(_exePath, pathStr.c_str());
+
 		EnableInterface(false);
 
 		if (_configuration->HideWindow()) {
 			Show(false);
 		}
-
-		chained_futures::async(&::Launcher::Launch, &_logWindow, path.c_str().AsChar(),
+		chained_futures::async(&::Launcher::Launch, &_logWindow, _exePath,
 			launchingVanilla, _configuration
 		).chain(std::bind_front(&LauncherMainWindow::OnIsaacCompleted, this));
 	}
 
 	void LauncherMainWindow::OnIsaacCompleted(int exitCode) {
+		if (_exePath) {
+			delete[] _exePath;
+			_exePath = nullptr;
+		}
+
+		/* Need to fence here to prevent the compiler from reordering the call
+		 * to delete and the reset of exePath to below this call.
+		 *
+		 * We want to enforce that the pointer has been freed before enabling
+		 * the interface, otherwise we could have a memory leak if the user
+		 * manages to launch the game before the delete completes.
+		 */
+		std::atomic_thread_fence(std::memory_order_relaxed);
+
 		if (_configuration->HideWindow()) {
 			Show(true);
 		}

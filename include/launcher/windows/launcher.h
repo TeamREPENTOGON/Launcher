@@ -175,6 +175,7 @@ namespace Launcher {
 		LuaHeapSizeValidator _validator;
 		bool _initialUnstableUpdates = false;
 		bool _canPromptOnUnstableSwitch = true;
+		char* _exePath = nullptr;
 
 		wxTextCtrlLog _logWindow;
 		Installation* _installation;
