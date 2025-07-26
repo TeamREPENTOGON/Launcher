@@ -6,8 +6,7 @@
 #include <stdexcept>
 
 namespace Updater::Utils {
-	static const char* LockFileBasePath = "Documents\\My Games\\Binding of Isaac Repentance";
-	static const char* RepentogonSubFolder = "Repentogon";
+	static const char* LockFileBasePath = "Documents\\My Games";
 	static const char* LockFileName = "repentogon_launcher_updater.lock";
 
 	static char* GetUserProfileDir();
@@ -230,16 +229,10 @@ namespace Updater::Utils {
 
 		pathStr += std::string("\\") + LockFileBasePath;
 		if (!FileExists(pathStr.c_str())) {
-			Logger::Error("GetLockFilePath: Repentance save folder %s does not exist\n", pathStr.c_str());
-			return false;
-		}
-
-		pathStr += std::string("\\") + RepentogonSubFolder;
-		if (!FileExists(pathStr.c_str())) {
-			Logger::Info("GetLockFilePath: Repentogon data folder %s does not exist, creating it\n", pathStr.c_str());
+			Logger::Info("GetLockFilePath: Target folder %s does not exist, creating it\n", pathStr.c_str());
 			if (!CreateDirectoryA(pathStr.c_str(), NULL)) {
 				DWORD lastError = GetLastError();
-				Logger::Error("GetLockFilePath: error while creating Repentogon data folder %s (%d)\n", pathStr.c_str(), lastError);
+				Logger::Error("GetLockFilePath: Error while creating folder %s (%d)\n", pathStr.c_str(), lastError);
 				return false;
 			}
 		}
