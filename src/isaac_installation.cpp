@@ -203,7 +203,8 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 	_needsPatch = !repentogon && PatchIsAvailable();
 	_isCompatibleWithRepentogon = _needsPatch || RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
 
-	if (srgon::IsStandaloneFolder(sourcePath) && !repentogon) {
+	bool isStandalone = srgon::IsStandaloneFolder(sourcePath);
+	if (isStandalone && !repentogon) {
 		_gui->LogWarn("The main Isaac executable is located in a Repentogon installation, this may indicate a broken configuration\n");
 		Logger::Warn("Main Isaac executable %s is located inside a Repentogon installation", path.c_str());
 
@@ -211,7 +212,17 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 			*standalone = true;
 		}
 	} else if (standalone) {
-		*standalone = false;
+		*standalone = isStandalone;
+	}
+
+	std::string steamAppidPath = sourcePath + "\\steam_appid.txt";
+	if (repentogon && !Filesystem::Exists(steamAppidPath.c_str())) {
+		Logger::Warn("Repentogon installation folder has no steam_appid.txt file, "
+			"creating one\n");
+		if (!srgon::CreateSteamAppIDFile(sourcePath)) {
+			Logger::Error("Unable to create steam_appid.txt in Repentogon folder\n");
+			return false;
+		}
 	}
 
 	return true;
