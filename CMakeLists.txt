@@ -5,10 +5,6 @@ set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/;${CMAKE_MODULE_PATH}")
 
 option (LAUNCHER_UNSTABLE "Build unstable version instead of release version" OFF)
 
-if (NOT CMAKE_LAUNCHER_VERSION)
-  set (CMAKE_LAUNCHER_VERSION "dev")
-endif()
-
 # Stupid MSVC
 add_compile_definitions (_CRT_SECURE_NO_WARNINGS)
 
@@ -32,6 +28,13 @@ include (cmake/deps/libzip.cmake)
 
 add_subdirectory(deps/bzip2)
 add_subdirectory(deps/bsdiff)
+
+if (NOT CMAKE_LAUNCHER_VERSION)
+  message(WARNING "No Launcher version specified, defaulting to dev")
+  set (CMAKE_LAUNCHER_VERSION "dev")
+endif()
+
+message (STATUS "Building Launcher version ${CMAKE_LAUNCHER_VERSION}")
 
 # Generate the resource file
 # set (RESOURCE_PATH "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
