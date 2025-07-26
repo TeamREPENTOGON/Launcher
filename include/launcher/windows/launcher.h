@@ -56,7 +56,7 @@ namespace Launcher {
 		std::regex _regex;
 	};
 
-	class MainFrame : public wxFrame {
+	class LauncherMainWindow : public wxFrame {
 	public:
 		friend class AdvancedOptionsWindow;
 
@@ -68,8 +68,8 @@ namespace Launcher {
 			ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE
 		};
 
-		MainFrame(Installation* installation, LauncherConfiguration* configuration);
-		~MainFrame();
+		LauncherMainWindow(Installation* installation, LauncherConfiguration* configuration);
+		~LauncherMainWindow();
 
 		/* Load the configuration file and update the options accordingly.
 		 *

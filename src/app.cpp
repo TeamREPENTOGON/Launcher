@@ -16,7 +16,7 @@ static LauncherConfiguration __configuration;
 static Launcher::Installation* __installation;
 static NopLogGUI __nopLogGUI;
 
-bool Launcher::App::RunWizard(Launcher::MainFrame* mainWindow, bool* installedRepentogon) {
+bool Launcher::App::RunWizard(Launcher::LauncherMainWindow* mainWindow, bool* installedRepentogon) {
 	/* Do not do the same in the main window : if we reach the main window,
 	 * the wizard has run. This doesn't change even if the user chooses to
 	 * rerun the wizard from the main window.
@@ -35,15 +35,15 @@ bool Launcher::App::RunWizard(Launcher::MainFrame* mainWindow, bool* installedRe
 }
 
 RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(
-	MainFrame* mainWindow, bool forceUpdate, bool allowUnstable) {
+	LauncherMainWindow* mainWindow, bool forceUpdate, bool allowUnstable) {
 	RepentogonInstallerFrame* frame = new RepentogonInstallerFrame(mainWindow,
 		false, __installation, forceUpdate, allowUnstable);
 	frame->Initialize();
 	return frame;
 }
 
-Launcher::MainFrame* Launcher::App::CreateMainWindow() {
-	MainFrame* frame = new MainFrame(__installation, &__configuration);
+Launcher::LauncherMainWindow* Launcher::App::CreateMainWindow() {
+	LauncherMainWindow* frame = new LauncherMainWindow(__installation, &__configuration);
 	return frame;
 }
 

@@ -33,7 +33,7 @@ EVT_CHECKBOX(LAUNCHER_WIZARD_CONTROL_AUTOMATIC_UPDATES_CHECKBOX, LauncherWizard:
 EVT_WIZARD_CANCEL(LAUNCHER_WIZARD_CONTROL_WIZARD, LauncherWizard::OnCancel)
 wxEND_EVENT_TABLE()
 
-LauncherWizard::LauncherWizard(Launcher::MainFrame* mainWindow,
+LauncherWizard::LauncherWizard(Launcher::LauncherMainWindow* mainWindow,
     Launcher::Installation* installation,
     LauncherConfiguration* configuration) :
     _installation(installation), _configuration(configuration),

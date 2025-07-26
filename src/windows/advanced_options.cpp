@@ -15,7 +15,7 @@ EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_U
 wxEND_EVENT_TABLE()
 
 namespace Launcher {
-	AdvancedOptionsWindow::AdvancedOptionsWindow(MainFrame* mainFrame) : _mainFrame(mainFrame), wxDialog(mainFrame, -1, "Advanced options") {
+	AdvancedOptionsWindow::AdvancedOptionsWindow(LauncherMainWindow* mainFrame) : _mainFrame(mainFrame), wxDialog(mainFrame, -1, "Advanced options") {
 		Build();
 	}
 
@@ -25,23 +25,23 @@ namespace Launcher {
 
 	void AdvancedOptionsWindow::OnButtonSelect(wxCommandEvent& event) {
 		int id = ((wxButton*)event.GetEventObject())->GetId();
-		int result = MainFrame::ADVANCED_EVENT_NONE;
+		int result = LauncherMainWindow::ADVANCED_EVENT_NONE;
 
 		switch (id) {
 		case Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UNSTABLE_UPDATE:
-			result = MainFrame::ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE;
+			result = LauncherMainWindow::ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE;
 			break;
 
 		case Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UPDATE:
-			result = MainFrame::ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE;
+			result = LauncherMainWindow::ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE;
 			break;
 
 		case Controls::ADVANCED_CONTROLS_BUTTON_STABLE_SELF_UPDATE:
-			result = MainFrame::ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE;
+			result = LauncherMainWindow::ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE;
 			break;
 
 		case Controls::ADVANCED_CONTROLS_BUTTON_UNSTABLE_SELF_UPDATE:
-			result = MainFrame::ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE;
+			result = LauncherMainWindow::ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE;
 			break;
 
 		default:

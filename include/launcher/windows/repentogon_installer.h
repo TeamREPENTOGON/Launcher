@@ -11,7 +11,7 @@
 
 // Forward decl to avoid circular dependency
 namespace Launcher {
-	class MainFrame;
+	class LauncherMainWindow;
 }
 
 class RepentogonInstallerFrame : public wxFrame {
@@ -25,11 +25,11 @@ public:
 	void InstallRepentogon();
 	void OnClose(wxCloseEvent& event);
 
-	inline void SetMainFrame(Launcher::MainFrame* frame) {
+	inline void SetMainFrame(Launcher::LauncherMainWindow* frame) {
 		_mainFrame = frame;
 	}
 
-	inline Launcher::MainFrame* GetMainFrame() const {
+	inline Launcher::LauncherMainWindow* GetMainFrame() const {
 		return _mainFrame;
 	}
 
@@ -55,7 +55,7 @@ private:
 	 * Upon completion of the installation, this window transfers control to
 	 * the main window.
 	 */
-	Launcher::MainFrame* _mainFrame = nullptr;
+	Launcher::LauncherMainWindow* _mainFrame = nullptr;
 	wxTextCtrl* _logWindow = nullptr;
 	bool _forceUpdate = false;
 	bool _allowUnstable = false;

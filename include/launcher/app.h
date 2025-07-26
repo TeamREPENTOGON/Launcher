@@ -4,7 +4,7 @@
 #include "launcher/windows/repentogon_installer.h"
 
 namespace Launcher {
-	class MainFrame;
+	class LauncherMainWindow;
 
 	int Launch(ILoggableGUI* gui, const char* path, bool isLegacy, LauncherConfiguration const* configuration);
 
@@ -14,11 +14,11 @@ namespace Launcher {
 		int OnExit() override;
 
 	private:
-		bool RunWizard(MainFrame* mainWindow, bool* installedRepentogon);
+		bool RunWizard(LauncherMainWindow* mainWindow, bool* installedRepentogon);
 		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(
-			MainFrame* mainWindow, bool forceUpdate, bool allowUnstable);
-		MainFrame* CreateMainWindow();
+			LauncherMainWindow* mainWindow, bool forceUpdate, bool allowUnstable);
+		LauncherMainWindow* CreateMainWindow();
 
-		MainFrame* _mainFrame;
+		LauncherMainWindow* _mainFrame;
 	};
 }

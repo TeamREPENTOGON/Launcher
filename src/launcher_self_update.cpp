@@ -18,7 +18,7 @@ namespace Launcher {
 
 	static SelfUpdateResult DoSelfUpdate(const char* version, const char* url);
 
-	void HandleSelfUpdate(MainFrame* mainWindow, bool allowUnstable, bool force) {
+	void HandleSelfUpdate(LauncherMainWindow* mainWindow, bool allowUnstable, bool force) {
 		wxProgressDialog dialog("Launcher updater checker",
 			"Checking for updates of the launcher...", 100, mainWindow,
 			wxPD_APP_MODAL | wxPD_CAN_ABORT);

@@ -6,5 +6,5 @@
 #include "launcher/windows/launcher.h"
 
 namespace Launcher {
-	void HandleSelfUpdate(MainFrame* mainWindow, bool allowUnstable, bool force);
+	void HandleSelfUpdate(LauncherMainWindow* mainWindow, bool allowUnstable, bool force);
 }

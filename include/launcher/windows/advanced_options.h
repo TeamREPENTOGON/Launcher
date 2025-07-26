@@ -8,7 +8,7 @@
 
 
 namespace Launcher {
-	class MainFrame;
+	class LauncherMainWindow;
 
 	class AdvancedOptionsWindow : public wxDialog {
 	public:
@@ -19,7 +19,7 @@ namespace Launcher {
 			ADVANCED_CONTROLS_BUTTON_UNSTABLE_SELF_UPDATE
 		};
 
-		AdvancedOptionsWindow(MainFrame* mainFrame);
+		AdvancedOptionsWindow(LauncherMainWindow* mainFrame);
 		~AdvancedOptionsWindow();
 
 	private:
@@ -27,7 +27,7 @@ namespace Launcher {
 		void OnButtonSelect(wxCommandEvent&);
 
 	private:
-		MainFrame* _mainFrame;
+		LauncherMainWindow* _mainFrame;
 
 		DECLARE_EVENT_TABLE();
 	};

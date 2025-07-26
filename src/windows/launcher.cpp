@@ -46,20 +46,20 @@
 #undef min
 #endif
 
-wxBEGIN_EVENT_TABLE(Launcher::MainFrame, wxFrame)
-EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::MainFrame::OnLevelSelect)
-EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLaunchModeSelect)
-EVT_TEXT(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::MainFrame::OnLaunchModeSelect)
-EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::MainFrame::OnOptionSelected)
-EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::MainFrame::OnOptionSelected)
-EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::MainFrame::OnOptionSelected)
-EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_HIDE_WINDOW, Launcher::MainFrame::OnOptionSelected)
-EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, Launcher::MainFrame::OnOptionSelected)
-// EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::MainFrame::OnCharacterWritten)
-EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::MainFrame::Launch)
-EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::MainFrame::OnIsaacSelectClick)
-// EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::MainFrame::OnSelectRepentogonFolderClick)
-EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_OPTIONS, Launcher::MainFrame::OnAdvancedOptionsClick)
+wxBEGIN_EVENT_TABLE(Launcher::LauncherMainWindow, wxFrame)
+EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::LauncherMainWindow::OnLevelSelect)
+EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::LauncherMainWindow::OnLaunchModeSelect)
+EVT_TEXT(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::LauncherMainWindow::OnLaunchModeSelect)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::LauncherMainWindow::OnOptionSelected)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::LauncherMainWindow::OnOptionSelected)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_HIDE_WINDOW, Launcher::LauncherMainWindow::OnOptionSelected)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
+// EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::LauncherMainWindow::OnCharacterWritten)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::LauncherMainWindow::Launch)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::LauncherMainWindow::OnIsaacSelectClick)
+// EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::LauncherMainWindow::OnSelectRepentogonFolderClick)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_OPTIONS, Launcher::LauncherMainWindow::OnAdvancedOptionsClick)
 wxEND_EVENT_TABLE()
 
 int chained_future_f(int a) {
@@ -141,7 +141,7 @@ namespace Launcher {
 		return false;
 	}
 
-	MainFrame::MainFrame(Installation* installation, LauncherConfiguration* configuration) :
+	LauncherMainWindow::LauncherMainWindow(Installation* installation, LauncherConfiguration* configuration) :
 		wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
 		_installation(installation), _configuration(configuration),
 		_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1),
@@ -185,11 +185,11 @@ namespace Launcher {
 		SetBackgroundColour(wxColour(237, 237, 237));
 	}
 
-	MainFrame::~MainFrame() {
+	LauncherMainWindow::~LauncherMainWindow() {
 		_configuration->Write();
 	}
 
-	void MainFrame::AddLauncherConfigurationOptions() {
+	void LauncherMainWindow::AddLauncherConfigurationOptions() {
 		wxBoxSizer* isaacSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
 		AddLauncherConfigurationTextField("Indicate the path of the Isaac executable file",
 			"Select Isaac executable...", NoIsaacText,
@@ -211,7 +211,7 @@ namespace Launcher {
 		_configurationSizer->Add(_hideWindow, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 	}
 
-	void MainFrame::AddLaunchOptions() {
+	void LauncherMainWindow::AddLaunchOptions() {
 		wxStaticBox* launchModeBox = new wxStaticBox(_optionsBox, -1, "Launch Options");
 		wxStaticBoxSizer* launchModeBoxSizer = new wxStaticBoxSizer(launchModeBox, wxVERTICAL);
 
@@ -235,7 +235,7 @@ namespace Launcher {
 		_optionsSizer->Add(launchModeBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
 	}
 
-	void MainFrame::AddRepentogonOptions() {
+	void LauncherMainWindow::AddRepentogonOptions() {
 		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "REPENTOGON Options");
 		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxVERTICAL);
 
@@ -260,7 +260,7 @@ namespace Launcher {
 		_optionsSizer->Add(repentogonBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
 	}
 
-	void MainFrame::AddVanillaOptions() {
+	void LauncherMainWindow::AddVanillaOptions() {
 		wxStaticBox* vanillaBox = new wxStaticBox(_optionsBox, -1, "Vanilla Options");
 		wxStaticBoxSizer* vanillaBoxSizer = new wxStaticBoxSizer(vanillaBox, wxVERTICAL);
 
@@ -288,11 +288,11 @@ namespace Launcher {
 		_optionsSizer->Add(vanillaBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
 	}
 
-	void MainFrame::OnIsaacSelectClick(wxCommandEvent&) {
+	void LauncherMainWindow::OnIsaacSelectClick(wxCommandEvent&) {
 		SelectIsaacExecutablePath();
 	}
 
-	/* void MainFrame::OnSelectRepentogonFolderClick(wxCommandEvent& event) {
+	/* void LauncherMainWindow::OnSelectRepentogonFolderClick(wxCommandEvent& event) {
 		wxDirDialog dialog(this, "Please select the folder in which to install Repentogon", wxEmptyString,
 			0, wxDefaultPosition, wxDefaultSize, "Select Repentogon installation folder");
 		dialog.ShowModal();
@@ -301,7 +301,7 @@ namespace Launcher {
 		OnFileSelected(path, NoRepentogonInstallationFolderColor, _repentogonInstallFolderText, NoRepentogonInstallationFolderText);
 	} */
 
-	void MainFrame::OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl,
+	void LauncherMainWindow::OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl,
 		const char* emptyText) {
 		if (!path.empty()) {
 			ctrl->SetValue(path);
@@ -314,7 +314,7 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::OnLevelSelect(wxCommandEvent& event) {
+	void LauncherMainWindow::OnLevelSelect(wxCommandEvent& event) {
 		wxComboBox* box = dynamic_cast<wxComboBox*>(event.GetEventObject());
 		wxString string = box->GetValue();
 		std::cmatch match;
@@ -330,7 +330,7 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::OnLaunchModeSelect(wxCommandEvent& event) {
+	void LauncherMainWindow::OnLaunchModeSelect(wxCommandEvent& event) {
 		wxComboBox* box = dynamic_cast<wxComboBox*>(event.GetEventObject());
 		if (box->GetValue() == ComboBoxVanilla) {
 			_configuration->IsaacLaunchMode(LAUNCH_MODE_VANILLA);
@@ -339,12 +339,12 @@ namespace Launcher {
 		}
 	}
 
-	/* void MainFrame::OnCharacterWritten(wxCommandEvent& event) {
+	/* void LauncherMainWindow::OnCharacterWritten(wxCommandEvent& event) {
 		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(event.GetEventObject());
 		_options.luaHeapSize = std::stoi(ctrl->GetValue().c_str().AsChar());
 	} */
 
-	void MainFrame::OnOptionSelected(wxCommandEvent& event) {
+	void LauncherMainWindow::OnOptionSelected(wxCommandEvent& event) {
 		wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
 		switch (box->GetId()) {
 		case WINDOW_CHECKBOX_REPENTOGON_CONSOLE:
@@ -372,11 +372,11 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::Launch(wxCommandEvent&) {
+	void LauncherMainWindow::Launch(wxCommandEvent&) {
 		LaunchIsaac();
 	}
 
-	void MainFrame::LaunchIsaac() {
+	void LauncherMainWindow::LaunchIsaac() {
 		_logWindow.Log("Launching the game with the following options:");
 		_logWindow.Log("\tRepentogon:");
 		bool launchingVanilla = _configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA;
@@ -410,10 +410,10 @@ namespace Launcher {
 
 		chained_futures::async(&::Launcher::Launch, &_logWindow, path.c_str().AsChar(),
 			launchingVanilla, _configuration
-		).chain(std::bind_front(&MainFrame::OnIsaacCompleted, this));
+		).chain(std::bind_front(&LauncherMainWindow::OnIsaacCompleted, this));
 	}
 
-	void MainFrame::OnIsaacCompleted(int exitCode) {
+	void LauncherMainWindow::OnIsaacCompleted(int exitCode) {
 		if (_configuration->HideWindow()) {
 			Show(true);
 		}
@@ -426,17 +426,17 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::RelaunchIsaac() {
+	void LauncherMainWindow::RelaunchIsaac() {
 		LaunchIsaac();
 	}
 
-	void MainFrame::EnableInterface(bool enable) {
+	void LauncherMainWindow::EnableInterface(bool enable) {
 		_configurationBox->Enable(enable);
 		_advancedOptionsButton->Enable(enable);
 		_optionsBox->Enable(enable);
 	}
 
-	bool MainFrame::SelectIsaacExecutablePath() {
+	bool LauncherMainWindow::SelectIsaacExecutablePath() {
 		LauncherWizard* wizard = new LauncherWizard(this, _installation, _configuration);
 		wizard->AddPages(true);
 		bool ok = wizard->Run();
@@ -475,11 +475,11 @@ namespace Launcher {
 		return ok;
 	}
 
-	bool MainFrame::SanityCheckLauncherUpdate() {
+	bool LauncherMainWindow::SanityCheckLauncherUpdate() {
 		return !Filesystem::Exists(Comm::UnpackedArchiveName);
 	}
 
-	void MainFrame::SanitizeLauncherUpdate() {
+	void LauncherMainWindow::SanitizeLauncherUpdate() {
 		if (!SanityCheckLauncherUpdate()) {
 			_logWindow.LogWarn("Found launcher update file %s in the current folder."
 				"This may indicate a broken update. Deleting it.\n", Comm::UnpackedArchiveName);
@@ -487,7 +487,7 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::OneTimeIsaacPathInitialization() {
+	void LauncherMainWindow::OneTimeIsaacPathInitialization() {
 		std::string const& isaacPath = _installation->GetIsaacInstallation()
 			.GetMainInstallation().GetExePath();
 		if (!isaacPath.empty())
@@ -518,7 +518,7 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::PreInit() {
+	void LauncherMainWindow::PreInit() {
 /* #ifdef LAUNCHER_UNSTABLE
 		wxMessageBox("You are running an unstable version of the REPENTOGON launcher.\n"
 			"If you wish to run a stable version, use the \"Self-update (stable version)\" button",
@@ -540,7 +540,7 @@ namespace Launcher {
 		UpdateRepentogonOptionsFromInstallation();
 	}
 
-	bool MainFrame::PromptBoolean(wxString const& message, wxString const& shortMessage) {
+	bool LauncherMainWindow::PromptBoolean(wxString const& message, wxString const& shortMessage) {
 		wxMessageDialog dialog(this, message, shortMessage, wxYES_NO | wxCANCEL);
 		int result = dialog.ShowModal();
 		return result == wxID_OK || result == wxID_YES;
@@ -580,12 +580,12 @@ namespace Launcher {
 		return box;
 	}
 
-	void MainFrame::InitializeOptions() {
+	void LauncherMainWindow::InitializeOptions() {
 		SanitizeConfiguration();
 		InitializeGUIFromOptions();
 	}
 
-	void MainFrame::SanitizeConfiguration() {
+	void LauncherMainWindow::SanitizeConfiguration() {
 		namespace c = Configuration;
 		LaunchMode mode = _configuration->IsaacLaunchMode();
 		if (mode != LAUNCH_MODE_REPENTOGON && mode != LAUNCH_MODE_VANILLA) {
@@ -655,7 +655,7 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::InitializeGUIFromOptions() {
+	void LauncherMainWindow::InitializeGUIFromOptions() {
 		_console->SetValue(_configuration->RepentogonConsole());
 		_updates->SetValue(_configuration->AutomaticUpdates());
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
@@ -672,7 +672,7 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::InitializeLevelSelectFromOptions() {
+	void LauncherMainWindow::InitializeLevelSelectFromOptions() {
 		int level = _configuration->Stage(), type = _configuration->StageType();
 		std::string value;
 		if (level == 0) {
@@ -700,7 +700,7 @@ namespace Launcher {
 		_levelSelect->SetValue(wxString(value));
 	}
 
-	void MainFrame::UpdateRepentogonOptionsFromInstallation() {
+	void LauncherMainWindow::UpdateRepentogonOptionsFromInstallation() {
 		RepentogonInstallation const& repentogonInstallation = _installation->GetRepentogonInstallation();
 		IsaacInstallation const& isaacInstallation = _installation->GetIsaacInstallation();
 
@@ -740,7 +740,7 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::ForceRepentogonUpdate(bool allowPreReleases) {
+	void LauncherMainWindow::ForceRepentogonUpdate(bool allowPreReleases) {
 		_logWindow.Log("Forcibly updating Repentogon to the latest version");
 
 		EnableInterface(false);
@@ -750,10 +750,10 @@ namespace Launcher {
 		updater->Initialize();
 		updater->Show();
 		chained_future<void> future = chained_futures::async(&RepentogonInstallerFrame::InstallRepentogon,
-			updater.get()).chain(std::bind_front(&MainFrame::OnForceUpdateCompleted, this, updater));
+			updater.get()).chain(std::bind_front(&LauncherMainWindow::OnForceUpdateCompleted, this, updater));
 	}
 
-	void MainFrame::OnForceUpdateCompleted(std::shared_ptr<RepentogonInstallerFrame> frame) {
+	void LauncherMainWindow::OnForceUpdateCompleted(std::shared_ptr<RepentogonInstallerFrame> frame) {
 		Launcher::RepentogonInstaller::DownloadInstallRepentogonResult result =
 			frame->GetDownloadInstallResult();
 
@@ -777,12 +777,12 @@ namespace Launcher {
 		}
 	}
 
-	void MainFrame::ForceLauncherUpdate(bool allowUnstable) {
+	void LauncherMainWindow::ForceLauncherUpdate(bool allowUnstable) {
 		_logWindow.Log("Performing self-update (forcibly triggered)...");
 		Launcher::HandleSelfUpdate(this, allowUnstable, true);
 	}
 
-	std::string MainFrame::PromptIsaacInstallation() {
+	std::string LauncherMainWindow::PromptIsaacInstallation() {
 		wxString message("No Isaac installation found, please select Isaac executable to run");
 		// wxDirDialog dialog(this, message, wxEmptyString, wxDD_DIR_MUST_EXIST, wxDefaultPosition, wxDefaultSize, "Select Isaac folder");
 		wxFileDialog dialog(this, message, wxEmptyString, wxEmptyString, wxEmptyString, wxFD_FILE_MUST_EXIST, wxDefaultPosition,
@@ -791,7 +791,7 @@ namespace Launcher {
 		return dialog.GetPath().ToStdString();
 	}
 
-	void MainFrame::AddLauncherConfigurationTextField(const char* intro,
+	void LauncherMainWindow::AddLauncherConfigurationTextField(const char* intro,
 		const char* buttonText, const char* emptyText, wxColour const& emptyColor,
 		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
 		sizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxRIGHT, 5);
@@ -813,7 +813,7 @@ namespace Launcher {
 		}
 	}
 
-	bool MainFrame::PromptLegacyUninstall() {
+	bool LauncherMainWindow::PromptLegacyUninstall() {
 		std::ostringstream s;
 		s << "An unsupported build of Repentogon is currently installed and must be removed in order to upgrade to the latest Repentgon version.\n"
 			"Proceed with its uninstallation?";
@@ -822,7 +822,7 @@ namespace Launcher {
 		return result == wxID_YES || result == wxID_OK;
 	}
 
-	void MainFrame::OnAdvancedOptionsClick(wxCommandEvent&) {
+	void LauncherMainWindow::OnAdvancedOptionsClick(wxCommandEvent&) {
 		AdvancedOptionsWindow window(this);
 		int result = window.ShowModal();
 

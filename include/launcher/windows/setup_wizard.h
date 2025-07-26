@@ -21,7 +21,7 @@
 
 class LauncherWizard : public wxWizard {
 public:
-    LauncherWizard(Launcher::MainFrame* mainWindow,
+    LauncherWizard(Launcher::LauncherMainWindow* mainWindow,
         Launcher::Installation* installation,
         LauncherConfiguration* configuration);
 
