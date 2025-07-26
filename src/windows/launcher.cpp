@@ -466,7 +466,12 @@ namespace Launcher {
 			Show(true);
 		}
 
-		_logWindow.LogInfo("Game exited with error code %d\n", exitCode);
+		if (exitCode && exitCode != LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED) {
+			_logWindow.LogWarn("Game exited with error code %d\n", exitCode);
+		} else {
+			_logWindow.LogInfo("Game sucessfully exited\n");
+		}
+
 		EnableInterface(true);
 
 		if (exitCode == LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED) {
