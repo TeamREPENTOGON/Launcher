@@ -215,11 +215,11 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 		*standalone = isStandalone;
 	}
 
-	std::string steamAppidPath = sourcePath + "\\steam_appid.txt";
+	std::string steamAppidPath = _folderPath + "\\steam_appid.txt";
 	if (repentogon && !Filesystem::Exists(steamAppidPath.c_str())) {
-		Logger::Warn("Repentogon installation folder has no steam_appid.txt file, "
-			"creating one\n");
-		if (!srgon::CreateSteamAppIDFile(sourcePath)) {
+		Logger::Warn("Repentogon installation folder %s has no steam_appid.txt file, "
+			"creating one\n", _folderPath.c_str());
+		if (!srgon::CreateSteamAppIDFile(_folderPath)) {
 			Logger::Error("Unable to create steam_appid.txt in Repentogon folder\n");
 			return false;
 		}
