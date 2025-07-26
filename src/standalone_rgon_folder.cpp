@@ -1314,6 +1314,16 @@ namespace standalone_rgon {
                  * sit through copying those.
                  */
                 if (!relative.starts_with("tools/")) {
+                    /* Skip files that do not exist in the source Isaac folder.
+                     * If people want to run a broken Isaac installation, it's
+                     * on them, we cannot realistically handle such scenarios.
+                     */
+                    if (!Filesystem::Exists(sourceStr)) {
+                        Logger::Warn("standalone_rgon::CopyFiles: skipping %s as "
+                            "the source file does not exist", sourceStr);
+                        continue;
+                    }
+
                     fs::create_directories(destPath.parent_path());
                     fs::copy_file(sourcePath, destPath, fs::copy_options::overwrite_existing);
                     Logger::Info("standalone_rgon::CopyFiles: copied %s\n", destPath.string().c_str());
