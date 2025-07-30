@@ -60,6 +60,10 @@ bool Launcher::App::OnInit() {
 	_mainFrame = CreateMainWindow();
 	_mainFrame->EnableInterface(false);
 	_mainFrame->Show();
+	
+	wxIcon icon;
+	icon.CopyFromBitmap(wxBitmap(wxICON(IDI_ICON1)));
+	_mainFrame->SetIcon(icon);
 
 	if (!sCLI->SkipSelfUpdate()) {
 		HandleSelfUpdate(_mainFrame, false, false);

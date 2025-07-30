@@ -56,8 +56,10 @@ target_link_libraries (bspatch bzip2)
 target_include_directories (bspatch PRIVATE 
     "${CMAKE_SOURCE_DIR}/deps/bzip2")
 
+enable_language("RC")
+set (WIN32_RESOURCES ${CMAKE_SOURCE_DIR}/assets/icon.rc)
 file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h")
-add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES})
+add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES} ${WIN32_RESOURCES})
 target_compile_options (REPENTOGONLauncher PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
 target_include_directories (REPENTOGONLauncher PRIVATE 
     "${CMAKE_SOURCE_DIR}/deps/curl/include"

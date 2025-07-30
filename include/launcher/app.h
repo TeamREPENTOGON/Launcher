@@ -3,6 +3,8 @@
 #include "launcher/windows/launcher.h"
 #include "launcher/windows/repentogon_installer.h"
 
+#define IDI_ICON1                       101
+
 namespace Launcher {
 	class LauncherMainWindow;
 
