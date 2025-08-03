@@ -155,6 +155,7 @@ namespace Launcher {
 
 		wxStaticBoxSizer* _optionsSizer;
 		wxStaticBoxSizer* _configurationSizer;
+		wxSizer* _verticalSizer;
 		wxCheckBox* _console;
 		wxCheckBox* _updates;
 		wxCheckBox* _unstableRepentogon;

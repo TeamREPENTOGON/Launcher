@@ -153,7 +153,7 @@ namespace Launcher {
 		wxStaticBox* optionsBox = new wxStaticBox(this, -1, "Game configuration");
 		wxStaticBoxSizer* optionsSizer = new wxStaticBoxSizer(optionsBox, wxHORIZONTAL);
 
-		wxSizer* verticalSizer = new wxBoxSizer(wxVERTICAL);
+		_verticalSizer = new wxBoxSizer(wxVERTICAL);
 		wxTextCtrl* logWindow = _logWindow.Get();
 		logWindow->SetBackgroundColour(*wxWHITE);
 
@@ -161,10 +161,10 @@ namespace Launcher {
 		wxStaticBoxSizer* configurationSizer = new wxStaticBoxSizer(configurationBox, wxVERTICAL);
 
 		wxSizerFlags logFlags = wxSizerFlags().Expand().Proportion(5).Border(wxLEFT | wxRIGHT | wxTOP);
-		verticalSizer->Add(logWindow, logFlags);
+		_verticalSizer->Add(logWindow, logFlags);
 		logFlags.Proportion(0);
-		verticalSizer->Add(configurationSizer, logFlags);
-		verticalSizer->Add(optionsSizer, logFlags);
+		_verticalSizer->Add(configurationSizer, logFlags);
+		_verticalSizer->Add(optionsSizer, logFlags);
 
 		_configurationBox = configurationBox;
 		_configurationSizer = configurationSizer;
@@ -176,11 +176,7 @@ namespace Launcher {
 		AddVanillaOptions();
 		AddLaunchOptions();
 
-		_advancedOptionsButton = new wxButton(this, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
-		wxSizerFlags advancedOptionsFlags = wxSizerFlags().Right();
-		verticalSizer->Add(_advancedOptionsButton, advancedOptionsFlags);
-
-		SetSizerAndFit(verticalSizer);
+		SetSizerAndFit(_verticalSizer);
 
 		SetBackgroundColour(wxColour(237, 237, 237));
 	}
@@ -191,8 +187,8 @@ namespace Launcher {
 
 	void LauncherMainWindow::AddLauncherConfigurationOptions() {
 		wxBoxSizer* isaacSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
-		AddLauncherConfigurationTextField("Indicate the path of the Isaac executable file",
-			"Select Isaac executable...", NoIsaacText,
+		AddLauncherConfigurationTextField("Isaac executable", 
+			"Choose exe", NoIsaacText,
 			NoIsaacColor, isaacSelectionSizer, &_isaacFileText, WINDOW_BUTTON_SELECT_ISAAC);
 
 		_configurationSizer->Add(isaacSelectionSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
@@ -208,7 +204,7 @@ namespace Launcher {
 
 		_hideWindow = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_HIDE_WINDOW,
 			"Hide launcher window while the game is running");
-		_configurationSizer->Add(_hideWindow, 0, wxLEFT | wxRIGHT | wxTOP, 5);
+		_verticalSizer->Add(_hideWindow, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 	}
 
 	void LauncherMainWindow::AddLaunchOptions() {
@@ -225,14 +221,16 @@ namespace Launcher {
 
 		box->Add(_launchMode);
 
-		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 5);
+		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 0);
 
-		_launchButton = new wxButton(launchModeBox, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game");
-		launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
+		_launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game", wxDefaultPosition,wxSize(50,50));
+		//launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
-		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxBOTTOM, 5);
+		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxBOTTOM, 0);
 
 		_optionsSizer->Add(launchModeBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+		_verticalSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
+		_verticalSizer->AddSpacer(10);
 	}
 
 	void LauncherMainWindow::AddRepentogonOptions() {
@@ -248,6 +246,10 @@ namespace Launcher {
 		wxCheckBox* unstable = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, "Upgrade to unstable versions");
 		unstable->SetValue(false);
 
+		_advancedOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
+		wxSizerFlags advancedOptionsFlags = wxSizerFlags().Right();
+
+
 		_updates = updates;
 		_console = console;
 		_unstableRepentogon = unstable;
@@ -255,6 +257,7 @@ namespace Launcher {
 		repentogonBoxSizer->Add(console, 0, wxTOP | wxLEFT | wxRIGHT, 5);
 		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxRIGHT, 5);
 		repentogonBoxSizer->Add(unstable, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
+		repentogonBoxSizer->Add(_advancedOptionsButton, 0, wxCENTER | wxBOTTOM, 5);
 
 		_repentogonOptions = repentogonBox;
 		_optionsSizer->Add(repentogonBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
@@ -851,9 +854,8 @@ namespace Launcher {
 	void LauncherMainWindow::AddLauncherConfigurationTextField(const char* intro,
 		const char* buttonText, const char* emptyText, wxColour const& emptyColor,
 		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
-		sizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxRIGHT, 5);
+		sizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxRIGHT, 51);
 		wxButton* isaacSelectionButton = new wxButton(_configurationBox, windowId, buttonText);
-		sizer->Add(isaacSelectionButton, 0, wxRIGHT, 5);
 		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1), wxTE_READONLY | wxTE_RICH);
 		textCtrl->SetBackgroundColour(*wxWHITE);
 
@@ -864,6 +866,8 @@ namespace Launcher {
 
 		wxSizerFlags flags = wxSizerFlags().Expand().Proportion(1);
 		sizer->Add(textCtrl, flags);
+
+		sizer->Add(isaacSelectionButton, 0, wxRIGHT, 5);
 
 		if (result) {
 			*result = textCtrl;
