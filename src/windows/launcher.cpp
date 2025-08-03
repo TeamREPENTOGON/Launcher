@@ -204,7 +204,7 @@ namespace Launcher {
 
 		_hideWindow = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_HIDE_WINDOW,
 			"Hide launcher window while the game is running");
-		_verticalSizer->Add(_hideWindow, 0, wxLEFT | wxRIGHT | wxTOP, 5);
+		_configurationSizer->Add(_hideWindow, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 	}
 
 	void LauncherMainWindow::AddLaunchOptions() {
