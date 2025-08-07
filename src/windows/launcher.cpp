@@ -45,6 +45,7 @@
 #ifdef min
 #undef min
 #endif
+#include <launcher/modmanager.h>
 
 wxBEGIN_EVENT_TABLE(Launcher::LauncherMainWindow, wxFrame)
 EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::LauncherMainWindow::OnLevelSelect)
@@ -60,6 +61,7 @@ EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::LauncherMainWindow::
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::LauncherMainWindow::OnIsaacSelectClick)
 // EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::LauncherMainWindow::OnSelectRepentogonFolderClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_OPTIONS, Launcher::LauncherMainWindow::OnAdvancedOptionsClick)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_MODMAN_BUTTON, Launcher::LauncherMainWindow::OnModManagerButtonPressed)
 wxEND_EVENT_TABLE()
 
 int chained_future_f(int a) {
@@ -154,6 +156,7 @@ namespace Launcher {
 		wxStaticBoxSizer* optionsSizer = new wxStaticBoxSizer(optionsBox, wxHORIZONTAL);
 
 		_verticalSizer = new wxBoxSizer(wxVERTICAL);
+		
 		wxTextCtrl* logWindow = _logWindow.Get();
 		logWindow->SetBackgroundColour(*wxWHITE);
 
@@ -174,11 +177,18 @@ namespace Launcher {
 		AddLauncherConfigurationOptions();
 		AddRepentogonOptions();
 		AddVanillaOptions();
+
+		_launchnmoddingSizer = new wxBoxSizer(wxVERTICAL);
+
 		AddLaunchOptions();
+		AddModdingOptions();
+
+		_optionsSizer->Add(_launchnmoddingSizer, 0, wxALL, 0);
 
 		SetSizerAndFit(_verticalSizer);
 
 		SetBackgroundColour(wxColour(237, 237, 237));
+
 	}
 
 	LauncherMainWindow::~LauncherMainWindow() {
@@ -228,9 +238,18 @@ namespace Launcher {
 
 		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxBOTTOM, 0);
 
-		_optionsSizer->Add(launchModeBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+		_launchnmoddingSizer->Add(launchModeBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 0);
 		_verticalSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
-		_verticalSizer->AddSpacer(10);
+		_launchnmoddingSizer->AddSpacer(10);
+	}
+
+	void LauncherMainWindow::AddModdingOptions() {
+		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "Modding Options");
+		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxVERTICAL);
+
+		wxButton* modman = new wxButton(repentogonBox, WINDOW_BUTTON_MODMAN_BUTTON, "Open Mod Manager", wxDefaultPosition, wxSize(200, 30));
+		repentogonBoxSizer->Add(modman, 0, wxCENTER | wxBOTTOM, 5);
+		_launchnmoddingSizer->Add(repentogonBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 0);
 	}
 
 	void LauncherMainWindow::AddRepentogonOptions() {
@@ -303,6 +322,11 @@ namespace Launcher {
 		std::string path = dialog.GetPath().ToStdString();
 		OnFileSelected(path, NoRepentogonInstallationFolderColor, _repentogonInstallFolderText, NoRepentogonInstallationFolderText);
 	} */
+
+	void LauncherMainWindow::OnModManagerButtonPressed(wxCommandEvent&) {
+		ModManagerFrame* modWindow = new ModManagerFrame(this,_installation);
+		modWindow->Show();
+	}
 
 	void LauncherMainWindow::OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl,
 		const char* emptyText) {

@@ -19,3 +19,6 @@
 [submodule "deps/chained_futures"]
 	path = deps/chained_futures
 	url = https://github.com/Sylmir/chained_futures.git
+[submodule "deps/rapidxml"]
+	path = deps/rapidxml
+	url = https://github.com/discord/rapidxml/

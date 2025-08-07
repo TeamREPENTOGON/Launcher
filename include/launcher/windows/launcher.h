@@ -33,7 +33,8 @@ namespace Launcher {
 		WINDOW_BUTTON_LAUNCH_BUTTON,
 		WINDOW_BUTTON_SELECT_ISAAC,
 		WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER,
-		WINDOW_BUTTON_ADVANCED_OPTIONS
+		WINDOW_BUTTON_ADVANCED_OPTIONS,
+		WINDOW_BUTTON_MODMAN_BUTTON
 	};
 
 	class AdvancedOptionsWindow;
@@ -91,6 +92,7 @@ namespace Launcher {
 		void AddLaunchOptions();
 		void AddRepentogonOptions();
 		void AddVanillaOptions();
+		void AddModdingOptions();
 
 		void AddLauncherConfigurationTextField(const char* intro,
 			const char* buttonText, const char* emptyText, wxColour const& emptyColor,
@@ -117,6 +119,8 @@ namespace Launcher {
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
 
 		void OnRepentogonUnstableStateSwitched();
+
+		void OnModManagerButtonPressed(wxCommandEvent& event);
 
 		void OnForceUpdateCompleted(std::shared_ptr<RepentogonInstallerFrame> ptr);
 
@@ -156,6 +160,7 @@ namespace Launcher {
 		wxStaticBoxSizer* _optionsSizer;
 		wxStaticBoxSizer* _configurationSizer;
 		wxSizer* _verticalSizer;
+		wxSizer* _launchnmoddingSizer;
 		wxCheckBox* _console;
 		wxCheckBox* _updates;
 		wxCheckBox* _unstableRepentogon;
