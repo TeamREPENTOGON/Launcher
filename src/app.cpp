@@ -181,7 +181,7 @@ bool Launcher::App::OnInit() {
 		_mainFrame->SetFocus();
 		_mainFrame->EnableInterface(true);
 	}
-
+	wxInitAllImageHandlers(); //needed for stupid modman thumb shit (dunno if it belongs here, but it felt nice to shove it here)
 	return true;
 }
 
