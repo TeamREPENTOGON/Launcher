@@ -66,10 +66,14 @@ namespace Updater {
 		};
 
 		std::chrono::steady_clock::time_point lastReceived = std::chrono::steady_clock::now();
+		bool anyEmpty = false;
 		while (updateData->_hashDownloadDesc->result.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready ||
 			updateData->_zipDownloadDesc->result.wait_for(std::chrono::milliseconds(1)) != std::future_status::ready) {
+			anyEmpty = false;
 			for (auto s = monitorAndName; s->monitor; ++s) {
-				while (std::optional<curl::DownloadNotification> message = s->monitor->Get()) {
+				bool timedout = false;
+				std::optional<curl::DownloadNotification> message;
+				while (message = s->monitor->Get(&timedout)) {
 					switch (message->type) {
 					case curl::DOWNLOAD_INIT_CURL:
 						_gui->Log("", true, "[%s] Initializing cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
@@ -108,6 +112,14 @@ namespace Updater {
 						break;
 					}
 				}
+
+				if (!message && !timedout) {
+					anyEmpty = true;
+				}
+			}
+
+			if (anyEmpty) {
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
 			}
 		}
 

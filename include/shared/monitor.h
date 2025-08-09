@@ -16,10 +16,13 @@ namespace Threading {
 			_timeout.store(100, std::memory_order_relaxed);
 		}
 
-		std::optional<T> Get() {
+		std::optional<T> Get(bool* timedout) {
 			std::unique_lock<std::timed_mutex> lck(_mutex, std::defer_lock);
 			bool locked = lck.try_lock_for(std::chrono::milliseconds(_timeout.load(std::memory_order_acquire)));
 			if (!locked || _queue.empty()) {
+				if (timedout) {
+					*timedout = !locked;
+				}
 				return std::nullopt;
 			}
 

@@ -187,10 +187,15 @@ void RepentogonInstallerHelper::InstallerThread() {
 			shouldContinue = false;
 		}
 
-		while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get()) {
+		bool timedout = false;
+		while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get(&timedout)) {
 			// Sub-efficient, but less likely to cause a cancellation request to be missed
 			std::unique_lock<std::mutex> lck(_logWindowMutex);
 			std::visit(visitor, notification->_data);
+		}
+
+		if (!timedout) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		}
 	}
 
@@ -204,7 +209,7 @@ void RepentogonInstallerHelper::InstallerThread() {
 			return;
 		}
 
-		while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get()) {
+		while (std::optional<Launcher::RepentogonInstallationNotification> notification = monitor->Get(nullptr)) {
 			// Sub-efficient, but less likely to cause a cancellation request to be missed
 			std::unique_lock<std::mutex> windowLck(_logWindowMutex);
 			std::visit(visitor, notification->_data);

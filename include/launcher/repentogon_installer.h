@@ -247,7 +247,9 @@ namespace Launcher {
 					return std::nullopt;
 				}
 
-				while (std::optional<curl::DownloadNotification> message = monitor->Get()) {
+				bool timedout = false;
+				std::optional<curl::DownloadNotification> message;
+				while (message = monitor->Get(&timedout)) {
 					if (CancelRequested()) {
 						return std::nullopt;
 					}
@@ -281,6 +283,10 @@ namespace Launcher {
 						PushNotification(true, "[RepentogonUpdater] Unexpected asynchronous notification (id = %d)", message->type);
 						break;
 					}
+				}
+
+				if (!message && !timedout) {
+					std::this_thread::sleep_for(std::chrono::milliseconds(100));
 				}
 			}
 

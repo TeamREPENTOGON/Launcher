@@ -56,7 +56,7 @@ void OnRichTextUrlClick(wxTextUrlEvent& event)
 
 
 void ModManagerFrame::OnHover(wxMouseEvent& event) {
-    static wxString lastTip; 
+    static wxString lastTip;
     int x = event.GetX();
     int y = event.GetY();
 
@@ -150,10 +150,10 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     rightBox->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_ENABLEALL, "Enable All"), 0, wxEXPAND | wxALL, 5);
 
     wxBoxSizer* centerButtons = new wxBoxSizer(wxVERTICAL);
-    
+
     centerButtons->Add(new wxStaticText(panel, wxID_ANY, "<"), 0, wxALIGN_CENTER); //just for the looks, lol, they feel pointless as buttons
     centerButtons->Add(new wxStaticText(panel, wxID_ANY, ">"), 0, wxALIGN_CENTER); //just for the looks, lol, they feel pointless as buttons
-    
+
 
     listSizer->Add(leftBox, 1, wxEXPAND);
     listSizer->Add(centerButtons, 0, wxALIGN_CENTER | wxALL, 10);
@@ -176,7 +176,7 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     topSizer->Add(leftPanel, 0, wxEXPAND | wxALL, 5);
 
     wxStaticLine* line = new wxStaticLine(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxLI_VERTICAL);
-    topSizer->Add(line, 0, wxEXPAND | wxTOP | wxBOTTOM, 5); 
+    topSizer->Add(line, 0, wxEXPAND | wxTOP | wxBOTTOM, 5);
 
     topSizer->Add(rightPanel, 1, wxEXPAND | wxALL, 5);
 
@@ -435,7 +435,7 @@ bool HasAnm2File(fs::path path)
     for (const auto& entry : fs::recursive_directory_iterator(folder))
     {
         if (entry.is_regular_file() && entry.path().extension() == ".anm2")
-            return true; 
+            return true;
     }
     return false;
 }
@@ -449,7 +449,7 @@ bool HasPNGFile(fs::path path)
     for (const auto& entry : fs::recursive_directory_iterator(folder))
     {
         if (entry.is_regular_file() && entry.path().extension() == ".png")
-            return true; 
+            return true;
     }
     return false;
 }
@@ -535,7 +535,7 @@ void ModManagerFrame::LoadModExtraData() {
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
 
-    if (selectedMod->extradata.Items > 0) { 
+    if (selectedMod->extradata.Items > 0) {
         style.SetBackgroundColour(wxColor(82, 235, 5)); //barf green
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Items>"));
@@ -646,7 +646,7 @@ void ParseBBCode(wxRichTextCtrl* field, const std::string& bbcode) {
         }
 
         size_t tag_end = bbcode.find(']', tag_start);
-        if (tag_end == std::string::npos) break; 
+        if (tag_end == std::string::npos) break;
 
         std::string tag = bbcode.substr(tag_start + 1, tag_end - tag_start - 1);
 

@@ -31,10 +31,15 @@ void GithubExecutor::Start() {
 }
 
 void GithubExecutor::Run() {
+    bool timedout = false;
     while (!_stop.load(std::memory_order_acquire)) {
-        std::optional<GithubRequest> request = _requests.Get();
-        if (!request)
+        std::optional<GithubRequest> request = _requests.Get(&timedout);
+        if (!request) {
+            if (!timedout) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
             continue;
+        }
 
         std::visit(GithubRequestVisitor(), *request);
     }
