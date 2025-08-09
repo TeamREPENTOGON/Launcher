@@ -13,31 +13,33 @@
 namespace fs = std::filesystem;
 
 struct ModExtraData {
-    bool lua;
-    bool anm2;
-    bool sprites;
+    bool lua = false;
+    bool anm2 = false;
+    bool sprites = false;
 
-    int Items;
-    int Trinkets;
-    int Characters;
-    int Music;
-    int Sounds;
-    int Challenges;
-    int ItemPools;
-    int Cards;
-    int Pills;
-    int Shaders;    
+    bool Items = false;
+    bool Trinkets = false;
+    bool Characters = false;
+    bool Music = false;
+    bool Sounds = false;
+    bool Challenges = false;
+    bool ItemPools = false;
+    bool Cards = false;
+    bool Pills = false;
+    bool Shaders = false;
 
-    bool resourceItems;
-    bool resourceTrinkets;
-    bool resourceCharacters;
-    bool resourceMusic;
-    bool resourceSounds;
-    bool resourceChallenges;
-    bool resourceItemPools;
-    bool resourceCards;
-    bool resourcePills;
-    bool resourceShaders;
+    bool resourceItems = false;
+    bool resourceTrinkets = false;
+    bool resourceCharacters = false;
+    bool resourceMusic = false;
+    bool resourceSounds = false;
+    bool resourceChallenges = false;
+    bool resourceItemPools = false;
+    bool resourceCards = false;
+    bool resourcePills = false;
+    bool resourceShaders = false;
+
+    bool resourceMinor = false;
 
     bool dataset = false;
 };
