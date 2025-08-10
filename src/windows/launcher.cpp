@@ -304,6 +304,7 @@ namespace Launcher {
 				);
 				_luaDebug->SetValue(res == wxYES);
 			}
+			event.Skip();
 		});
 
 		vanillaBoxSizer->Add(_luaDebug, 0, wxLEFT | wxRIGHT, 5);
