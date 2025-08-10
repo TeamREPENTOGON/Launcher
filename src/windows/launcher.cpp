@@ -205,11 +205,11 @@ namespace Launcher {
 		// _configurationSizer->Add(new wxStaticLine(), 0, wxTOP | wxBOTTOM, 5);
 
 		wxBoxSizer* repentogonExeSizer = new wxBoxSizer(wxHORIZONTAL);
-		wxStaticText* repentogonExeText = new wxStaticText(_configurationBox, wxID_ANY, "Repentogon executable");
+		wxStaticText* repentogonExeText = new wxStaticText(_configurationBox, wxID_ANY, "Repentogon executable",wxDefaultPosition ,wxSize(150,20));
 		_repentogonFileText = new wxTextCtrl(_configurationBox, wxID_ANY, "", wxDefaultPosition,
 			wxDefaultSize, wxTE_READONLY);
 		repentogonExeSizer->Add(repentogonExeText);
-		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Expand().Border(wxLEFT | wxRIGHT));
+		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Expand().Border( wxRIGHT));
 		_configurationSizer->Add(repentogonExeSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
 		_hideWindow = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_HIDE_WINDOW,
@@ -878,9 +878,9 @@ namespace Launcher {
 	void LauncherMainWindow::AddLauncherConfigurationTextField(const char* intro,
 		const char* buttonText, const char* emptyText, wxColour const& emptyColor,
 		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
-		sizer->Add(new wxStaticText(_configurationBox, -1, intro), 0, wxRIGHT, 51);
+		sizer->Add(new wxStaticText(_configurationBox, -1, intro, wxDefaultPosition, wxSize(150, 20)));
 		wxButton* isaacSelectionButton = new wxButton(_configurationBox, windowId, buttonText);
-		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1), wxTE_READONLY | wxTE_RICH);
+		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY | wxTE_RICH);
 		textCtrl->SetBackgroundColour(*wxWHITE);
 
 		wxTextAttr textAttr = textCtrl->GetDefaultStyle();
