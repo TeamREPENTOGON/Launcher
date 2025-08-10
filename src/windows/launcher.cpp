@@ -293,6 +293,19 @@ namespace Launcher {
 
 		vanillaBoxSizer->Add(levelSelectSizer, 0, wxTOP | wxLEFT | wxRIGHT, 5);
 		_luaDebug = new wxCheckBox(vanillaBox, WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe)");
+		_luaDebug->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
+			if (_luaDebug->IsChecked()) {
+				_luaDebug->SetValue(false);
+				int res = wxMessageBox(
+					"By enabling this, you give all your auto-updating workshop mods FULL UNRESTRICTED ACCESS TO YOUR COMPUTER!!, they can delete files, encrypt your harddrive, minebitcoins, send out your login tokens, you name it...\nAre you sure you want to enable it?",
+					"Enable luadebug",
+					wxYES_NO | wxNO_DEFAULT | wxICON_WARNING,
+					this
+				);
+				_luaDebug->SetValue(res == wxYES);
+			}
+		});
+
 		vanillaBoxSizer->Add(_luaDebug, 0, wxLEFT | wxRIGHT, 5);
 		vanillaBoxSizer->Add(new wxStaticLine(vanillaBox), 0, wxTOP | wxBOTTOM, 5);
 
