@@ -498,6 +498,8 @@ bool HasXMLFile(fs::path folder)
 
 void ModManagerFrame::LoadModExtraData() {
     extraInfoCtrl->SetValue("Adds nothing?");
+    extraInfoCtrl->SetDefaultStyle(wxTextAttr());
+    extraInfoCtrl->EndURL(); //no fucking clue why, but theres some oddity where clicking a link leaves this shit open somewhere in wxwidgets internal code?
     if (!selectedMod->extradata.dataset) {
         selectedMod->extradata.dataset = true;
 
