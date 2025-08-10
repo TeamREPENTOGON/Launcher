@@ -522,7 +522,7 @@ void ModManagerFrame::LoadModExtraData() {
             selectedMod->extradata.Cards        = selectedMod->extradata.Cards      || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "pocketitems.xml"), "pocketitems","card");
             selectedMod->extradata.Pills        = selectedMod->extradata.Pills      || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "pocketitems.xml"), "pocketitems","pill");
         }
-        selectedMod->extradata.lua = fs::exists(fs::path(_modspath / selectedMod->folderName));
+        selectedMod->extradata.lua = fs::exists(fs::path(_modspath / selectedMod->folderName / "main.lua"));
         
         checks = 0;
         if (fs::exists(fs::path(_modspath / selectedMod->folderName / "resources-dlc3"))) {
