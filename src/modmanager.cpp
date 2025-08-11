@@ -837,7 +837,7 @@ void ModManagerFrame::OnSelectMod(wxCommandEvent& evt) {
                     if (DownloadThumbFromID(id, imagePath.string())) {
                         try {
                         wxImage img;
-                        if (img.LoadFile(imagePath.string(), wxBITMAP_TYPE_ANY) && img.IsOk()) {
+                        if (LoadImageQuietly(imagePath.string(), img)) {
                             img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
                             this->CallAfter([this, bmp = wxBitmap(img), idx = id] {
                                 if (selectedMod->id == idx) { //so it doesnt get replaced if the mod changes while other thumbs are loading

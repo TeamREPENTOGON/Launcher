@@ -297,7 +297,7 @@ namespace Launcher {
 			if (_luaDebug->IsChecked()) {
 				_luaDebug->SetValue(false);
 				int res = wxMessageBox(
-					"By enabling this, you give all your auto-updating workshop mods FULL UNRESTRICTED ACCESS TO YOUR COMPUTER!!, they can delete files, encrypt your harddrive, minebitcoins, send out your login tokens, you name it...\nAre you sure you want to enable it?",
+					"By enabling this, you give all your auto-updating workshop mods FULL UNRESTRICTED ACCESS TO YOUR COMPUTER!!, they can delete files, encrypt your harddrive, mine bitcoins, send out your login tokens, you name it...\nAre you sure you want to enable it?",
 					"Enable luadebug",
 					wxYES_NO | wxNO_DEFAULT | wxICON_WARNING,
 					this
