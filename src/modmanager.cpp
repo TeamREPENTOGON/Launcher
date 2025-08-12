@@ -384,7 +384,6 @@ bool DownloadThumbFromID(const std::string& itemId, const std::string& filePath)
         long response_code = 0;
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
         if (response_code != 200) {
-            // Failed — close and delete the file
             fclose(fp);
             remove(filePath.c_str());
             return false;
@@ -396,6 +395,7 @@ bool DownloadThumbFromID(const std::string& itemId, const std::string& filePath)
         return false;
     }
 
+    fclose(fp);
     return res == CURLE_OK;
 }
 
@@ -822,7 +822,7 @@ void ModManagerFrame::OnSelectMod(wxCommandEvent& evt) {
             if (fs::exists(imagePath) && fs::file_size(imagePath) > 0) {
                 wxImage img;
                 if (LoadImageQuietly(imagePath.string(), img)) {
-                    img.Rescale(200, 200, wxIMAGE_QUALITY_NEAREST);
+                    img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
                     thumbnailCtrl->SetBitmap(wxBitmap(img));
                 }
                 else {
