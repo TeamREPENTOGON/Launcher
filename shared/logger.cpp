@@ -14,8 +14,8 @@ void Logger::Init(const char* filename, bool append) {
 	if (!_file) {
 		_file = fopen(filename, append ? "a" : "w");
 		if (!_file) {
-			MessageBoxA(NULL, "Error",
-				"Unable to create log file launcher.log\nExtra log information will not be available",
+			MessageBoxA(NULL, "Unable to create log file launcher.log\nExtra log information will not be available",
+				"Error",
 				MB_OK | MB_ICONASTERISK | MB_TASKMODAL);
 		}
 	}
