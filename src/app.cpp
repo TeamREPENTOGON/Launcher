@@ -11,6 +11,7 @@
 #include "shared/logger.h"
 #include "shared/loggable_gui.h"
 #include "launcher/windows/repentogon_installer.h"
+#include <filesystem>
 
 static LauncherConfiguration __configuration;
 static Launcher::Installation* __installation;
@@ -47,7 +48,15 @@ Launcher::LauncherMainWindow* Launcher::App::CreateMainWindow() {
 	return frame;
 }
 
+void SetWorkingDirToExe() {//stupid shit to make menu shortcuts work
+	char exePath[MAX_PATH];
+	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+	SetCurrentDirectoryA(exeDir.string().c_str());
+}
+
 bool Launcher::App::OnInit() {
+	SetWorkingDirToExe();
 	Logger::Init("launcher.log", "w");
 	Externals::Init();
 
