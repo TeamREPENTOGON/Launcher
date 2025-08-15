@@ -138,13 +138,13 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     selectedModTitle->Wrap(850);
     descnextra->Add(selectedModTitle, 0, wxLEFT | wxTOP, 5);
     //descnextra->Add(new wxStaticText(panel, wxEXPAND | wxALL, "Description"), 0, wxTOP | wxLEFT, 5);
-    descriptionCtrl = new wxRichTextCtrl(panel, wxID_ANY, "(No Mod Selected, that means no description to show!)", wxDefaultPosition, FromDIP(wxSize(1850, 160)), wxEXPAND | wxTE_MULTILINE | wxTE_READONLY | wxTE_AUTO_URL);
+    descriptionCtrl = new wxRichTextCtrl(panel, wxID_ANY, "(No Mod Selected, that means no description to show!)", wxDefaultPosition, wxSize(850, 200), wxTE_MULTILINE | wxTE_READONLY | wxTE_AUTO_URL);
     descriptionCtrl->Bind(wxEVT_TEXT_URL, &OnRichTextUrlClick);
 
     descnextra->Add(descriptionCtrl, 0, wxEXPAND | wxALL, 5);
 
     descnextra->Add(new wxStaticText(panel, wxID_ANY, "Mod Contents:"), 0, wxLEFT, 5);
-    extraInfoCtrl = new wxRichTextCtrl(panel, wxEXPAND | wxALL, "Extra info", wxDefaultPosition, FromDIP(wxSize(1850, 50)), wxEXPAND | wxTE_MULTILINE | wxTE_READONLY);
+    extraInfoCtrl = new wxRichTextCtrl(panel, wxEXPAND | wxALL, "Extra info", wxDefaultPosition, wxSize(850, 50), wxTE_MULTILINE | wxTE_READONLY);
     extraInfoCtrl->Bind(wxEVT_MOTION, &ModManagerFrame::OnHover, this);
 
     descnextra->Add(extraInfoCtrl, 0, wxEXPAND | wxALL, 5);
@@ -158,8 +158,8 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     _modspath = originalPath.parent_path() / "mods";
 
 
-    _enabledlist = new wxListBox(panel, WINDOW_LIST_MODMAN_ENABLED, wxDefaultPosition, FromDIP(wxSize(200, 200)), 0, nullptr, wxLB_SINGLE | wxLB_SORT);
-    _disabledlist = new wxListBox(panel, WINDOW_LIST_MODMAN_DISABLED, wxDefaultPosition, FromDIP(wxSize(200, 200)), 0, nullptr, wxLB_SINGLE | wxLB_SORT);
+    _enabledlist = new wxListBox(panel, WINDOW_LIST_MODMAN_ENABLED, wxDefaultPosition, wxSize(200, 200), 0, nullptr, wxLB_SINGLE | wxLB_SORT);
+    _disabledlist = new wxListBox(panel, WINDOW_LIST_MODMAN_DISABLED, wxDefaultPosition, wxSize(200, 200), 0, nullptr, wxLB_SINGLE | wxLB_SORT);
 
     wxBoxSizer* leftBox = new wxBoxSizer(wxVERTICAL);
     leftBox->Add(new wxStaticText(panel, wxID_ANY, "[Enabled Mods]"), 0, wxALIGN_CENTER | wxBOLD);

@@ -205,7 +205,7 @@ namespace Launcher {
 		// _configurationSizer->Add(new wxStaticLine(), 0, wxTOP | wxBOTTOM, 5);
 
 		wxBoxSizer* repentogonExeSizer = new wxBoxSizer(wxHORIZONTAL);
-		wxStaticText* repentogonExeText = new wxStaticText(_configurationBox, wxID_ANY, "Repentogon executable",wxDefaultPosition , FromDIP(wxSize(125, 15)));
+		wxStaticText* repentogonExeText = new wxStaticText(_configurationBox, wxID_ANY, "Repentogon executable",wxDefaultPosition ,wxSize(150,20));
 		_repentogonFileText = new wxTextCtrl(_configurationBox, wxID_ANY, "", wxDefaultPosition,
 			wxDefaultSize, wxTE_READONLY);
 		repentogonExeSizer->Add(repentogonExeText);
@@ -233,7 +233,7 @@ namespace Launcher {
 
 		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 0);
 
-		_launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game", wxDefaultPosition, FromDIP(wxSize(50,50)));
+		_launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game", wxDefaultPosition,wxSize(50,50));
 		//launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
 		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxBOTTOM, 0);
@@ -247,7 +247,7 @@ namespace Launcher {
 		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "Modding Options");
 		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxVERTICAL);
 
-		wxButton* modman = new wxButton(repentogonBox, WINDOW_BUTTON_MODMAN_BUTTON, "Open Mod Manager", wxDefaultPosition, FromDIP(wxSize(166, 30)));
+		wxButton* modman = new wxButton(repentogonBox, WINDOW_BUTTON_MODMAN_BUTTON, "Open Mod Manager", wxDefaultPosition, wxSize(200, 30));
 		repentogonBoxSizer->Add(modman, 0, wxCENTER | wxBOTTOM, 5);
 		_launchnmoddingSizer->Add(repentogonBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 0);
 	}
@@ -892,7 +892,7 @@ namespace Launcher {
 	void LauncherMainWindow::AddLauncherConfigurationTextField(const char* intro,
 		const char* buttonText, const char* emptyText, wxColour const& emptyColor,
 		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
-		sizer->Add(new wxStaticText(_configurationBox, -1, intro, wxDefaultPosition, FromDIP(wxSize(125, 15))));
+		sizer->Add(new wxStaticText(_configurationBox, -1, intro, wxDefaultPosition, wxSize(150, 20)));
 		wxButton* isaacSelectionButton = new wxButton(_configurationBox, windowId, buttonText);
 		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY | wxTE_RICH);
 		textCtrl->SetBackgroundColour(*wxWHITE);

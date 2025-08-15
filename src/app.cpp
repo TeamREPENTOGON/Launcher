@@ -57,9 +57,6 @@ void SetWorkingDirToExe() {//stupid shit to make menu shortcuts work
 
 bool Launcher::App::OnInit() {
 	SetWorkingDirToExe();
-	#ifdef __WXMSW__
-		SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-	#endif
 	Logger::Init("launcher.log", "w");
 	Externals::Init();
 
