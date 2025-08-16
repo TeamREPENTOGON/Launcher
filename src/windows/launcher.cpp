@@ -360,12 +360,12 @@ namespace Launcher {
 		wxString string = box->GetValue();
 		std::cmatch match;
 		const char* text = string.c_str().AsChar();
-		if (std::regex_search(text, match, std::basic_regex("([0-9])\\.([0-9])"))) {
-			int stage = std::stoi(match[1].str(), NULL, 0);
-			int type = std::stoi(match[2].str(), NULL, 0);
+		if (std::regex_search(text, match, std::basic_regex("([0-9]+)\\.([0-9]+)"))) {
+			int stage = std::stoi(match[1].str());
+			int type = std::stoi(match[2].str());
 			_configuration->Stage(stage);
 			_configuration->StageType(type);
-		} else if (!strcmp(text, "--")) {
+		} else {
 			_configuration->Stage(0);
 			_configuration->StageType(0);
 		}
@@ -454,12 +454,16 @@ namespace Launcher {
 		}
 		_logWindow.Log("\tVanilla:");
 		if (_configuration->Stage()) {
-			_logWindow.Log("\t\tStarting stage: %d.%d", _configuration->Stage(), _configuration->StageType());
+			_logWindow.Log("\t\tStarting stage: %d.%d", *_configuration->Stage(), _configuration->StageType().value_or(0));
 		} else {
 			_logWindow.Log("\t\tStarting stage: not selected");
 		}
 		_logWindow.Log("\t\tLua debug: %s", _configuration->LuaDebug() ? "yes" : "no");
-		_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize().c_str());
+		if (_configuration->LuaHeapSize()) {
+			_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize()->c_str());
+		} else {
+			_logWindow.Log("\t\tLua heap size: not set");
+		}
 
 		_configuration->Write();
 
@@ -651,24 +655,12 @@ namespace Launcher {
 		wxComboBox* box = new wxComboBox(window, WINDOW_COMBOBOX_LEVEL, "Start level");
 
 		int pos = 0;
-		box->Insert(wxString("--"), pos++);
-		box->SetValue("--");
-		int variant = 0;
-		const char** name = &(IsaacInterface::levelNames[0]);
-		while (*name) {
-			wxString s;
-			int level = 1 + 2 * (variant / 5);
-			box->Insert(s.Format("%s I (%d.%d)", *name, level, variant % 5), pos++, (void*)nullptr);
-			box->Insert(s.Format("%s II (%d.%d)", *name, level + 1, variant % 5), pos++, (void*)nullptr);
 
-			++variant;
-			++name;
-		}
+		box->Insert("--", pos++);
+		box->SetSelection(0);
 
-		name = &(IsaacInterface::uniqueLevelNames[0]);
-		while (*name) {
-			box->Insert(wxString(*name), pos++, (void*)nullptr);
-			++name;
+		for (const IsaacInterface::Stage& stage : IsaacInterface::stages) {
+			box->Insert(wxString().Format("%s (%d.%d)", stage.name, stage.level, stage.type), pos++, (void*)nullptr);
 		}
 
 		return box;
@@ -691,7 +683,7 @@ namespace Launcher {
 			}
 		}
 
-		std::string luaHeapSize = _configuration->LuaHeapSize();
+		std::string luaHeapSize = _configuration->LuaHeapSize().value_or("");
 		if (!luaHeapSize.empty()) {
 			(void)std::remove_if(luaHeapSize.begin(), luaHeapSize.end(), [](char c) -> bool { return std::isspace(c); });
 			std::regex r("([0-9]+)([KMG]?)");
@@ -707,7 +699,8 @@ namespace Launcher {
 			}
 		}
 
-		int levelStage = _configuration->Stage();
+		// Validate LevelStage
+		int levelStage = _configuration->Stage().value_or(IsaacInterface::STAGE_NULL);
 		if (levelStage < IsaacInterface::STAGE_NULL || levelStage > IsaacInterface::STAGE8) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default",
 				levelStage, c::Keys::levelStage.c_str());
@@ -715,37 +708,20 @@ namespace Launcher {
 			_configuration->StageType(c::Defaults::stageType);
 		}
 
-		int stageType = _configuration->StageType();
+		// Validate StageType
+		int stageType = _configuration->StageType().value_or(IsaacInterface::STAGETYPE_ORIGINAL);
 		if (stageType < IsaacInterface::STAGETYPE_ORIGINAL || stageType > IsaacInterface::STAGETYPE_REPENTANCE_B) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default",
 				stageType, c::Keys::stageType.c_str());
 			_configuration->StageType(c::Defaults::stageType);
 		}
 
-		if (stageType == IsaacInterface::STAGETYPE_GREEDMODE) {
-			_logWindow.LogWarn("Value 3 (Greed mode) for %s field in configuration file is deprecated since Repentance."
-				"Overriding with default", c::Keys::stageType.c_str());
+		// Validate the combination of LevelStage+StageType
+		if (levelStage > IsaacInterface::STAGE_NULL && !IsaacInterface::IsValidStage(levelStage, stageType)) {
+			_logWindow.LogWarn("Invalid value %d for %s field associated with value %d "
+				"for %s field in configuration file. Overriding with default", stageType, c::Keys::stageType.c_str(),
+				levelStage, c::Keys::levelStage.c_str());
 			_configuration->StageType(c::Defaults::stageType);
-		}
-
-		// Validate stage type for Chapter 4.
-		if (levelStage == IsaacInterface::STAGE4_1 || levelStage == IsaacInterface::STAGE4_2) {
-			if (stageType == IsaacInterface::STAGETYPE_REPENTANCE_B) {
-				_logWindow.LogWarn("Invalid value %d for %s field associated with value %d "
-					"for %s field in configuration file. Overriding with default", stageType, c::Keys::levelStage.c_str(),
-					stageType, c::Keys::stageType.c_str());
-				_configuration->StageType(c::Defaults::stageType);
-			}
-		}
-
-		// Validate stage type for Chapters > 4.
-		if (levelStage >= IsaacInterface::STAGE4_3 && levelStage <= IsaacInterface::STAGE8) {
-			if (stageType != IsaacInterface::STAGETYPE_ORIGINAL) {
-				_logWindow.LogWarn("Invalid value %d for %s field associated with value %d "
-					"for %s field in configuration file. Overriding with default", levelStage, c::Keys::levelStage.c_str(),
-					stageType, c::Keys::stageType.c_str());
-				_configuration->StageType(c::Defaults::stageType);
-			}
 		}
 	}
 
@@ -755,7 +731,9 @@ namespace Launcher {
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
 		_initialUnstableUpdates = _unstableRepentogon->GetValue();
 
-		_luaHeapSize->SetValue(_configuration->LuaHeapSize());
+		if (_configuration->LuaHeapSize()) {
+			_luaHeapSize->SetValue(*_configuration->LuaHeapSize());
+		}
 
 		_luaDebug->SetValue(_configuration->LuaDebug());
 		_hideWindow->SetValue(_configuration->HideWindow());
@@ -768,31 +746,15 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::InitializeLevelSelectFromOptions() {
-		int level = _configuration->Stage(), type = _configuration->StageType();
-		std::string value;
-		if (level == 0) {
-			value = "--";
+		int levelStage = _configuration->Stage().value_or(0);
+		int stageType = _configuration->StageType().value_or(0);
+
+		const char* stageName = IsaacInterface::GetStageName(levelStage, stageType);
+		if (stageName) {
+			_levelSelect->SetValue(wxString().Format("%s (%d.%d)", stageName, levelStage, stageType));
 		} else {
-			std::string levelName;
-			if (level <= IsaacInterface::STAGE4_2) {
-				/* To find the level name, divide level by two to get the chapter - 1, then add the stage type. */
-				levelName = IsaacInterface::levelNames[((level - 1) / 2) * 5 + type];
-				if (level % 2 == 0) {
-					levelName += " II";
-				} else {
-					levelName += " I";
-				}
-
-				char buffer[10];
-				sprintf(buffer, " (%d.%d)", level, type);
-				levelName += std::string(buffer);
-			} else {
-				levelName = IsaacInterface::uniqueLevelNames[level - IsaacInterface::STAGE4_3];
-			}
-			value = levelName;
+			_levelSelect->SetSelection(0);
 		}
-
-		_levelSelect->SetValue(wxString(value));
 	}
 
 	void LauncherMainWindow::UpdateRepentogonOptionsFromInstallation() {

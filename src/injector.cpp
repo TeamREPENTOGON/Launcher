@@ -33,39 +33,34 @@ static int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration
 	HANDLE* process, void** page, size_t* functionOffset, size_t* paramOffset,
 	PROCESS_INFORMATION* processInfo);
 
-static void GenerateCLI(LauncherConfiguration const* configuration, bool isLegacy, char cli[256]);
+static std::string GenerateCLI(const char* path, LauncherConfiguration const* configuration, bool isLegacy);
 
-void GenerateCLI(LauncherConfiguration const* configuration, bool isLegacy, char cli[256]) {
-	memset(cli, 0, sizeof(cli));
+std::string GenerateCLI(const char* path, LauncherConfiguration const* configuration, bool isLegacy) {
+	std::ostringstream cli;
+
+	cli << "\"" << path << "\"";
 
 	if (configuration->LuaDebug()) {
-		strcat(cli, "--luadebug ");
+		cli << " --luadebug";
 	}
 
-	if (configuration->Stage()) {
-		strcat(cli, "--set-stage=");
-		char buffer[13]; // 11 chars for a max int (including sign) + 1 char for space + 1 char for '\0'
-		sprintf(buffer, "%d ", configuration->Stage());
-		strcat(cli, buffer);
+	if (configuration->Stage() && configuration->Stage() > 0) {
+		cli << " --set-stage=" << *configuration->Stage();
+
+		if (configuration->StageType()) {
+			cli << " --set-stage-type=" << *configuration->StageType();
+		}
 	}
 
-	if (configuration->StageType()) {
-		strcat(cli, "--set-stage-type=");
-		char buffer[13]; // 11 chars for a max int (including sign) + 1 char for space + 1 char for '\0'
-		sprintf(buffer, "%d ", configuration->StageType());
-		strcat(cli, buffer);
-	}
-
-	if (!configuration->LuaHeapSize().empty()) {
-		strcat(cli, "--luaheapsize=");
-		char buffer[14];
-		sprintf(buffer, "%14s ", configuration->LuaHeapSize().c_str());
-		strcat(cli, buffer);
+	if (configuration->LuaHeapSize()) {
+		cli << " --luaheapsize=" << *configuration->LuaHeapSize();
 	}
 
 	if (isLegacy && configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA) {
-		strcat(cli, "-repentogonoff ");
+		cli << " --repentogonoff";
 	}
+
+	return cli.str();
 }
 
 DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* configuration,
@@ -75,8 +70,7 @@ DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* 
 
 	memset(processInfo, 0, sizeof(*processInfo));
 
-	char cli[256];
-	GenerateCLI(configuration, isLegacy, cli);
+	const std::string cli = GenerateCLI(path, configuration, isLegacy);
 
 	std::filesystem::path filepath(path);
 	std::filesystem::path parentPath = filepath.parent_path();
@@ -85,7 +79,7 @@ DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* 
 
 	Logger::Info("Creating process with path %s, lpCurrentDirectory = %s\n", path, currentDirectory);
 
-	DWORD result = CreateProcessA(path, cli, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, filepath.parent_path().string().c_str(), &startupInfo, processInfo);
+	DWORD result = CreateProcessA(path, (LPSTR)cli.c_str(), NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, filepath.parent_path().string().c_str(), &startupInfo, processInfo);
 	if (result == 0) {
 		Logger::Error("Failed to create process: %d\n", GetLastError());
 	} else {

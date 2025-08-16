@@ -82,7 +82,7 @@ public:
         return _configurationPath;
     }
 
-    inline LaunchMode GetLaunchMode() const {
+    inline std::optional<LaunchMode> GetLaunchMode() const {
         return _launchMode;
     }
 
@@ -169,7 +169,7 @@ private:
     std::optional<std::string> _configurationPath;
 
     bool _steamLaunch = false;
-    LaunchMode _launchMode = LAUNCH_MODE_REPENTOGON;
+    std::optional<LaunchMode> _launchMode = LAUNCH_MODE_REPENTOGON;
     std::string _isaacPath;
     bool _luaDebug = false;
     std::string _luaHeapSize;

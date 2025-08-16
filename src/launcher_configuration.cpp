@@ -241,15 +241,25 @@ void LauncherConfiguration::LoadFromCLI() {
 		_ranWizard = false;
 	}
 
-	_launchMode = sCLI->GetLaunchMode();
+	if (sCLI->GetLaunchMode()) {
+		_launchMode = *sCLI->GetLaunchMode();
+	}
 
-	_stage = sCLI->Stage();
-	_stageType = sCLI->StageType();
+	if (sCLI->Stage()) {
+		_stage = sCLI->Stage();
+	}
+	if (sCLI->StageType()) {
+		_stageType = sCLI->StageType();
+	}
 	if (sCLI->LuaDebug()) {
 		_luaDebug = true;
 	}
-	_roomId = sCLI->LoadRoom();
-	_luaHeapSize = sCLI->LuaHeapSize();
+	if (sCLI->LoadRoom()) {
+		_roomId = sCLI->LoadRoom();
+	}
+	if (!sCLI->LuaHeapSize().empty()) {
+		_luaHeapSize = sCLI->LuaHeapSize();
+	}
 
 	if (sCLI->RepentogonConsole()) {
 		_repentogonConsole = true;
@@ -292,12 +302,12 @@ void LauncherConfiguration::Write() {
 
 	fprintf(f, "[%s]\n", Sections::vanilla.c_str());
 
-	if (_stage) {
+	if (_stage && *_stage > 0) {
 		fprintf(f, "%s = %ld\n", Keys::levelStage.c_str(), *_stage);
-	}
 
-	if (_stageType) {
-		fprintf(f, "%s = %ld\n", Keys::stageType.c_str(), *_stageType);
+		if (_stageType) {
+			fprintf(f, "%s = %ld\n", Keys::stageType.c_str(), *_stageType);
+		}
 	}
 
 	if (_luaHeapSize && !_luaHeapSize->empty()) {

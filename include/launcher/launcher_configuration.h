@@ -72,8 +72,8 @@ inline void NAME(T const& param) {\
 }
 
 #undef OPTIONAL_CONFIGURATION_FIELD
-#define OPTIONAL_CONFIGURATION_FIELD(T, NAME, FIELD) inline T const& NAME() const {\
-	return *FIELD;\
+#define OPTIONAL_CONFIGURATION_FIELD(T, NAME, FIELD) inline std::optional<T> const& NAME() const {\
+	return FIELD;\
 }\
 \
 inline void NAME(T const& param) {\
