@@ -52,7 +52,7 @@ std::string GenerateCLI(const char* path, LauncherConfiguration const* configura
 		}
 	}
 
-	if (configuration->LuaHeapSize()) {
+	if (configuration->LuaHeapSize() && !configuration->LuaHeapSize()->empty()) {
 		cli << " --luaheapsize=" << *configuration->LuaHeapSize();
 	}
 

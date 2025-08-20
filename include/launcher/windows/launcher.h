@@ -39,24 +39,6 @@ namespace Launcher {
 
 	class AdvancedOptionsWindow;
 
-	class LuaHeapSizeValidator : public wxValidator {
-	public:
-		LuaHeapSizeValidator();
-		LuaHeapSizeValidator(std::string* output);
-
-		inline void SetOutputVariable(std::string* output) {
-			_output = output;
-		}
-
-		virtual bool TransferFromWindow() override;
-		virtual bool TransferToWindow() override;
-		virtual bool Validate(wxWindow* parent) override;
-
-	private:
-		std::string* _output;
-		std::regex _regex;
-	};
-
 	class LauncherMainWindow : public wxFrame {
 	public:
 		friend class AdvancedOptionsWindow;
@@ -114,7 +96,7 @@ namespace Launcher {
 			const char* emptyText);
 		void OnLevelSelect(wxCommandEvent& event);
 		void OnLaunchModeSelect(wxCommandEvent& event);
-		// void OnCharacterWritten(wxCommandEvent& event);
+		void OnLuaHeapSizeCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
 
@@ -178,7 +160,6 @@ namespace Launcher {
 		wxButton* _advancedOptionsButton;
 		int _repentogonLaunchModeIdx = -1;
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
-		LuaHeapSizeValidator _validator;
 		bool _initialUnstableUpdates = false;
 		bool _canPromptOnUnstableSwitch = true;
 		char* _exePath = nullptr;
