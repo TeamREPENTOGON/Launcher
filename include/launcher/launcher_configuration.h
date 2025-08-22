@@ -24,16 +24,49 @@ enum LaunchMode {
 	LAUNCH_MODE_REPENTOGON
 };
 
+struct Options {
+	/* General options */
+	std::optional<std::string> isaacExecutablePath;
+	/**
+	 * Indicate whether the wizard ran to the point where the user selected
+	 * their options when it comes to the configuration of Repentogon (i.e.
+	 * automatic updates and unstable updates).
+	 *
+	 * This variable does NOT indicate whether the wizard ran successfully.
+	 * Only the above.
+	 */
+	std::optional<bool> ranWizard;
+
+	/* Shared options */
+	std::optional<LaunchMode> launchMode;
+	std::optional<bool> hideWindow;
+
+	/* Repentogon options */
+	std::optional<bool> console;
+	std::optional<bool> automaticUpdates;
+	std::optional<bool> unstableUpdates;
+
+	/* Game options */
+	std::optional<bool> luaDebug;
+	std::optional<long> levelStage;
+	std::optional<long> stageType;
+	std::optional<std::string> luaHeapSize;
+	std::optional<std::string> loadRoom;
+};
+
 namespace Configuration::Defaults {
+	const std::string isaacExecutablePath = "";
+	constexpr const bool ranWizard = false;
+	constexpr const LaunchMode launchMode = LAUNCH_MODE_REPENTOGON;
+	constexpr const bool hideWindow = true;
 	constexpr const bool console = false;
+	constexpr const bool automaticUpdates = true;
+	constexpr const bool unstableUpdates = false;
+	constexpr const bool luaDebug = false;
 	constexpr const int levelStage = 0;
 	constexpr const int stageType = 0;
-	constexpr const bool luaDebug = false;
-	const std::string luaHeapSize("1024M");
-	constexpr const bool update = true;
-	constexpr const bool unstableUpdates = false;
-	constexpr const bool hideWindow = true;
-	constexpr const bool ranWizard = false;
+	const std::string luaHeapSize = "1024M";
+	const std::string loadRoom = "";
 }
 
 namespace Configuration::Sections {
@@ -54,30 +87,33 @@ namespace Configuration::Keys {
 	const std::string luaDebug("LuaDebug");
 	const std::string luaHeapSize("LuaHeapSize");
 	const std::string stageType("StageType");
-	const std::string roomId("RoomID");
+	const std::string loadRoom("LoadRoom");
 
 	const std::string console("Console");
 	const std::string update("Update");
 	const std::string unstableUpdates("UnstableUpdates");
-
 }
 
 #undef CONFIGURATION_FIELD
-#define CONFIGURATION_FIELD(T, NAME, FIELD) inline T const& NAME() const {\
-	return FIELD;\
+#define CONFIGURATION_FIELD(T, NAME, FIELD)\
+inline const T NAME##IgnoreOverride() const {\
+	return _options.FIELD.value_or(Configuration::Defaults::FIELD);\
 }\
-\
-inline void NAME(T const& param) {\
-		FIELD = param;\
-}
-
-#undef OPTIONAL_CONFIGURATION_FIELD
-#define OPTIONAL_CONFIGURATION_FIELD(T, NAME, FIELD) inline std::optional<T> const& NAME() const {\
-	return FIELD;\
+inline const T NAME() const {\
+	if (_cliOverrides.FIELD.has_value()) {\
+		return *_cliOverrides.FIELD;\
+	}\
+	return NAME##IgnoreOverride();\
 }\
-\
-inline void NAME(T const& param) {\
-	FIELD = param;\
+inline void NAME(const std::optional<T> value) {\
+	if (NAME##HasCliOverride()) {\
+		_cliOverrides.FIELD = value;\
+	} else {\
+		_options.FIELD = value;\
+	}\
+}\
+inline bool NAME##HasCliOverride() const {\
+	return _cliOverrides.FIELD.has_value();\
 }
 
 class LauncherConfiguration {
@@ -115,18 +151,18 @@ public:
 
 	void Write();
 
-	CONFIGURATION_FIELD(std::string, IsaacExecutablePath, _isaacExecutablePath);
-	CONFIGURATION_FIELD(LaunchMode, IsaacLaunchMode, _launchMode);
-	CONFIGURATION_FIELD(bool, UnstableUpdates, _unstableUpdates);
-	CONFIGURATION_FIELD(bool, RepentogonConsole, _repentogonConsole);
-	CONFIGURATION_FIELD(bool, AutomaticUpdates, _update);
-	CONFIGURATION_FIELD(bool, LuaDebug, _luaDebug);
-	CONFIGURATION_FIELD(bool, HideWindow, _hideWindow);
-	CONFIGURATION_FIELD(bool, RanWizard, _ranWizard);
-	OPTIONAL_CONFIGURATION_FIELD(long, Stage, _stage);
-	OPTIONAL_CONFIGURATION_FIELD(long, StageType, _stageType);
-	OPTIONAL_CONFIGURATION_FIELD(long, RoomID, _roomId);
-	OPTIONAL_CONFIGURATION_FIELD(std::string, LuaHeapSize, _luaHeapSize);
+	CONFIGURATION_FIELD(std::string, IsaacExecutablePath, isaacExecutablePath);
+	CONFIGURATION_FIELD(LaunchMode, IsaacLaunchMode, launchMode);
+	CONFIGURATION_FIELD(bool, RepentogonConsole, console);
+	CONFIGURATION_FIELD(bool, AutomaticUpdates, automaticUpdates);
+	CONFIGURATION_FIELD(bool, UnstableUpdates, unstableUpdates);
+	CONFIGURATION_FIELD(bool, LuaDebug, luaDebug);
+	CONFIGURATION_FIELD(bool, HideWindow, hideWindow);
+	CONFIGURATION_FIELD(bool, RanWizard, ranWizard);
+	CONFIGURATION_FIELD(long, Stage, levelStage);
+	CONFIGURATION_FIELD(long, StageType, stageType);
+	CONFIGURATION_FIELD(std::string, LoadRoom, loadRoom);
+	CONFIGURATION_FIELD(std::string, LuaHeapSize, luaHeapSize);
 
 private:
 	bool Search(LauncherConfigurationLoad* result);
@@ -144,33 +180,8 @@ private:
 	int _configFileParseErrorLine = 0;
 	bool _isLoaded = false;
 
-	/* General options */
-	std::string _isaacExecutablePath;
-	/**
-	 * Indicate whether the wizard ran to the point where the user selected
-	 * their options when it comes to the configuration of Repentogon (i.e.
-	 * automatic updates and unstable updates).
-	 *
-	 * This variable does NOT indicate whether the wizard ran successfully.
-	 * Only the above.
-	 */
-	bool _ranWizard = false;
-
-	/* Shared options */
-	LaunchMode _launchMode = LAUNCH_MODE_REPENTOGON;
-	bool _hideWindow = true;
-
-	/* Repentogon options */
-	bool _unstableUpdates = false;
-	bool _repentogonConsole = false;
-	bool _update = true;
-
-	/* Game options */
-	bool _luaDebug = false;
-	std::optional<long> _stage;
-	std::optional<long> _stageType;
-	std::optional<std::string> _luaHeapSize;
-	std::optional<long> _roomId;
+	Options _options;
+	Options _cliOverrides;
 };
 
 #undef CONFIGURATION_FIELD

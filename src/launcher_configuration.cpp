@@ -17,52 +17,52 @@ std::string LauncherConfiguration::_configurationPath;
 template<typename T>
 using ConfigurationTuple = std::tuple<std::string, std::string, T>;
 
-static ConfigurationTuple<std::string> GetIsaacExecutablePath() {
+static ConfigurationTuple<std::string> IsaacExecutablePathConf() {
 	return { Sections::general, Keys::isaacExecutableKey, "" };
 }
 
-static ConfigurationTuple<bool> HasRanWizard() {
+static ConfigurationTuple<bool> RanWizardConf() {
 	return { Sections::general, Keys::ranWizard, Defaults::ranWizard };
 }
 
-static ConfigurationTuple<bool> HasHideWindow() {
+static ConfigurationTuple<bool> HideWindowConf() {
 	return { Sections::general, Keys::hideWindow, Defaults::hideWindow };
 }
 
-static ConfigurationTuple<bool> HasConsole() {
+static ConfigurationTuple<bool> ConsoleConf() {
 	return { Sections::repentogon, Keys::console, Defaults::console };
 }
 
-static ConfigurationTuple<int> Stage() {
+static ConfigurationTuple<int> StageConf() {
 	return { Sections::vanilla, Keys::levelStage, Defaults::levelStage };
 }
 
-static ConfigurationTuple<bool> HasLuaDebug() {
+static ConfigurationTuple<bool> LuaDebugConf() {
 	return { Sections::vanilla, Keys::luaDebug, Defaults::luaDebug };
 }
 
-static ConfigurationTuple<int> StageType() {
+static ConfigurationTuple<int> StageTypeConf() {
 	return { Sections::vanilla, Keys::stageType, Defaults::stageType };
 }
 
-static ConfigurationTuple<std::string> LuaHeapSize() {
+static ConfigurationTuple<std::string> LuaHeapSizeConf() {
 	return { Sections::vanilla, Keys::luaHeapSize, Defaults::luaHeapSize };
 }
 
-static ConfigurationTuple<bool> HasAutomaticUpdates() {
-	return { Sections::repentogon, Keys::update, Defaults::update };
+static ConfigurationTuple<bool> AutomaticUpdatesConf() {
+	return { Sections::repentogon, Keys::update, Defaults::automaticUpdates };
 }
 
-static ConfigurationTuple<bool> HasUnstableUpdates() {
+static ConfigurationTuple<bool> UnstableUpdatesConf() {
 	return { Sections::repentogon, Keys::unstableUpdates, Defaults::unstableUpdates };
 }
 
-static ConfigurationTuple<int> GetLaunchMode() {
-	return { Sections::shared, Keys::launchMode, LAUNCH_MODE_REPENTOGON };
+static ConfigurationTuple<int> LaunchModeConf() {
+	return { Sections::shared, Keys::launchMode, Defaults::launchMode };
 }
 
-static ConfigurationTuple<int> RoomId() {
-	return { Sections::vanilla, Keys::roomId, 0 };
+static ConfigurationTuple<std::string> LoadRoomConf() {
+	return { Sections::vanilla, Keys::loadRoom, Defaults::loadRoom };
 }
 
 static std::string ReadString(INIReader const& reader, ConfigurationTuple<std::string>(*fn)()) {
@@ -187,7 +187,7 @@ bool LauncherConfiguration::Process(LauncherConfigurationLoad* outResult) {
 	Logger::Info("Successfully opened and parsed launcher configuration file %s\n", _configurationPath.c_str());
 	Load(reader);
 
-	if (_isaacExecutablePath.empty()) {
+	if (IsaacExecutablePathIgnoreOverride().empty()) {
 		if (outResult)
 			*outResult = LAUNCHER_CONFIGURATION_LOAD_NO_ISAAC;
 		return false;
@@ -212,65 +212,59 @@ void LauncherConfiguration::Load(INIReader const& reader) {
 }
 
 void LauncherConfiguration::LoadFromFile(INIReader const& reader) {
-	_isaacExecutablePath = ReadString(reader, GetIsaacExecutablePath);
-	_ranWizard = ReadBoolean(reader, HasRanWizard);
+	_options.isaacExecutablePath = ReadString(reader, IsaacExecutablePathConf);
+	_options.ranWizard = ReadBoolean(reader, RanWizardConf);
 
-	_launchMode = (LaunchMode)ReadInteger(reader, GetLaunchMode);
+	_options.launchMode = (LaunchMode)ReadInteger(reader, LaunchModeConf);
 
-	_stage = ReadInteger(reader, ::Stage);
-	_stageType = ReadInteger(reader, ::StageType);
-	_luaDebug = ReadBoolean(reader, HasLuaDebug);
-	_luaHeapSize = ReadString(reader, ::LuaHeapSize);
-	_roomId = ReadInteger(reader, RoomId);
-	_hideWindow = ReadBoolean(reader, HasHideWindow);
+	_options.levelStage = ReadInteger(reader, StageConf);
+	_options.stageType = ReadInteger(reader, StageTypeConf);
+	_options.luaDebug = ReadBoolean(reader, LuaDebugConf);
+	_options.luaHeapSize = ReadString(reader, LuaHeapSizeConf);
+	_options.loadRoom = ReadString(reader, LoadRoomConf);
+	_options.hideWindow = ReadBoolean(reader, HideWindowConf);
 
-	_repentogonConsole = ReadBoolean(reader, HasConsole);
-	_unstableUpdates = ReadBoolean(reader, HasUnstableUpdates);
-	_update = ReadBoolean(reader, HasAutomaticUpdates);
+	_options.console = ReadBoolean(reader, ConsoleConf);
+	_options.automaticUpdates = ReadBoolean(reader, AutomaticUpdatesConf);
+	_options.unstableUpdates = ReadBoolean(reader, UnstableUpdatesConf);
 }
 
 void LauncherConfiguration::LoadFromCLI() {
 	std::string const& isaacPath = sCLI->IsaacPath();
 	if (!isaacPath.empty()) {
-		_isaacExecutablePath = isaacPath;
+		_cliOverrides.isaacExecutablePath = isaacPath;
 	}
 
 	if (sCLI->SkipWizard()) {
-		_ranWizard = true;
+		_cliOverrides.ranWizard = true;
 	} else if (sCLI->ForceWizard()) {
-		_ranWizard = false;
+		_cliOverrides.ranWizard = false;
 	}
 
-	if (sCLI->GetLaunchMode()) {
-		_launchMode = *sCLI->GetLaunchMode();
-	}
+	_cliOverrides.launchMode = sCLI->GetLaunchMode();
 
 	if (sCLI->Stage()) {
-		_stage = sCLI->Stage();
-	}
-	if (sCLI->StageType()) {
-		_stageType = sCLI->StageType();
+		_cliOverrides.levelStage = sCLI->Stage();
+		_cliOverrides.stageType = sCLI->StageType();
 	}
 	if (sCLI->LuaDebug()) {
-		_luaDebug = true;
+		_cliOverrides.luaDebug = true;
 	}
-	if (sCLI->LoadRoom()) {
-		_roomId = sCLI->LoadRoom();
+	if (!sCLI->LoadRoom().empty()) {
+		_cliOverrides.loadRoom = sCLI->LoadRoom();
 	}
 	if (!sCLI->LuaHeapSize().empty()) {
-		_luaHeapSize = sCLI->LuaHeapSize();
+		_cliOverrides.luaHeapSize = sCLI->LuaHeapSize();
 	}
 
 	if (sCLI->RepentogonConsole()) {
-		_repentogonConsole = true;
+		_cliOverrides.console = true;
 	}
-
 	if (sCLI->UnstableUpdates()) {
-		_unstableUpdates = true;
+		_cliOverrides.unstableUpdates = true;
 	}
-
 	if (sCLI->AutomaticUpdates()) {
-		_update = true;
+		_cliOverrides.automaticUpdates = true;
 	}
 }
 
@@ -289,35 +283,34 @@ void LauncherConfiguration::Write() {
 	}
 
 	fprintf(f, "[%s]\n", Sections::general.c_str());
-	fprintf(f, "%s = %s\n", Keys::isaacExecutableKey.c_str(),
-		_isaacExecutablePath.empty() ? "" : _isaacExecutablePath.c_str());
-	fprintf(f, "%s = %d\n", Keys::ranWizard.c_str(),
-		_ranWizard ? 1 : 0);
-	fprintf(f, "%s = %d\n", Keys::hideWindow.c_str(), _hideWindow ? 1 : 0);
+	fprintf(f, "%s = %s\n", Keys::isaacExecutableKey.c_str(), IsaacExecutablePathIgnoreOverride().c_str());
+	fprintf(f, "%s = %d\n", Keys::ranWizard.c_str(), RanWizardIgnoreOverride() ? 1 : 0);
+	fprintf(f, "%s = %d\n", Keys::hideWindow.c_str(), HideWindowIgnoreOverride() ? 1 : 0);
 
 	fprintf(f, "[%s]\n", Sections::repentogon.c_str());
-	fprintf(f, "%s = %d\n", Keys::console.c_str(), _repentogonConsole);
-	fprintf(f, "%s = %d\n", Keys::update.c_str(), _update);
-	fprintf(f, "%s = %d\n", Keys::unstableUpdates.c_str(), _unstableUpdates ? 1 : 0);
+	fprintf(f, "%s = %d\n", Keys::console.c_str(), RepentogonConsoleIgnoreOverride());
+	fprintf(f, "%s = %d\n", Keys::update.c_str(), AutomaticUpdatesIgnoreOverride());
+	fprintf(f, "%s = %d\n", Keys::unstableUpdates.c_str(), UnstableUpdatesIgnoreOverride() ? 1 : 0);
 
 	fprintf(f, "[%s]\n", Sections::vanilla.c_str());
 
-	if (_stage && *_stage > 0) {
-		fprintf(f, "%s = %ld\n", Keys::levelStage.c_str(), *_stage);
-
-		if (_stageType) {
-			fprintf(f, "%s = %ld\n", Keys::stageType.c_str(), *_stageType);
-		}
+	if (const long levelStage = StageIgnoreOverride(); levelStage > 0) {
+		fprintf(f, "%s = %ld\n", Keys::levelStage.c_str(), levelStage);
+		fprintf(f, "%s = %ld\n", Keys::stageType.c_str(), StageTypeIgnoreOverride());
 	}
 
-	if (_luaHeapSize && !_luaHeapSize->empty()) {
-		fprintf(f, "%s = %s\n", Keys::luaHeapSize.c_str(), _luaHeapSize->c_str());
+	if (const std::string& loadRoom = LoadRoomIgnoreOverride(); !loadRoom.empty()) {
+		fprintf(f, "%s = %s\n", Keys::loadRoom.c_str(), loadRoom.c_str());
 	}
 
-	fprintf(f, "%s = %d\n", Keys::luaDebug.c_str(), _luaDebug);
+	if (const std::string& luaHeapSize = LuaHeapSizeIgnoreOverride(); !luaHeapSize.empty()) {
+		fprintf(f, "%s = %s\n", Keys::luaHeapSize.c_str(), luaHeapSize.c_str());
+	}
+
+	fprintf(f, "%s = %d\n", Keys::luaDebug.c_str(), LuaDebugIgnoreOverride());
 
 	fprintf(f, "[%s]\n", Sections::shared.c_str());
-	fprintf(f, "%s = %d\n", Keys::launchMode.c_str(), _launchMode);
+	fprintf(f, "%s = %d\n", Keys::launchMode.c_str(), IsaacLaunchModeIgnoreOverride());
 
 	fclose(f);
 }
