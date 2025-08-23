@@ -38,6 +38,7 @@ struct ModExtraData {
     bool resourceCards = false;
     bool resourcePills = false;
     bool resourceShaders = false;
+    bool cutscenes = false;
 
     bool resourceMinor = false;
 

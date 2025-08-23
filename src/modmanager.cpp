@@ -472,25 +472,13 @@ bool HasAnm2File(fs::path folder)
     return false;
 }
 
-bool HasPNGFile(fs::path folder)
+bool HasFile(fs::path folder, std::string ext)
 {
     if (!fs::exists(folder) || !fs::is_directory(folder))
         return false;
     for (const auto& entry : fs::recursive_directory_iterator(folder))
     {
-        if (entry.is_regular_file() && entry.path().extension() == ".png")
-            return true;
-    }
-    return false;
-}
-
-bool HasXMLFile(fs::path folder)
-{
-    if (!fs::exists(folder) || !fs::is_directory(folder))
-        return false;
-    for (const auto& entry : fs::directory_iterator(folder))
-    {
-        if (entry.is_regular_file() && entry.path().extension() == ".xml")
+        if (entry.is_regular_file() && entry.path().extension() == ext)
             return true;
     }
     return false;
@@ -532,7 +520,7 @@ void ModManagerFrame::LoadModExtraData() {
             selectedMod->extradata.resourceItems        = selectedMod->extradata.resourceItems      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "items.xml"));
             selectedMod->extradata.resourceTrinkets     = selectedMod->extradata.resourceTrinkets   || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "items.xml"));
             selectedMod->extradata.resourceCharacters   = selectedMod->extradata.resourceCharacters || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "players.xml"));
-            selectedMod->extradata.resourceMusic        = selectedMod->extradata.resourceMusic      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "music.xml"));
+            selectedMod->extradata.resourceMusic        = selectedMod->extradata.resourceMusic      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "music.xml")) ;
             selectedMod->extradata.resourceSounds       = selectedMod->extradata.resourceSounds     || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "sounds.xml"));
             selectedMod->extradata.resourceItemPools    = selectedMod->extradata.resourceItemPools  || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "itempools.xml"));
             selectedMod->extradata.resourceShaders      = selectedMod->extradata.resourceShaders    || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "shaders.xml"));
@@ -540,8 +528,12 @@ void ModManagerFrame::LoadModExtraData() {
             selectedMod->extradata.resourceCards        = selectedMod->extradata.resourceCards      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "pocketitems.xml"));
             selectedMod->extradata.resourcePills        = selectedMod->extradata.resourcePills      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "pocketitems.xml"));
             selectedMod->extradata.anm2                 = selectedMod->extradata.anm2               || HasAnm2File(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx")); 
-            selectedMod->extradata.sprites              = selectedMod->extradata.sprites            || HasPNGFile(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx")); 
-            selectedMod->extradata.resourceMinor        = selectedMod->extradata.resourceMinor      || HasXMLFile(fs::path(_modspath / selectedMod->folderName / resources[i]));
+            selectedMod->extradata.sprites              = selectedMod->extradata.sprites            || HasFile(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx"), ".png");
+            selectedMod->extradata.resourceMinor        = selectedMod->extradata.resourceMinor      || HasFile(fs::path(_modspath / selectedMod->folderName / resources[i]), ".xml");
+            selectedMod->extradata.cutscenes        = selectedMod->extradata.cutscenes || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx" / "cutscenes"));
+
+            selectedMod->extradata.Sounds = selectedMod->extradata.Sounds || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "sfx"));
+            selectedMod->extradata.Music = selectedMod->extradata.Music || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "music"));
         }
     }
     extraInfoCtrl->SetValue("");
@@ -561,7 +553,7 @@ void ModManagerFrame::LoadModExtraData() {
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
     else if (selectedMod->extradata.resourceMinor){
-        style.SetBackgroundColour(wxColor("Grey")); //Blood Red of Heck
+        style.SetBackgroundColour(wxColor("Grey")); 
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->BeginURL("Not too bad on this case, but could still be bad for compat");
         extraInfoCtrl->WriteText(wxString::FromUTF8("<XML REPLACEMENTS>"));
@@ -657,6 +649,15 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor(200, 207, 2)); //infected pee
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Sounds>"));
+        extraInfoCtrl->EndStyle();
+        style.SetBackgroundColour(wxColor("White"));
+        extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
+    }
+    
+    if (selectedMod->extradata.cutscenes) {
+        style.SetBackgroundColour(wxColor(136, 42, 245)); //the man who slaughers or some shit, I didnt play fnaf!
+        extraInfoCtrl->BeginStyle(style);
+        extraInfoCtrl->WriteText(wxString::FromUTF8("<Cutscenes>"));
         extraInfoCtrl->EndStyle();
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
