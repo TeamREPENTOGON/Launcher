@@ -38,14 +38,13 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         "startup logic as possible");
     parser.AddLongOption(Options::isaacPath, "Absolute path to the Isaac executable to start");
     parser.AddLongSwitch(Options::luaDebug, "Enable system functions in the Lua API");
-    parser.AddLongOption(Options::luaHeapSize, "Size of the Lua heap in MB");
+    parser.AddLongOption(Options::luaHeapSize, "Size of the Lua heap (default: \"1024M\")");
     parser.AddLongSwitch(Options::networkTest, "Enable multiplayer features");
     parser.AddLongOption(Options::setStage, "Start stage identifier",
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::setStageType, "Start stage variant identifier",
         wxCMD_LINE_VAL_NUMBER);
-    parser.AddLongOption(Options::loadRoom, "ID of the room in which to start the run",
-        wxCMD_LINE_VAL_NUMBER);
+    parser.AddLongOption(Options::loadRoom, "Path to a rooms xml file for testing");
     parser.AddLongOption(Options::launchMode, "Whether to launch vanilla or Repentogon.\n"
         "Accepted values: \"vanilla\", \"repentogon\". Default: repentogon.");
     parser.AddLongSwitch(Options::repentogonConsole, "Enable the Repentogon console window");
@@ -152,7 +151,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         }
     }
 
-    long loadRoom;
+    wxString loadRoom;
     if (parser.Found(Options::loadRoom, &loadRoom)) {
         _loadRoom = loadRoom;
     }

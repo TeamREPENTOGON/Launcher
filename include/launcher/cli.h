@@ -74,7 +74,7 @@ public:
         return _stageType;
     }
 
-    inline std::optional<unsigned long> const& LoadRoom() const {
+    inline std::string const& LoadRoom() const {
         return _loadRoom;
     }
 
@@ -169,17 +169,17 @@ private:
     std::optional<std::string> _configurationPath;
 
     bool _steamLaunch = false;
-    std::optional<LaunchMode> _launchMode = LAUNCH_MODE_REPENTOGON;
+    std::optional<LaunchMode> _launchMode;
     std::string _isaacPath;
     bool _luaDebug = false;
     std::string _luaHeapSize;
     bool _networkTest = false;
     std::optional<unsigned long> _stage;
     std::optional<unsigned long> _stageType;
-    std::optional<unsigned long> _loadRoom;
+    std::string _loadRoom;
     bool _repentogonConsole = false;
     bool _unstableUpdates = false;
-    bool _automaticUpdates = true;
+    bool _automaticUpdates = false;
 };
 
 #define sCLI CLIParser::instance()

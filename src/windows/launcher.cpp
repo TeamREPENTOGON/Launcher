@@ -56,7 +56,7 @@ EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::LauncherMai
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_HIDE_WINDOW, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
-// EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::LauncherMainWindow::OnCharacterWritten)
+EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::LauncherMainWindow::OnLuaHeapSizeCharacterWritten)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::LauncherMainWindow::Launch)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::LauncherMainWindow::OnIsaacSelectClick)
 // EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::LauncherMainWindow::OnSelectRepentogonFolderClick)
@@ -90,64 +90,13 @@ namespace Launcher {
 	static constexpr const char* ComboBoxVanilla = "Vanilla";
 	static constexpr const char* ComboBoxRepentogon = "Repentogon";
 
-	LuaHeapSizeValidator::LuaHeapSizeValidator() : wxValidator() { }
-
-	LuaHeapSizeValidator::LuaHeapSizeValidator(std::string* output) : wxValidator(), _output(output),
-		_regex("([0-9]+)([KMG]?)") {
-
-	}
-
-	bool LuaHeapSizeValidator::TransferFromWindow() {
-		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(GetWindow());
-		if (!ctrl) {
-			return false;
-		}
-
-		*_output = ctrl->GetValue();
-		return true;
-	}
-
-	bool LuaHeapSizeValidator::TransferToWindow() {
-		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(GetWindow());
-		if (!ctrl) {
-			return false;
-		}
-
-		ctrl->ChangeValue(*_output);
-		return true;
-	}
-
-	bool LuaHeapSizeValidator::Validate(wxWindow*) {
-		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(GetWindow());
-		wxString str = ctrl->GetValue();
-
-		if (str.empty()) {
-			ctrl->ChangeValue("0");
-			return true;
-		}
-
-		std::cmatch match;
-		bool result = std::regex_match((const char*)str, match, _regex);
-		if (result) {
-			return true;
-		}
-
-		if (str.size() == 1) {
-			char c = str[0];
-			if (c == 'K' || c == 'M' || c == 'G') {
-				ctrl->ChangeValue("0");
-				return true;
-			}
-		}
-
-		return false;
-	}
+	static const std::regex LuaHeapSizeRegex("^([0-9]+[KMG]{0,1})?$");
 
 	LauncherMainWindow::LauncherMainWindow(Installation* installation, LauncherConfiguration* configuration) :
 		wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
 		_installation(installation), _configuration(configuration),
 		_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1),
-			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)), _validator() {
+			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)) {
 		// _optionsGrid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
 		_luaHeapSize = nullptr;
@@ -310,15 +259,13 @@ namespace Launcher {
 		vanillaBoxSizer->Add(_luaDebug, 0, wxLEFT | wxRIGHT, 5);
 		vanillaBoxSizer->Add(new wxStaticLine(vanillaBox), 0, wxTOP | wxBOTTOM, 5);
 
-		_validator.SetOutputVariable((std::string*)&_configuration->LuaHeapSize());
 		wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
-		wxTextCtrl* heapSizeCtrl = new wxTextCtrl(vanillaBox, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024");
-		heapSizeCtrl->SetValidator(_validator);
+		wxTextCtrl* heapSizeCtrl = new wxTextCtrl(vanillaBox, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024M");
 		_luaHeapSize = heapSizeCtrl;
-		wxStaticText* heapSizeText = new wxStaticText(vanillaBox, -1, "Lua heap size (MB): ");
+		wxStaticText* heapSizeText = new wxStaticText(vanillaBox, -1, "Lua heap size: ");
 		heapSizeBox->Add(heapSizeText);
 		heapSizeBox->Add(heapSizeCtrl);
-		vanillaBoxSizer->Add(heapSizeBox, 0, wxLEFT | wxRIGHT, 20);
+		vanillaBoxSizer->Add(heapSizeBox, 0, wxLEFT | wxRIGHT, 5);
 		vanillaBoxSizer->Add(new wxStaticLine(vanillaBox), 0, wxBOTTOM, 5);
 
 		_optionsSizer->Add(vanillaBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
@@ -380,10 +327,24 @@ namespace Launcher {
 		}
 	}
 
-	/* void LauncherMainWindow::OnCharacterWritten(wxCommandEvent& event) {
+	void LauncherMainWindow::OnLuaHeapSizeCharacterWritten(wxCommandEvent& event) {
 		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(event.GetEventObject());
-		_options.luaHeapSize = std::stoi(ctrl->GetValue().c_str().AsChar());
-	} */
+
+		std::string luaHeapSize = ctrl->GetValue().c_str().AsChar();
+		std::transform(luaHeapSize.begin(), luaHeapSize.end(), luaHeapSize.begin(), toupper);
+
+		std::cmatch match;
+		if (std::regex_match(luaHeapSize.c_str(), match, LuaHeapSizeRegex)) {
+			_configuration->LuaHeapSize(luaHeapSize);
+		} else if (luaHeapSize == "K" || luaHeapSize == "M" || luaHeapSize == "G") {
+			_configuration->LuaHeapSize("");
+		} else {
+			wxBell();
+			const long ip = ctrl->GetInsertionPoint() - 1;
+			ctrl->SetValue(_configuration->LuaHeapSize());
+			ctrl->SetInsertionPoint(ip > 0 ? ip : 0);
+		}
+	}
 
 	void LauncherMainWindow::OnOptionSelected(wxCommandEvent& event) {
 		wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
@@ -453,14 +414,14 @@ namespace Launcher {
 			_logWindow.Log("\t\tEnable Repentogon console window: %s", _configuration->RepentogonConsole() ? "yes" : "no");
 		}
 		_logWindow.Log("\tVanilla:");
-		if (_configuration->Stage()) {
-			_logWindow.Log("\t\tStarting stage: %d.%d", *_configuration->Stage(), _configuration->StageType().value_or(0));
+		if (_configuration->Stage() > 0) {
+			_logWindow.Log("\t\tStarting stage: %d.%d", _configuration->Stage(), _configuration->StageType());
 		} else {
 			_logWindow.Log("\t\tStarting stage: not selected");
 		}
 		_logWindow.Log("\t\tLua debug: %s", _configuration->LuaDebug() ? "yes" : "no");
-		if (_configuration->LuaHeapSize()) {
-			_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize()->c_str());
+		if (!_configuration->LuaHeapSize().empty()) {
+			_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize().c_str());
 		} else {
 			_logWindow.Log("\t\tLua heap size: not set");
 		}
@@ -683,24 +644,21 @@ namespace Launcher {
 			}
 		}
 
-		std::string luaHeapSize = _configuration->LuaHeapSize().value_or("");
+		std::string luaHeapSize = _configuration->LuaHeapSize();
 		if (!luaHeapSize.empty()) {
 			(void)std::remove_if(luaHeapSize.begin(), luaHeapSize.end(), [](char c) -> bool { return std::isspace(c); });
-			std::regex r("([0-9]+)([KMG]?)");
 			std::cmatch match;
-			bool hasMatch = std::regex_match(luaHeapSize.c_str(), match, r);
-
-			if (!hasMatch) {
+			if (!std::regex_match(luaHeapSize.c_str(), match, LuaHeapSizeRegex)) {
 				_logWindow.LogWarn("Invalid value %s for %s field in configuration file. Ignoring\n",
 					luaHeapSize.c_str(), c::Keys::luaHeapSize.c_str());
-				_configuration->LuaHeapSize("");
+				_configuration->LuaHeapSize(c::Defaults::luaHeapSize);
 			} else {
 				_configuration->LuaHeapSize(luaHeapSize);
 			}
 		}
 
 		// Validate LevelStage
-		int levelStage = _configuration->Stage().value_or(IsaacInterface::STAGE_NULL);
+		int levelStage = _configuration->Stage();
 		if (levelStage < IsaacInterface::STAGE_NULL || levelStage > IsaacInterface::STAGE8) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default",
 				levelStage, c::Keys::levelStage.c_str());
@@ -709,7 +667,7 @@ namespace Launcher {
 		}
 
 		// Validate StageType
-		int stageType = _configuration->StageType().value_or(IsaacInterface::STAGETYPE_ORIGINAL);
+		int stageType = _configuration->StageType();
 		if (stageType < IsaacInterface::STAGETYPE_ORIGINAL || stageType > IsaacInterface::STAGETYPE_REPENTANCE_B) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default",
 				stageType, c::Keys::stageType.c_str());
@@ -726,28 +684,40 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::InitializeGUIFromOptions() {
+		_configurationBox->GetWindowChild(WINDOW_BUTTON_SELECT_ISAAC)->Enable(!_configuration->IsaacExecutablePathHasCliOverride());
+
 		_console->SetValue(_configuration->RepentogonConsole());
+		_console->Enable(!_configuration->RepentogonConsoleHasCliOverride());
+
 		_updates->SetValue(_configuration->AutomaticUpdates());
+		_updates->Enable(!_configuration->AutomaticUpdatesHasCliOverride());
+
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
+		_unstableRepentogon->Enable(!_configuration->UnstableUpdatesHasCliOverride());
 		_initialUnstableUpdates = _unstableRepentogon->GetValue();
 
-		if (_configuration->LuaHeapSize()) {
-			_luaHeapSize->SetValue(*_configuration->LuaHeapSize());
-		}
+		_luaHeapSize->SetValue(_configuration->LuaHeapSize());
+		_luaHeapSize->Enable(!_configuration->LuaHeapSizeHasCliOverride());
 
 		_luaDebug->SetValue(_configuration->LuaDebug());
+		_luaDebug->Enable(!_configuration->LuaDebugHasCliOverride());
+
 		_hideWindow->SetValue(_configuration->HideWindow());
+		_hideWindow->Enable(!_configuration->HideWindowHasCliOverride());
+
 		InitializeLevelSelectFromOptions();
+
 		if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
 			_launchMode->SetValue(ComboBoxRepentogon);
 		} else {
 			_launchMode->SetValue(ComboBoxVanilla);
 		}
+		_launchMode->Enable(!_configuration->IsaacLaunchModeHasCliOverride());
 	}
 
 	void LauncherMainWindow::InitializeLevelSelectFromOptions() {
-		int levelStage = _configuration->Stage().value_or(0);
-		int stageType = _configuration->StageType().value_or(0);
+		int levelStage = _configuration->Stage();
+		int stageType = _configuration->StageType();
 
 		const char* stageName = IsaacInterface::GetStageName(levelStage, stageType);
 		if (stageName) {
@@ -755,6 +725,7 @@ namespace Launcher {
 		} else {
 			_levelSelect->SetSelection(0);
 		}
+		_levelSelect->Enable(!_configuration->StageHasCliOverride());
 	}
 
 	void LauncherMainWindow::UpdateRepentogonOptionsFromInstallation() {
@@ -784,7 +755,9 @@ namespace Launcher {
 				_repentogonLaunchModeIdx = _launchMode->Append(ComboBoxRepentogon);
 			}
 
-			_launchMode->SetValue(ComboBoxRepentogon);
+			if (!_configuration->IsaacLaunchModeHasCliOverride() || _configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
+				_launchMode->SetValue(ComboBoxRepentogon);
+			}
 
 			/* Intentionally not changing the selected launch mode value.
 			 *

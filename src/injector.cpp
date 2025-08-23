@@ -44,16 +44,16 @@ std::string GenerateCLI(const char* path, LauncherConfiguration const* configura
 		cli << " --luadebug";
 	}
 
-	if (configuration->Stage() && configuration->Stage() > 0) {
-		cli << " --set-stage=" << *configuration->Stage();
-
-		if (configuration->StageType()) {
-			cli << " --set-stage-type=" << *configuration->StageType();
-		}
+	if (configuration->Stage() > 0) {
+		cli << " --set-stage=" << configuration->Stage() << " --set-stage-type=" << configuration->StageType();
 	}
 
-	if (configuration->LuaHeapSize()) {
-		cli << " --luaheapsize=" << *configuration->LuaHeapSize();
+	if (!configuration->LoadRoom().empty()) {
+		cli << " --load-room=" << "\"" << configuration->LoadRoom() << "\"";
+	}
+
+	if (!configuration->LuaHeapSize().empty()) {
+		cli << " --luaheapsize=" << configuration->LuaHeapSize();
 	}
 
 	if (isLegacy && configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA) {
