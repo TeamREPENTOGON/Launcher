@@ -35,9 +35,10 @@
 #include "shared/compat.h"
 #include "shared/github.h"
 #include "shared/filesystem.h"
+#include "shared/launcher_update_checker.h"
 #include "shared/logger.h"
 #include "shared/monitor.h"
-#include "shared/launcher_update_checker.h"
+#include "shared/utils.h"
 
 #include "zip.h"
 #include "zipint.h"
@@ -472,8 +473,12 @@ namespace Launcher {
 			Show(true);
 		}
 
-		if (exitCode && exitCode != LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED) {
-			_logWindow.LogWarn("Game exited with error code %ul (%#lx)\n", exitCode, exitCode);
+		std::string desc;
+		utils::ErrorCodeToString(exitCode, desc);
+
+		if (exitCode && exitCode != LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED &&
+			exitCode != STATUS_CONTROL_C_EXIT) {
+			_logWindow.LogWarn("Game exited with error code %#lx (%s)\n", exitCode, desc.c_str());
 		} else {
 			_logWindow.LogInfo("Game sucessfully exited\n");
 		}
