@@ -252,7 +252,7 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	return 0;
 }
 
-int Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
+DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 	LauncherConfiguration const* configuration) {
 	HANDLE process;
 	void* remotePage;

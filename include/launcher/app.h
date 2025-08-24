@@ -8,7 +8,8 @@
 namespace Launcher {
 	class LauncherMainWindow;
 
-	int Launch(ILoggableGUI* gui, const char* path, bool isLegacy, LauncherConfiguration const* configuration);
+	DWORD Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
+		LauncherConfiguration const* configuration);
 
 	class App : public wxApp {
 	public:

@@ -105,7 +105,7 @@ namespace Launcher {
 		wxStaticBoxSizer* optionsSizer = new wxStaticBoxSizer(optionsBox, wxHORIZONTAL);
 
 		_verticalSizer = new wxBoxSizer(wxVERTICAL);
-		
+
 		wxTextCtrl* logWindow = _logWindow.Get();
 		logWindow->SetBackgroundColour(*wxWHITE);
 
@@ -146,7 +146,7 @@ namespace Launcher {
 
 	void LauncherMainWindow::AddLauncherConfigurationOptions() {
 		wxBoxSizer* isaacSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
-		AddLauncherConfigurationTextField("Isaac executable", 
+		AddLauncherConfigurationTextField("Isaac executable",
 			"Choose exe", NoIsaacText,
 			NoIsaacColor, isaacSelectionSizer, &_isaacFileText, WINDOW_BUTTON_SELECT_ISAAC);
 
@@ -453,7 +453,7 @@ namespace Launcher {
 		).chain(std::bind_front(&LauncherMainWindow::OnIsaacCompleted, this));
 	}
 
-	void LauncherMainWindow::OnIsaacCompleted(int exitCode) {
+	void LauncherMainWindow::OnIsaacCompleted(DWORD exitCode) {
 		if (_exePath) {
 			delete[] _exePath;
 			_exePath = nullptr;
@@ -473,7 +473,7 @@ namespace Launcher {
 		}
 
 		if (exitCode && exitCode != LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED) {
-			_logWindow.LogWarn("Game exited with error code %d\n", exitCode);
+			_logWindow.LogWarn("Game exited with error code %ul (%#lx)\n", exitCode, exitCode);
 		} else {
 			_logWindow.LogInfo("Game sucessfully exited\n");
 		}
@@ -827,7 +827,7 @@ namespace Launcher {
 	void LauncherMainWindow::AddLauncherConfigurationTextField(const char* intro,
 		const char* buttonText, const char* emptyText, wxColour const& emptyColor,
 		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
-		
+
 		wxStaticText* txt = new wxStaticText(_configurationBox, -1, intro, wxDefaultPosition);
 		int width, height;
 		txt->GetTextExtent("Repentogon executable", &width, &height);

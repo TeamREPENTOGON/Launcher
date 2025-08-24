@@ -136,7 +136,7 @@ namespace Launcher {
 		bool SelectIsaacExecutablePath();
 
 		void LaunchIsaac();
-		void OnIsaacCompleted(int result);
+		void OnIsaacCompleted(DWORD result);
 		void RelaunchIsaac();
 
 		wxStaticBoxSizer* _optionsSizer;
