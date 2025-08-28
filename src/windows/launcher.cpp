@@ -174,17 +174,17 @@ namespace Launcher {
 		wxSizer* box = new wxBoxSizer(wxHORIZONTAL);
 		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "));
 
+		_launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game", wxDefaultPosition, wxSize(50, 50));
+		//launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
+
 		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE);
-		_repentogonLaunchModeIdx = _launchMode->Append(ComboBoxRepentogon);
+		_launchMode->Append(ComboBoxRepentogon);
 		_launchMode->Append(ComboBoxVanilla);
 		_launchMode->SetValue(ComboBoxRepentogon);
 
 		box->Add(_launchMode);
 
 		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 0);
-
-		_launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game", wxDefaultPosition,wxSize(50,50));
-		//launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
 
 		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxBOTTOM, 0);
 
@@ -326,6 +326,7 @@ namespace Launcher {
 		} else {
 			_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
 		}
+		UpdateLaunchButtonEnabledState();
 	}
 
 	void LauncherMainWindow::OnLuaHeapSizeCharacterWritten(wxCommandEvent& event) {
@@ -404,7 +405,57 @@ namespace Launcher {
 		LaunchIsaac();
 	}
 
-	void LauncherMainWindow::LaunchIsaac() {
+	LauncherMainWindow::IsaacLaunchability LauncherMainWindow::GetIsaacLaunchability() {
+		const RepentogonInstallation& repentogonInstallation = _installation->GetRepentogonInstallation();
+		const IsaacInstallation& isaacInstallation = _installation->GetIsaacInstallation();
+
+		if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
+			if (!repentogonInstallation.IsValid()) {
+				return ISAAC_LAUNCH_REPENTOGON_INVALID;
+			}
+			if (!isaacInstallation.GetRepentogonInstallation().IsCompatibleWithRepentogon()) {
+				return ISAAC_LAUNCH_REPENTOGON_INCOMPATIBLE;
+			}
+			return ISAAC_LAUNCH_OK;
+		} else if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA) {
+			if (!isaacInstallation.GetMainInstallation().IsValid()) {
+				return ISAAC_LAUNCH_VANILLA_INVALID;
+			}
+			return ISAAC_LAUNCH_OK;
+		}
+
+		return ISAAC_LAUNCH_UNKNOWN;
+	}
+
+	const char* LauncherMainWindow::GetIsaacLaunchabilityErrorMessage(const IsaacLaunchability launchability) {
+		switch (launchability) {
+		case ISAAC_LAUNCH_OK:
+			return "No error - the game can be launched!";
+		case ISAAC_LAUNCH_VANILLA_INVALID:
+			return "The vanilla installation is broken!";
+		case ISAAC_LAUNCH_REPENTOGON_INVALID:
+			return "The REPENTOGON installation is broken!";
+		case ISAAC_LAUNCH_REPENTOGON_INCOMPATIBLE:
+			return "The Isaac executable is not compatible with REPENTOGON!";
+		default:
+			return "The game cannot be launched due to an unknown error!!!";
+		}
+	}
+
+	bool LauncherMainWindow::LaunchIsaac() {
+		const IsaacLaunchability launchability = GetIsaacLaunchability();
+		if (launchability != ISAAC_LAUNCH_OK) {
+			SetFocus();
+			if (!IsShown()) {
+				Show();
+			}
+			const wxString errMessage = wxString::Format("Failed to launch game: %s", GetIsaacLaunchabilityErrorMessage(launchability));
+			Logger::Error("%s (%d)\n", errMessage.c_str().AsChar(), launchability);
+			wxMessageDialog(this, errMessage, "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
+			_logWindow.LogError(errMessage.c_str().AsChar());
+			EnableInterface(true);
+			return false;
+		}
 		_logWindow.Log("Launching the game with the following options:");
 		_logWindow.Log("\tRepentogon:");
 		bool launchingVanilla = _configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA;
@@ -439,7 +490,7 @@ namespace Launcher {
 		if (!_exePath) {
 			_logWindow.LogError("Unable to allocate memory to launch the game\n");
 			Logger::Error("Unable to allocate memory for executable path\n");
-			return;
+			return false;
 		}
 
 		strcpy(_exePath, pathStr.c_str());
@@ -452,6 +503,8 @@ namespace Launcher {
 		chained_futures::async(&::Launcher::Launch, &_logWindow, _exePath,
 			launchingVanilla, _configuration
 		).chain(std::bind_front(&LauncherMainWindow::OnIsaacCompleted, this));
+
+		return true;
 	}
 
 	void LauncherMainWindow::OnIsaacCompleted(DWORD exitCode) {
@@ -642,11 +695,7 @@ namespace Launcher {
 		LaunchMode mode = _configuration->IsaacLaunchMode();
 		if (mode != LAUNCH_MODE_REPENTOGON && mode != LAUNCH_MODE_VANILLA) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default", mode, c::Keys::launchMode.c_str());
-			if (_installation->GetRepentogonInstallation().IsValid()) {
-				_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
-			} else {
-				_configuration->IsaacLaunchMode(LAUNCH_MODE_VANILLA);
-			}
+			_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
 		}
 
 		std::string luaHeapSize = _configuration->LuaHeapSize();
@@ -733,46 +782,18 @@ namespace Launcher {
 		_levelSelect->Enable(!_configuration->StageHasCliOverride());
 	}
 
-	void LauncherMainWindow::UpdateRepentogonOptionsFromInstallation() {
-		RepentogonInstallation const& repentogonInstallation = _installation->GetRepentogonInstallation();
-		IsaacInstallation const& isaacInstallation = _installation->GetIsaacInstallation();
-
-		bool isValid = repentogonInstallation.IsValid();
-		bool isIncompatible = !isaacInstallation.GetRepentogonInstallation().IsCompatibleWithRepentogon();
-
-		if (!isValid || isIncompatible) {
-			if (_repentogonLaunchModeIdx != -1) {
-				if (!isValid) {
-					_logWindow.LogWarn("Removing Repentogon start option as the Repentogon installation is broken\n");
-				}
-
-				if (isIncompatible) {
-					_logWindow.LogWarn("Removing Repentogon start option as the Isaac executable is not compatible\n");
-				}
-
-				_launchMode->Delete(_repentogonLaunchModeIdx);
-				_repentogonLaunchModeIdx = -1;
-			}
-
-			_launchMode->SetValue(ComboBoxVanilla);
-		} else {
-			if (_repentogonLaunchModeIdx == -1) {
-				_repentogonLaunchModeIdx = _launchMode->Append(ComboBoxRepentogon);
-			}
-
-			if (!_configuration->IsaacLaunchModeHasCliOverride() || _configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
-				_launchMode->SetValue(ComboBoxRepentogon);
-			}
-
-			/* Intentionally not changing the selected launch mode value.
-			 *
-			 * While the change in the above if branch is mandatory to prevent
-			 * the game from incorrectly being injected with Repentogon in case
-			 * of a legacy installation, or broken installation, changing the
-			 * value here would override the value selected by the user the
-			 * last time.
-			 */
+	void LauncherMainWindow::UpdateLaunchButtonEnabledState() {
+		if (_launchButton) {
+			_launchButton->Enable(GetIsaacLaunchability() == ISAAC_LAUNCH_OK);
 		}
+	}
+
+	void LauncherMainWindow::UpdateRepentogonOptionsFromInstallation() {
+		const IsaacLaunchability launchability = GetIsaacLaunchability();
+		if (launchability != ISAAC_LAUNCH_OK && _configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
+			_logWindow.LogWarn("Disabling REPENTOGON start option: %s", GetIsaacLaunchabilityErrorMessage(launchability));
+		}
+		UpdateLaunchButtonEnabledState();
 	}
 
 	void LauncherMainWindow::ForceRepentogonUpdate(bool allowPreReleases) {

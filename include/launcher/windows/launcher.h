@@ -51,6 +51,14 @@ namespace Launcher {
 			ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE
 		};
 
+		enum IsaacLaunchability {
+			ISAAC_LAUNCH_UNKNOWN,
+			ISAAC_LAUNCH_OK,
+			ISAAC_LAUNCH_VANILLA_INVALID,
+			ISAAC_LAUNCH_REPENTOGON_INVALID,
+			ISAAC_LAUNCH_REPENTOGON_INCOMPATIBLE,
+		};
+
 		LauncherMainWindow(Installation* installation, LauncherConfiguration* configuration);
 		~LauncherMainWindow();
 
@@ -87,6 +95,7 @@ namespace Launcher {
 		void InitializeGUIFromOptions();
 		/* Helper to initialize the level selection field from the IsaacOptions structure. */
 		void InitializeLevelSelectFromOptions();
+		void UpdateLaunchButtonEnabledState();
 		void UpdateRepentogonOptionsFromInstallation();
 
 		/* Event handlers. */
@@ -135,7 +144,10 @@ namespace Launcher {
 
 		bool SelectIsaacExecutablePath();
 
-		void LaunchIsaac();
+		IsaacLaunchability GetIsaacLaunchability();
+		const char* GetIsaacLaunchabilityErrorMessage(const IsaacLaunchability state);
+
+		bool LaunchIsaac();
 		void OnIsaacCompleted(DWORD result);
 		void RelaunchIsaac();
 
@@ -158,7 +170,6 @@ namespace Launcher {
 		wxTextCtrl* _repentogonFileText;
 		wxButton* _launchButton;
 		wxButton* _advancedOptionsButton;
-		int _repentogonLaunchModeIdx = -1;
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
 		bool _initialUnstableUpdates = false;
 		bool _canPromptOnUnstableSwitch = true;
