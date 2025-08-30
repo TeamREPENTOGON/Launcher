@@ -1,9 +1,48 @@
+#!/usr/bin/env python
+
+import argparse
 import os
 import hashlib
 import json
 import bsdiff4
 from pathlib import Path
 import shutil
+import sys
+
+def parse_args():
+    description = """\
+This script is used to generate a binary patchset allowing to convert a set of
+files to a different one, either by patching existing files, creating new ones,
+or deleting extraneous files.
+
+The script works by taking all files in a source folder and binary diffing them
+with the files with the same name in a target folder. The corresponding bsdiff
+style patches are generated in an output folder.
+
+Given an output folder, the script creates a file called manifest.json that
+describes the operations to perform on the source files: patch them, delete
+some, or create new ones. Patches are stored in a subfolder called patches.
+The processing of manifest.json is to be done through a different process.
+"""
+    parser = argparse.ArgumentParser(prog="REPENTOGON binary diff generator",
+                                     description=description)
+    parser.add_argument("-n", "--dry-run", action="store_true",
+                        help="Perform a dry run: only simulate execution")
+    parser.add_argument("-y", "--yes", action="store_true",
+                        help="If the output folder already exists, do not prompt "
+                             "before deletion")
+    parser.add_argument("-s", "--source", metavar="DIR",
+                        help="Folder in which to find the files to downgrade",
+                        default="source", type=Path)
+    parser.add_argument("-t", "--target", metavar="DIR",
+                        help="Folder in which to find the downgraded versions of the files",
+                        default="target", type=Path)
+    parser.add_argument("-o", "--output", metavar="DIR",
+                        help="Folder in which to output the resulting patches",
+                        default="output", type=Path)
+
+    return parser.parse_args()
+
 
 def file_hash(path):
     with open(path, 'rb') as f:
@@ -18,57 +57,104 @@ def relative_files(folder):
             files.append(rel)
     return files
 
-def main(folder_a, folder_b, folder_c):
-    folder_a = Path(folder_a)
-    folder_b = Path(folder_b)
-    folder_c = Path(folder_c)
+def handle_output_folder(output, force, dry):
+    if output.exists():
+        if not force:
+            remove = input(f"Output folder {output} already exists, do you want "
+                           "to remove it (Y/n) ? (Answering no will abort) ")
+            while (remove != "y" and remove != "Y" and remove != "n" and
+                   remove != "N" and remove != ""):
+                remove = input(f"Please answer with y, Y, n, N or nothing (Y/n) ")
 
-    if folder_c.exists():
-        shutil.rmtree(folder_c)
-    folder_c.mkdir(parents=True)
+            if remove == "N" or remove == "n":
+                sys.exit(0)
+        print (f"Removing output folder {output}")
+        if not dry:
+            shutil.rmtree(output)
 
-    files_a = set(relative_files(folder_a))
-    files_b = set(relative_files(folder_b))
+    print(f"Creating output folder {output}")
+    if not dry:
+        output.mkdir(parents=True)
 
-    deleted = sorted(list(files_a - files_b))
-    created = sorted(list(files_b - files_a))
-    common = sorted(list(files_a & files_b))
-
+def generate_common_files_patches(files, source, target, patch_dir, dry):
     to_patch = []
 
-    patch_dir = folder_c / "patches"
-    patch_dir.mkdir()
-
-    for file in common:
-        file_a = folder_a / file
-        file_b = folder_b / file
+    for file in files:
+        file_a = source / file
+        file_b = target / file
         if file_hash(file_a) != file_hash(file_b):
+            print (f"Generating bsdiff patch for {file}")
             patch_path = patch_dir / (file.replace("/", "__") + ".patch")
-            patch_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if not dry:
+                patch_path.parent.mkdir(parents=True, exist_ok=True)
+
             with open(file_a, 'rb') as fa, open(file_b, 'rb') as fb:
                 a_data = fa.read()
                 b_data = fb.read()
                 patch = bsdiff4.diff(a_data, b_data)
-                patch_path.write_bytes(patch)
+
+                if not dry:
+                    patch_path.write_bytes(patch)
+
             to_patch.append(file)
+
+    return to_patch
+
+def generate_created_files_patches(files, target, output, dry):
+    result = {}
+
+    for file in files:
+        print (f"Generating creation patch for {file}")
+        src = target / file
+        dst = output / "create" / file
+
+        if not dry:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+
+        result[file] = str((Path("create") / file).as_posix())
+
+    return result
+
+def main(source, target, output, dry, force):
+    if dry:
+        print ("Performing a dry run")
+
+    source = Path(source)
+    target = Path(target)
+    output = Path(output)
+
+    handle_output_folder(output, force, dry)
+
+    source_files = set(relative_files(source))
+    target_files = set(relative_files(target))
+
+    deleted = sorted(list(source_files - target_files))
+    created = sorted(list(target_files - source_files))
+    common = sorted(list(source_files & target_files))
+
+    patch_dir = output / "patches"
+    print (f"Creating patches folder {patch_dir}")
+    if not dry:
+        patch_dir.mkdir()
+
+    to_patch = generate_common_files_patches(common, source, target, patch_dir, dry)
+    created_patch = generate_created_files_patches(created, target, output, dry)
 
     patch_manifest = {
         "delete": deleted,
-        "create": {},
+        "create": created_patch,
         "patch": to_patch
     }
 
-    for file in created:
-        src = folder_b / file
-        dst = folder_c / "create" / file
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, dst)
-        patch_manifest["create"][file] = str((Path("create") / file).as_posix())
+    print ("Generating manifest file")
+    if not dry:
+        with open(output / "manifest.json", "w") as f:
+            json.dump(patch_manifest, f, indent=2)
 
-    with open(folder_c / "manifest.json", "w") as f:
-        json.dump(patch_manifest, f, indent=2)
-
-    print("Patch created at:", folder_c)
+    print(f"Patch created at {output}")
 
 if __name__ == "__main__":
-    main("source", "target", "output")
+    args = parse_args()
+    main(args.source, args.target, args.output, args.dry_run, args.yes)
