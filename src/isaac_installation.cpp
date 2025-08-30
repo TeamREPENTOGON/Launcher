@@ -16,6 +16,7 @@
 #include "shared/steam.h"
 #include "shared/unique_free_ptr.h"
 #include "launcher/standalone_rgon_folder.h"
+#include "steam_api.h"
 
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
 
@@ -100,6 +101,15 @@ std::vector<std::string> ParseLibraryPathsFromSteamConfigFile(const std::string&
 // Attempts to locate an isaac-ng.exe file from Steam. First checks Steam's install directory,
 // then checks for alternate Steam Libraries on other drives.
 std::optional<std::string> LocateSteamIsaacExecutable() {
+	if (SteamAPI_Init()) { //SteamAPI way (more reliable but will only work if steam is running)
+		char temppath[MAX_PATH];
+		SteamApps()->GetAppInstallDir(250900, temppath, sizeof(temppath));
+		std::string stringedpath = std::string(temppath);
+		if (stringedpath.length() > 0) {
+			return std::string(temppath) + "\\isaac-ng.exe";
+		}
+	}
+
 	// Get the installation path of Steam itself.
 	std::optional<std::string> steamInstallPath = Steam::GetSteamInstallationPath();
 	if (!steamInstallPath) {

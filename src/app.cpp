@@ -12,6 +12,7 @@
 #include "shared/loggable_gui.h"
 #include "launcher/windows/repentogon_installer.h"
 #include <filesystem>
+#include <launcher/modupdater.h>
 
 static LauncherConfiguration __configuration;
 static Launcher::Installation* __installation;
@@ -191,6 +192,7 @@ bool Launcher::App::OnInit() {
 		_mainFrame->EnableInterface(true);
 	}
 	wxInitAllImageHandlers(); //needed for stupid modman thumb shit (dunno if it belongs here, but it felt nice to shove it here)
+
 	return true;
 }
 

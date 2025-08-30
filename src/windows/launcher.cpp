@@ -47,6 +47,7 @@
 #undef min
 #endif
 #include <launcher/modmanager.h>
+#include <launcher/modupdater.h>
 
 wxBEGIN_EVENT_TABLE(Launcher::LauncherMainWindow, wxFrame)
 EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::LauncherMainWindow::OnLevelSelect)
@@ -456,6 +457,13 @@ namespace Launcher {
 			EnableInterface(true);
 			return false;
 		}
+
+		if (SteamAPI_Init()) { //No point in running the updater if nonsteam....for now?, lol
+			_logWindow.Log("Checking for mod updates on Steam's folder:");
+			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "Mods", &_logWindow);
+			dlg.ShowModal();
+		}
+
 		_logWindow.Log("Launching the game with the following options:");
 		_logWindow.Log("\tRepentogon:");
 		bool launchingVanilla = _configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA;

@@ -10,6 +10,7 @@
 #include "launcher/installation.h"
 #include <wx/statline.h>
 #include <wx/mstream.h>
+#include <steam_api.h>
 
 namespace fs = std::filesystem;
 
@@ -47,6 +48,7 @@ EVT_LISTBOX(WINDOW_LIST_MODMAN_DISABLED, ModManagerFrame::OnSelectMod)
 
 wxEND_EVENT_TABLE()
 
+bool issteam = false;
 
 void OnRichTextUrlClick(wxTextUrlEvent& event)
 {
@@ -110,11 +112,13 @@ wxImage LoadPngFromResource(HINSTANCE hInst, int resID)
     return img;
 }
 
+
 ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Instalation)
     : wxFrame(parent, wxID_ANY, "REPENTOGON Mod Manager", wxDefaultPosition, wxSize(800, 800)) {
 
     Center(wxBOTH);
 
+    issteam = SteamAPI_Init();
     wxPanel* panel = new wxPanel(this);
 
 
@@ -364,6 +368,7 @@ std::string GetThumbnailURL(const std::string& itemId) {
 }
 
 bool DownloadThumbFromID(const std::string& itemId, const std::string& filePath) {
+
     if (itemId.length() <= 0) { return false; }
     CURL* curl = curl_easy_init();
     if (!curl) return false;
@@ -530,8 +535,8 @@ void ModManagerFrame::LoadModExtraData() {
             selectedMod->extradata.anm2                 = selectedMod->extradata.anm2               || HasAnm2File(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx")); 
             selectedMod->extradata.sprites              = selectedMod->extradata.sprites            || HasFile(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx"), ".png");
             selectedMod->extradata.resourceMinor        = selectedMod->extradata.resourceMinor      || HasFile(fs::path(_modspath / selectedMod->folderName / resources[i]), ".xml");
-            selectedMod->extradata.cutscenes        = selectedMod->extradata.cutscenes || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx" / "cutscenes"));
 
+            selectedMod->extradata.cutscenes        = selectedMod->extradata.cutscenes || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx" / "cutscenes"));
             selectedMod->extradata.Sounds = selectedMod->extradata.Sounds || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "sfx"));
             selectedMod->extradata.Music = selectedMod->extradata.Music || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "music"));
         }

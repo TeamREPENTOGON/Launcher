@@ -29,6 +29,8 @@ include (cmake/deps/libzip.cmake)
 add_subdirectory(deps/bzip2)
 add_subdirectory(deps/bsdiff)
 
+include(cmake/deps/steamapi.cmake)
+
 if (NOT CMAKE_LAUNCHER_VERSION)
   message(WARNING "No Launcher version specified, defaulting to dev")
   set (CMAKE_LAUNCHER_VERSION "dev")
@@ -68,16 +70,24 @@ target_include_directories (REPENTOGONLauncher PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/zlib"
     "${CMAKE_SOURCE_DIR}/deps/bzip2"
     "${CMAKE_SOURCE_DIR}/deps/bsdiff"
+    "${CMAKE_SOURCE_DIR}/deps/steamapi"
+    "${CMAKE_SOURCE_DIR}/deps/steamapi/lib"
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
     "${CMAKE_SOURCE_DIR}/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include"
     "${CMAKE_SOURCE_DIR}/deps/chained_futures/include"
 )
 target_compile_definitions (REPENTOGONLauncher PRIVATE UNICODE INI_SHARED_LIB "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
-target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch)
+target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch steamapi)
 add_custom_command(
     TARGET REPENTOGONLauncher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/deps/steamapi/lib/steam_api.dll"
+        $<TARGET_FILE_DIR:REPENTOGONLauncher>
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/deps/steamapi/lib/steam_appid.txt"
+        $<TARGET_FILE_DIR:REPENTOGONLauncher>
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/patch"
         "$<TARGET_FILE_DIR:REPENTOGONLauncher>/patch"
