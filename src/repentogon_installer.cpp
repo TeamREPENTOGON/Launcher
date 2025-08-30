@@ -453,11 +453,11 @@ namespace Launcher {
 		}
 
 		std::string zipHash;
-		try {
-			zipHash = Sha256::Sha256F(RepentogonZipName);
-		} catch (std::exception& e) {
-			Logger::Fatal("RepentogonUpdater::CheckRepentogonIntegrity: exception while hashing %s: %s\n", RepentogonZipName, e.what());
-			throw;
+		HashResult hashResult = Sha256::Sha256F(RepentogonZipName, zipHash);
+
+		if (hashResult != HASH_OK) {
+			Logger::Fatal("RepentogonUpdater::CheckRepentogonIntegrity: unable "
+				"to compute hash of %s: %s\n", RepentogonZipName, HashResultToString(hashResult));
 		}
 
 		_installationState.hash = hash;

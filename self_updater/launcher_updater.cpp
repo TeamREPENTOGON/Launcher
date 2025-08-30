@@ -37,8 +37,17 @@ namespace Updater {
 	}
 
 	bool LauncherUpdater::CheckHashConsistency(const char* zipFile, const char* hash) {
-		std::string fileHash = Sha256::Sha256F(zipFile);
-		Logger::Info("LauncherUpdater::CheckHashConsistencty: fileHash = %s (%lu), hash = %s (%lu)\n", fileHash.c_str(), strlen(fileHash.c_str()), hash, strlen(hash));
+		std::string fileHash;
+		HashResult result = Sha256::Sha256F(zipFile, fileHash);
+
+		if (result != HASH_OK) {
+			Logger::Error("LauncherUpdater::CheckHashConsistency: error while computing hash "
+				"of %s: %s\n", zipFile, HashResultToString(result));
+			return false;
+		}
+
+		Logger::Info("LauncherUpdater::CheckHashConsistencty: fileHash = %s (%lu), hash = %s (%lu)\n",
+			fileHash.c_str(), strlen(fileHash.c_str()), hash, strlen(hash));
 		return Sha256::Equals(fileHash.c_str(), hash);
 	}
 
