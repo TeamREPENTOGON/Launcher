@@ -101,7 +101,7 @@ std::vector<std::string> ParseLibraryPathsFromSteamConfigFile(const std::string&
 // Attempts to locate an isaac-ng.exe file from Steam. First checks Steam's install directory,
 // then checks for alternate Steam Libraries on other drives.
 std::optional<std::string> LocateSteamIsaacExecutable() {
-	if (SteamAPI_Init()) { //SteamAPI way (more reliable but will only work if steam is running)
+	if (SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //SteamAPI way (more reliable but will only work if steam is running)
 		char temppath[MAX_PATH];
 		SteamApps()->GetAppInstallDir(250900, temppath, sizeof(temppath));
 		std::string stringedpath = std::string(temppath);
