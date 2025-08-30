@@ -1302,7 +1302,8 @@ namespace standalone_rgon {
                 /* Skip whole folders, rely on the individual files inside the
                  * folder instead.
                  */
-                const char* sourceStr = sourcePath.string().c_str();
+                std::string tmp = sourcePath.string(); // I heckin love temporary strings...
+                const char* sourceStr = tmp.c_str();
                 if (Filesystem::IsFolder(sourceStr)) {
                     Logger::Info("standalone_rgon::CopyFiles: skipping folder %s\n",
                         sourceStr);
