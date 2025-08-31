@@ -403,6 +403,11 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::Launch(wxCommandEvent&) {
+		if (SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //No point in running the updater if nonsteam....for now?, lol
+			_logWindow.Log("Checking for mod updates on Steam's folder:");
+			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "Mods", &_logWindow);
+			dlg.ShowModal();
+		}
 		LaunchIsaac();
 	}
 
@@ -456,12 +461,6 @@ namespace Launcher {
 			_logWindow.LogError(errMessage.c_str().AsChar());
 			EnableInterface(true);
 			return false;
-		}
-
-		if (SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //No point in running the updater if nonsteam....for now?, lol
-			_logWindow.Log("Checking for mod updates on Steam's folder:");
-			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "Mods", &_logWindow);
-			dlg.ShowModal();
 		}
 
 		_logWindow.Log("Launching the game with the following options:");

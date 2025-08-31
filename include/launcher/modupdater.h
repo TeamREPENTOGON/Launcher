@@ -12,6 +12,7 @@
 #include "rapidxml/rapidxml.hpp"
 #include "rapidxml/rapidxml_utils.hpp"
 #include <unordered_set>
+#include "widgets/text_ctrl_log_widget.h"
 
 namespace fs = std::filesystem;
 
@@ -115,7 +116,7 @@ public:
 
     ~ModUpdateDialog() {
         cancelrequest = true;
-        if (mthread.joinable()) mthread.join();
+        if (mthread.joinable()) mthread.detach();
     }
 
 private:
@@ -134,7 +135,9 @@ private:
         wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
         evt->SetInt(overallPct);
         evt->SetString(message);
-        wxQueueEvent(this, evt);
+        if (!IsBeingDeleted()) {
+            wxQueueEvent(this, evt);
+        }
     }
 
     void OnCancel(wxCommandEvent&) {
@@ -230,7 +233,7 @@ private:
 
         for (auto pfid : subscribed) {
             subscribedIds.insert(static_cast<uint64_t>(pfid));
-            if (cancelrequest) break;
+            if (cancelrequest) return;
             ++idx;
             uint64_t id = static_cast<uint64_t>(pfid);
 
