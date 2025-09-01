@@ -50,6 +50,7 @@ struct ModInfo {
     std::string displayName;
     std::string description;
     std::string directory;
+    bool islocal;
     std::string id;
     ModExtraData extradata;
 };
@@ -64,7 +65,7 @@ private:
     wxRichTextCtrl* descriptionCtrl;
     wxRichTextCtrl* extraInfoCtrl;
 
-    ModInfo* selectedMod;
+    ModInfo selectedMod;
     wxStaticText* selectedModTitle;
 
     wxListBox* _enabledlist;
@@ -88,7 +89,9 @@ private:
     void OnClose(wxCommandEvent& event);
 
     void LoadModExtraData();
-    void OnSelectMod(wxCommandEvent& event);
+    void OnSelectModEnabled(wxCommandEvent& event);
+    void OnSelectModDisabled(wxCommandEvent& event);
+    void OnSelectMod(ModInfo mod);
     void OnWorkshopPage(wxCommandEvent& event);
     void OnModFolder(wxCommandEvent& event);
     void OnModSaveFolder(wxCommandEvent& event);
@@ -100,3 +103,5 @@ private:
 
     wxDECLARE_EVENT_TABLE();
 };
+
+

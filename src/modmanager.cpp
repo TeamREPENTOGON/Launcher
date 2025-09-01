@@ -43,8 +43,8 @@ EVT_BUTTON(WINDOW_BUTTON_MODMAN_WORKSHOP, ModManagerFrame::OnWorkshopPage)
 EVT_BUTTON(WINDOW_BUTTON_MODMAN_MODFOLDER, ModManagerFrame::OnModFolder)
 EVT_BUTTON(WINDOW_BUTTON_MODMAN_SAVEFOLDER, ModManagerFrame::OnModSaveFolder)
 
-EVT_LISTBOX(WINDOW_LIST_MODMAN_ENABLED, ModManagerFrame::OnSelectMod)
-EVT_LISTBOX(WINDOW_LIST_MODMAN_DISABLED, ModManagerFrame::OnSelectMod)
+EVT_LISTBOX(WINDOW_LIST_MODMAN_ENABLED, ModManagerFrame::OnSelectModEnabled)
+EVT_LISTBOX(WINDOW_LIST_MODMAN_DISABLED, ModManagerFrame::OnSelectModDisabled)
 
 wxEND_EVENT_TABLE()
 
@@ -246,6 +246,8 @@ void ModManagerFrame::LoadModsFromFolder() {
                         if (metadata->first_node("directory")) {
                             info.directory = metadata->first_node("directory")->value();
                         }
+
+                        info.islocal = info.folderName != (info.directory + "_" + info.id);
                     }
                 }
             } catch (...) {
@@ -264,12 +266,12 @@ void ModManagerFrame::RefreshLists() {
 
     for (const ModInfo& mod : allMods) {
         wxString name = mod.displayName;
+        if (mod.islocal) { name = "[DEV/NoSteam] " + name; }
         if (!filter.IsEmpty() && !name.Lower().Contains(filter)) continue;
-
         if (IsDisabled(mod.folderName)) {
-            _disabledlist->AppendString(name);
+            _disabledlist->Append(name,new ModInfo(mod));
         } else {
-            _enabledlist->AppendString(name);
+            _enabledlist->Append(name, new ModInfo(mod));
         }
     }
 }
@@ -301,24 +303,14 @@ void ModManagerFrame::OnDisableAll(wxCommandEvent&) {
 }
 
 void ModManagerFrame::OnDoubleClickEnabled(wxCommandEvent& evt) {
-    wxString label = _enabledlist->GetString(evt.GetSelection());
-    for (const auto& mod : allMods) {
-        if (mod.displayName == label.ToStdString()) {
-            DisableMod(mod.folderName);
-            break;
-        }
-    }
+    ModInfo* mod = static_cast<ModInfo*>(_enabledlist->GetClientData(evt.GetSelection()));
+    DisableMod(mod->folderName);
     RefreshLists();
 }
 
 void ModManagerFrame::OnDoubleClickDisabled(wxCommandEvent& evt) {
-    wxString label = _disabledlist->GetString(evt.GetSelection());
-    for (const auto& mod : allMods) {
-        if (mod.displayName == label.ToStdString()) {
-            EnableMod(mod.folderName);
-            break;
-        }
-    }
+    ModInfo* mod = static_cast<ModInfo*>(_disabledlist->GetClientData(evt.GetSelection()));
+    EnableMod(mod->folderName);
     RefreshLists();
 }
 
@@ -493,52 +485,52 @@ void ModManagerFrame::LoadModExtraData() {
     extraInfoCtrl->SetValue("Adds nothing?");
     extraInfoCtrl->SetDefaultStyle(wxTextAttr());
     extraInfoCtrl->EndURL(); //no fucking clue why, but theres some oddity where clicking a link leaves this shit open somewhere in wxwidgets internal code?
-    if (!selectedMod->extradata.dataset) {
-        selectedMod->extradata.dataset = true;
+    if (!selectedMod.extradata.dataset) {
+        selectedMod.extradata.dataset = true;
 
         std::string contents[] = { "content","content-dlc3" };
         std::string resources[] = { "resources","resources-dlc3" };
         int checks = 0;
-        if (fs::exists(fs::path(_modspath / selectedMod->folderName / "content-dlc3"))) {
+        if (fs::exists(fs::path(_modspath / selectedMod.folderName / "content-dlc3"))) {
             checks++;
         }
 
         for (int i = 0; i <= checks; i++) {
-            selectedMod->extradata.Items        = selectedMod->extradata.Items      || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "items.xml"), "items","active") || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / "content" / "items.xml"), "items", "passive");
-            selectedMod->extradata.Trinkets     = selectedMod->extradata.Trinkets   || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "items.xml"), "items","trinket");
-            selectedMod->extradata.Characters   = selectedMod->extradata.Characters || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "players.xml"), "players");
-            selectedMod->extradata.Music        = selectedMod->extradata.Music      || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "music.xml"), "music","track");
-            selectedMod->extradata.Sounds       = selectedMod->extradata.Sounds     || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "sounds.xml"), "sounds","sound");
-            selectedMod->extradata.ItemPools    = selectedMod->extradata.ItemPools  || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "itempools.xml"), "itempools","pool");
-            selectedMod->extradata.Shaders      = selectedMod->extradata.Shaders    || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "shaders.xml"), "shaders","shader");
-            selectedMod->extradata.Challenges   = selectedMod->extradata.Challenges || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "challenges.xml"), "challenges");
-            selectedMod->extradata.Cards        = selectedMod->extradata.Cards      || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "pocketitems.xml"), "pocketitems","card");
-            selectedMod->extradata.Pills        = selectedMod->extradata.Pills      || HasChildNodesFromXML(fs::path(_modspath / selectedMod->folderName / contents[i] / "pocketitems.xml"), "pocketitems","pill");
+            selectedMod.extradata.Items        = selectedMod.extradata.Items      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "items.xml"), "items","active") || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / "content" / "items.xml"), "items", "passive");
+            selectedMod.extradata.Trinkets     = selectedMod.extradata.Trinkets   || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "items.xml"), "items","trinket");
+            selectedMod.extradata.Characters   = selectedMod.extradata.Characters || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "players.xml"), "players");
+            selectedMod.extradata.Music        = selectedMod.extradata.Music      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "music.xml"), "music","track");
+            selectedMod.extradata.Sounds       = selectedMod.extradata.Sounds     || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "sounds.xml"), "sounds","sound");
+            selectedMod.extradata.ItemPools    = selectedMod.extradata.ItemPools  || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "itempools.xml"), "itempools","pool");
+            selectedMod.extradata.Shaders      = selectedMod.extradata.Shaders    || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "shaders.xml"), "shaders","shader");
+            selectedMod.extradata.Challenges   = selectedMod.extradata.Challenges || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "challenges.xml"), "challenges");
+            selectedMod.extradata.Cards        = selectedMod.extradata.Cards      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems","card");
+            selectedMod.extradata.Pills        = selectedMod.extradata.Pills      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems","pill");
         }
-        selectedMod->extradata.lua = fs::exists(fs::path(_modspath / selectedMod->folderName / "main.lua"));
+        selectedMod.extradata.lua = fs::exists(fs::path(_modspath / selectedMod.folderName / "main.lua"));
         
         checks = 0;
-        if (fs::exists(fs::path(_modspath / selectedMod->folderName / "resources-dlc3"))) {
+        if (fs::exists(fs::path(_modspath / selectedMod.folderName / "resources-dlc3"))) {
             checks++;
         }
         for (int i = 0; i <= checks; i++) {
-            selectedMod->extradata.resourceItems        = selectedMod->extradata.resourceItems      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "items.xml"));
-            selectedMod->extradata.resourceTrinkets     = selectedMod->extradata.resourceTrinkets   || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "items.xml"));
-            selectedMod->extradata.resourceCharacters   = selectedMod->extradata.resourceCharacters || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "players.xml"));
-            selectedMod->extradata.resourceMusic        = selectedMod->extradata.resourceMusic      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "music.xml")) ;
-            selectedMod->extradata.resourceSounds       = selectedMod->extradata.resourceSounds     || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "sounds.xml"));
-            selectedMod->extradata.resourceItemPools    = selectedMod->extradata.resourceItemPools  || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "itempools.xml"));
-            selectedMod->extradata.resourceShaders      = selectedMod->extradata.resourceShaders    || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "shaders.xml"));
-            selectedMod->extradata.resourceChallenges   = selectedMod->extradata.resourceChallenges || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "challenges.xml"));
-            selectedMod->extradata.resourceCards        = selectedMod->extradata.resourceCards      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "pocketitems.xml"));
-            selectedMod->extradata.resourcePills        = selectedMod->extradata.resourcePills      || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "pocketitems.xml"));
-            selectedMod->extradata.anm2                 = selectedMod->extradata.anm2               || HasAnm2File(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx")); 
-            selectedMod->extradata.sprites              = selectedMod->extradata.sprites            || HasFile(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx"), ".png");
-            selectedMod->extradata.resourceMinor        = selectedMod->extradata.resourceMinor      || HasFile(fs::path(_modspath / selectedMod->folderName / resources[i]), ".xml");
+            selectedMod.extradata.resourceItems        = selectedMod.extradata.resourceItems      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
+            selectedMod.extradata.resourceTrinkets     = selectedMod.extradata.resourceTrinkets   || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
+            selectedMod.extradata.resourceCharacters   = selectedMod.extradata.resourceCharacters || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "players.xml"));
+            selectedMod.extradata.resourceMusic        = selectedMod.extradata.resourceMusic      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music.xml")) ;
+            selectedMod.extradata.resourceSounds       = selectedMod.extradata.resourceSounds     || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sounds.xml"));
+            selectedMod.extradata.resourceItemPools    = selectedMod.extradata.resourceItemPools  || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "itempools.xml"));
+            selectedMod.extradata.resourceShaders      = selectedMod.extradata.resourceShaders    || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "shaders.xml"));
+            selectedMod.extradata.resourceChallenges   = selectedMod.extradata.resourceChallenges || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "challenges.xml"));
+            selectedMod.extradata.resourceCards        = selectedMod.extradata.resourceCards      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
+            selectedMod.extradata.resourcePills        = selectedMod.extradata.resourcePills      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
+            selectedMod.extradata.anm2                 = selectedMod.extradata.anm2               || HasAnm2File(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx")); 
+            selectedMod.extradata.sprites              = selectedMod.extradata.sprites            || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"), ".png");
+            selectedMod.extradata.resourceMinor        = selectedMod.extradata.resourceMinor      || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i]), ".xml");
 
-            selectedMod->extradata.cutscenes        = selectedMod->extradata.cutscenes || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "gfx" / "cutscenes"));
-            selectedMod->extradata.Sounds = selectedMod->extradata.Sounds || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "sfx"));
-            selectedMod->extradata.Music = selectedMod->extradata.Music || fs::exists(fs::path(_modspath / selectedMod->folderName / resources[i] / "music"));
+            selectedMod.extradata.cutscenes        = selectedMod.extradata.cutscenes || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx" / "cutscenes"));
+            selectedMod.extradata.Sounds = selectedMod.extradata.Sounds || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sfx"));
+            selectedMod.extradata.Music = selectedMod.extradata.Music || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music"));
         }
     }
     extraInfoCtrl->SetValue("");
@@ -547,7 +539,7 @@ void ModManagerFrame::LoadModExtraData() {
     style.SetTextColour(wxColor("White"));
 
 
-    if (selectedMod->extradata.resourceItems || selectedMod->extradata.resourceCharacters || selectedMod->extradata.resourceMusic || selectedMod->extradata.resourceSounds || selectedMod->extradata.resourceItemPools || selectedMod->extradata.resourceShaders || selectedMod->extradata.resourceChallenges || selectedMod->extradata.resourceCards) {
+    if (selectedMod.extradata.resourceItems || selectedMod.extradata.resourceCharacters || selectedMod.extradata.resourceMusic || selectedMod.extradata.resourceSounds || selectedMod.extradata.resourceItemPools || selectedMod.extradata.resourceShaders || selectedMod.extradata.resourceChallenges || selectedMod.extradata.resourceCards) {
         style.SetBackgroundColour(wxColor("Red")); //Blood Red of Heck
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->BeginURL("This means potential compat issues! (usually done by mistake)");
@@ -557,7 +549,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    else if (selectedMod->extradata.resourceMinor){
+    else if (selectedMod.extradata.resourceMinor){
         style.SetBackgroundColour(wxColor("Grey")); 
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->BeginURL("Not too bad on this case, but could still be bad for compat");
@@ -568,7 +560,7 @@ void ModManagerFrame::LoadModExtraData() {
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
 
-    if (selectedMod->extradata.lua) {
+    if (selectedMod.extradata.lua) {
         style.SetBackgroundColour(wxColor(0, 178, 255)); //cyanish
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<LuaCode>"));
@@ -576,7 +568,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod->extradata.anm2) {
+    if (selectedMod.extradata.anm2) {
         style.SetBackgroundColour(wxColor(32, 23, 224)); //bluish
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<ANM2>"));
@@ -584,7 +576,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod->extradata.sprites) {
+    if (selectedMod.extradata.sprites) {
         style.SetBackgroundColour(wxColor(40, 219, 140)); //cyanish
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Sprites>"));
@@ -592,7 +584,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod->extradata.Shaders) {
+    if (selectedMod.extradata.Shaders) {
         style.SetBackgroundColour(wxColor(209, 59, 199)); //peenk
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Shaders>"));
@@ -601,7 +593,7 @@ void ModManagerFrame::LoadModExtraData() {
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
 
-    if (selectedMod->extradata.Items > 0) { 
+    if (selectedMod.extradata.Items > 0) { 
         style.SetBackgroundColour(wxColor(82, 235, 5)); //barf green
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Items>"));
@@ -609,7 +601,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod->extradata.Trinkets > 0) {
+    if (selectedMod.extradata.Trinkets > 0) {
         style.SetBackgroundColour(wxColor(255, 207, 2)); //GOLD
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Trinkets>"));
@@ -618,7 +610,7 @@ void ModManagerFrame::LoadModExtraData() {
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
 
-    if (selectedMod->extradata.Cards) {
+    if (selectedMod.extradata.Cards) {
         style.SetBackgroundColour(wxColor(168, 70, 1)); //Bownie
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Cards>"));
@@ -626,7 +618,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod->extradata.Pills) {
+    if (selectedMod.extradata.Pills) {
         style.SetBackgroundColour(wxColor(114, 147, 255)); //Bluey
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Pills>"));
@@ -634,7 +626,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod->extradata.Characters) {
+    if (selectedMod.extradata.Characters) {
         style.SetBackgroundColour(wxColor(242, 152, 131)); //white dude after a sunny day
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Charas>"));
@@ -642,7 +634,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod->extradata.Music) {
+    if (selectedMod.extradata.Music) {
         style.SetBackgroundColour(wxColor(173, 101, 240)); //parpel
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Music>"));
@@ -650,7 +642,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod->extradata.Sounds) {
+    if (selectedMod.extradata.Sounds) {
         style.SetBackgroundColour(wxColor(200, 207, 2)); //infected pee
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Sounds>"));
@@ -659,7 +651,7 @@ void ModManagerFrame::LoadModExtraData() {
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
     
-    if (selectedMod->extradata.cutscenes) {
+    if (selectedMod.extradata.cutscenes) {
         style.SetBackgroundColour(wxColor(136, 42, 245)); //the man who slaughers or some shit, I didnt play fnaf!
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Cutscenes>"));
@@ -815,13 +807,18 @@ void ParseBBCode(wxRichTextCtrl* field, const std::string& bbcode) {
     }
 }
 
-void ModManagerFrame::OnSelectMod(wxCommandEvent& evt) {
-    wxListBox* list = static_cast<wxListBox*>(evt.GetEventObject());
-    if (list->GetSelection() == wxNOT_FOUND) return;
+void ModManagerFrame::OnSelectModEnabled(wxCommandEvent& evt) {
+    ModInfo* mod = static_cast<ModInfo*>(_enabledlist->GetClientData(evt.GetSelection()));
+    ModManagerFrame::OnSelectMod(*mod);
+}
 
-    wxString label = list->GetString(list->GetSelection());
-    for (auto& mod : allMods) {
-        if (mod.displayName == label.ToStdString()) {
+void ModManagerFrame::OnSelectModDisabled(wxCommandEvent& evt) {
+    ModInfo* mod = static_cast<ModInfo*>(_disabledlist->GetClientData(evt.GetSelection()));
+    ModManagerFrame::OnSelectMod(*mod);
+}
+
+
+void ModManagerFrame::OnSelectMod(ModInfo mod) {
             ParseBBCode(descriptionCtrl, mod.description.empty() ? "(No description)" : mod.description);
 
             fs::path imagePath = _modspath / mod.folderName / "thumb.png";
@@ -846,7 +843,7 @@ void ModManagerFrame::OnSelectMod(wxCommandEvent& evt) {
                         if (LoadImageQuietly(imagePath.string(), img)) {
                             img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
                             this->CallAfter([this, bmp = wxBitmap(img), idx = id] {
-                                if (selectedMod->id == idx) { //so it doesnt get replaced if the mod changes while other thumbs are loading
+                                if (selectedMod.id == idx) { //so it doesnt get replaced if the mod changes while other thumbs are loading
                                     thumbnailCtrl->SetBitmap(bmp);
                                 }
                                 });
@@ -864,32 +861,29 @@ void ModManagerFrame::OnSelectMod(wxCommandEvent& evt) {
                 }
             }
             selectedModTitle->SetLabel(mod.displayName);
-            selectedMod = &mod;
+            selectedMod = mod;
             LoadModExtraData();
-            break;
-        }
-    }
 }
 
 void ModManagerFrame::OnWorkshopPage(wxCommandEvent&) {
-    if (!selectedMod->id.empty()) {
-        wxLaunchDefaultBrowser("https://steamcommunity.com/sharedfiles/filedetails/?id=" + selectedMod->id);
+    if (!selectedMod.id.empty()) {
+        wxLaunchDefaultBrowser("https://steamcommunity.com/sharedfiles/filedetails/?id=" + selectedMod.id);
     }
 }
 
 void ModManagerFrame::OnModFolder(wxCommandEvent&) {
-    if (!selectedMod->folderName.empty()) {
-        wxLaunchDefaultBrowser("file:///" + fs::absolute(_modspath / selectedMod->folderName).string());
+    if (!selectedMod.folderName.empty()) {
+        wxLaunchDefaultBrowser("file:///" + fs::absolute(_modspath / selectedMod.folderName).string());
     }
 }
 
 void ModManagerFrame::OnModSaveFolder(wxCommandEvent&) {
-    fs::path savepath = fs::absolute(_modspath.parent_path() / "data" / selectedMod->directory);
+    fs::path savepath = fs::absolute(_modspath.parent_path() / "data" / selectedMod.directory);
     if (!fs::exists(savepath)) {
         fs::create_directories(savepath); //Why?, because theres the case where someone may want to share a savefile with some dude that has none
     }
 
-    if (!selectedMod->displayName.empty()) {
+    if (!selectedMod.displayName.empty()) {
         wxLaunchDefaultBrowser("file:///" + savepath.string());
     }
 }
