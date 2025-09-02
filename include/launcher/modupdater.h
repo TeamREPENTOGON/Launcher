@@ -16,48 +16,6 @@
 
 namespace fs = std::filesystem;
 
-static int CompareVersions(const std::string& a, const std::string& b) {
-    auto split = [](const std::string& s) {
-        std::vector<int> parts;
-        std::stringstream ss(s);
-        std::string token;
-        while (std::getline(ss, token, '.')) {
-            parts.push_back(token.empty() ? 0 : std::stoi(token));
-        }
-        return parts;
-    };
-
-    std::vector<int> va = split(a);
-    std::vector<int> vb = split(b);
-
-    size_t n = (va.size() > vb.size()) ? va.size() : vb.size();
-    va.resize(n, 0);
-    vb.resize(n, 0);
-
-    for (size_t i = 0; i < n; i++) {
-        if (va[i] < vb[i]) return -1;
-        if (va[i] > vb[i]) return 1;
-    }
-    return 0;
-}
-
-static bool ParseMetadata(const fs::path& metadataPath, std::string& outName, std::string& outVersion) {
-    try {
-        rapidxml::file<> xmlFile(metadataPath.string().c_str());
-        rapidxml::xml_document<> doc;
-        doc.parse<0>(xmlFile.data());
-        if (auto* root = doc.first_node("metadata")) {
-            auto* nodeName = root->first_node("directory");
-            auto* nodeVersion = root->first_node("version");
-            outName = nodeName ? nodeName->value() : "";
-            outVersion = nodeVersion ? nodeVersion->value() : "";
-            return true;
-        }
-    }
-    catch (const rapidxml::parse_error&) {
-    }
-    return false;
-}
 
 
 class ModUpdateDialog : public wxDialog {
@@ -131,8 +89,14 @@ private:
         }
         else {
             if (!msg.IsEmpty()) {
-                Logger::Info(("[MODUPDATER] " + msg + "\n").c_str());
-                launcherlogger->LogInfo(("[MODUPDATER] " + msg).c_str());
+                if (msg.StartsWith("ERROR")) {
+                    Logger::Error(("[MODUPDATER] " + msg + "\n").c_str());
+                    launcherlogger->LogError(("[MODUPDATER] " + msg).c_str());
+                }
+                else {
+                    Logger::Info(("[MODUPDATER] " + msg + "\n").c_str());
+                    launcherlogger->LogInfo(("[MODUPDATER] " + msg).c_str());
+                }
                 statuslog->Insert(msg, 0);
                 while (statuslog->GetCount() > 200) {
                     statuslog->Delete(statuslog->GetCount() - 1);
@@ -155,6 +119,25 @@ private:
     void OnCloseNow(wxCommandEvent&) {
         EndModal(wxID_OK);
     }
+
+    bool ParseMetadata(const fs::path& metadataPath, std::string& outName, std::string& outVersion) {
+        try {
+            rapidxml::file<> xmlFile(metadataPath.string().c_str());
+            rapidxml::xml_document<> doc;
+            doc.parse<0>(xmlFile.data());
+            if (auto* root = doc.first_node("metadata")) {
+                auto* nodeName = root->first_node("directory");
+                auto* nodeVersion = root->first_node("version");
+                outName = nodeName ? nodeName->value() : "";
+                outVersion = nodeVersion ? nodeVersion->value() : "";
+                return true;
+            }
+        }
+        catch (const rapidxml::parse_error&) {
+        }
+        return false;
+    }
+
 
     bool ParseMetadataId(const fs::path& xmlPath, uint64_t& outId) {
         try {
@@ -197,6 +180,38 @@ private:
         }
         std::error_code ec2;
         fs::copy_file(src / "metadata.xml", dst / "metadata.xml", fs::copy_options::overwrite_existing, ec2);
+    }
+
+    int CompareVersions(const std::string& a, const std::string& b) {
+        try {
+            auto split = [](const std::string& s) {
+                std::vector<int> parts;
+                std::stringstream ss(s);
+                std::string token;
+                while (std::getline(ss, token, '.')) {
+                    parts.push_back(token.empty() ? 0 : std::stoi(token));
+                }
+                return parts;
+            };
+
+            std::vector<int> va = split(a);
+            std::vector<int> vb = split(b);
+
+            size_t n = (va.size() > vb.size()) ? va.size() : vb.size();
+            va.resize(n, 0);
+            vb.resize(n, 0);
+
+            for (size_t i = 0; i < n; i++) {
+                if (va[i] < vb[i]) return -1;
+                if (va[i] > vb[i]) return 1;
+            }
+        }
+        catch (...) {
+                if (a != b) {
+                    return -2;
+                }
+        }
+        return 0;
     }
 
     void MainProc() {
@@ -289,6 +304,9 @@ private:
 
             int cmp = CompareVersions(installedVersion, cacheVersion);
             if ((cmp < 0) || (fs::exists(installedFolder / "Unfinished.it") || fs::exists(installedFolder / "Update.it"))) {
+                if (cmp == -2) {
+                    PostProgressEvent(overallPct, "ERROR Nonnumeric Mod Version for " + cacheName + " assuming outdated...");
+                }
                 PostProgressEvent(overallPct,"Updating " + cacheName + " (" + installedVersion + " -> " + cacheVersion + ")...");
                 try {
                     CopyDir(cachePath, installedFolder);
@@ -297,7 +315,7 @@ private:
                     PostProgressEvent(overallPct,"DONE: Updated " + cacheName + " to version " + cacheVersion);
                 }
                 catch (...) {
-                    PostProgressEvent(overallPct,"Error copying " + cacheName);
+                    PostProgressEvent(overallPct,"ERROR copying " + cacheName);
                 }
             }
 

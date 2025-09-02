@@ -266,7 +266,7 @@ void ModManagerFrame::RefreshLists() {
 
     for (const ModInfo& mod : allMods) {
         wxString name = mod.displayName;
-        if (mod.islocal) { name = "[DEV/NoSteam] " + name; }
+        if (mod.islocal) { name = "[[DEV/NoSteam]] " + name; }
         if (!filter.IsEmpty() && !name.Lower().Contains(filter)) continue;
         if (IsDisabled(mod.folderName)) {
             _disabledlist->Append(name,new ModInfo(mod));
