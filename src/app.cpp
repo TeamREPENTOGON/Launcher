@@ -69,7 +69,6 @@ bool Launcher::App::OnInit() {
 	__installation = new Installation(&__nopLogGUI, &__configuration);
 	_mainFrame = CreateMainWindow();
 	_mainFrame->EnableInterface(false);
-	_mainFrame->Show();
 	
 	wxIcon icon;
 	icon.CopyFromBitmap(wxBitmap(wxICON(IDI_ICON1)));
@@ -121,6 +120,8 @@ bool Launcher::App::OnInit() {
 			}
 		}
 	}
+
+	_mainFrame->Show(!__configuration.StealthMode());
 
 	std::optional<std::string> providedPath;
 	std::string cliIsaacPath = sCLI->IsaacPath();
@@ -187,9 +188,7 @@ bool Launcher::App::OnInit() {
 		installerFrame->InstallRepentogon();
 		installerFrame->Show();
 	} else {
-		_mainFrame->PreInit();
-		_mainFrame->SetFocus();
-		_mainFrame->EnableInterface(true);
+		_mainFrame->Init();
 	}
 	wxInitAllImageHandlers(); //needed for stupid modman thumb shit (dunno if it belongs here, but it felt nice to shove it here)
 

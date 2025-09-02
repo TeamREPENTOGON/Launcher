@@ -22,6 +22,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     parser.AddLongOption(Options::repentogonInstallerRefresh, "Time (in milliseconds) between two updates of the "
         "installer window", wxCMD_LINE_VAL_NUMBER);
     parser.AddLongSwitch(Options::skipSelfUpdate, "Skip the self update checks at startup");
+    parser.AddLongSwitch(Options::stealthMode, "Skip displaying launcher windows when possible, launch the game automatically if able, and close the launcher when the game closes.");
     parser.AddLongOption(Options::curlLimit, "Limit (in bytes per second) for the curl operations",
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::curlTimeout, "Timeout (in milliseconds) for curl transfers",
@@ -84,6 +85,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     }
 
     _skipSelfUpdate = parser.Found(Options::skipSelfUpdate);
+    _stealthMode = parser.Found(Options::stealthMode);
 
     long curlSpeedLimit = 0;
     if (parser.Found(Options::curlLimit, &curlSpeedLimit)) {

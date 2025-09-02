@@ -29,6 +29,10 @@ public:
         return _skipSelfUpdate;
     }
 
+    inline bool StealthMode() const {
+        return _stealthMode;
+    }
+
     inline static CLIParser* instance() {
         static CLIParser parser;
         return &parser;
@@ -130,6 +134,7 @@ private:
         static constexpr const char* repentogonInstallerWait = "repentogon-installer-wait";
         static constexpr const char* repentogonInstallerRefresh = "repentogon-installer-refresh";
         static constexpr const char* skipSelfUpdate = "skip-self-update";
+        static constexpr const char* stealthMode = "stealth-mode";
         static constexpr const char* curlLimit = "curl-limit";
         static constexpr const char* curlTimeout = "curl-timeout";
         static constexpr const char* curlConnectTimeout = "curl-connect-timeout";
@@ -161,6 +166,7 @@ private:
     bool _forceRepentogonUpdate = false;
     bool _repentogonInstallerWaitOnFinished = false;
     bool _skipSelfUpdate = false;
+    bool _stealthMode = false;
     bool _strictThreadCancel = false;
     unsigned long _repentogonInstallerRefreshRate = Options::_repentogonInstallerDefaultRefreshRate;
     unsigned long _curlLimit = 0;

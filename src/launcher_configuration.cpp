@@ -29,6 +29,10 @@ static ConfigurationTuple<bool> HideWindowConf() {
 	return { Sections::general, Keys::hideWindow, Defaults::hideWindow };
 }
 
+// static ConfigurationTuple<bool> StealthModeConf() {
+// 	return { Sections::general, Keys::stealthMode, Defaults::stealthMode };
+// }
+
 static ConfigurationTuple<bool> ConsoleConf() {
 	return { Sections::repentogon, Keys::console, Defaults::console };
 }
@@ -61,9 +65,9 @@ static ConfigurationTuple<int> LaunchModeConf() {
 	return { Sections::shared, Keys::launchMode, Defaults::launchMode };
 }
 
-static ConfigurationTuple<std::string> LoadRoomConf() {
-	return { Sections::vanilla, Keys::loadRoom, Defaults::loadRoom };
-}
+// static ConfigurationTuple<std::string> LoadRoomConf() {
+// 	return { Sections::vanilla, Keys::loadRoom, Defaults::loadRoom };
+// }
 
 static std::string ReadString(INIReader const& reader, ConfigurationTuple<std::string>(*fn)()) {
 	auto [section, key, def] = fn();
@@ -221,8 +225,10 @@ void LauncherConfiguration::LoadFromFile(INIReader const& reader) {
 	_options.stageType = ReadInteger(reader, StageTypeConf);
 	_options.luaDebug = ReadBoolean(reader, LuaDebugConf);
 	_options.luaHeapSize = ReadString(reader, LuaHeapSizeConf);
-	_options.loadRoom = ReadString(reader, LoadRoomConf);
+	// Not reading LoadRoom from the config file yet as it is not supported in the UI.
+	// _options.loadRoom = ReadString(reader, LoadRoomConf);
 	_options.hideWindow = ReadBoolean(reader, HideWindowConf);
+	// _options.stealthMode = ReadBoolean(reader, StealthModeConf);
 
 	_options.console = ReadBoolean(reader, ConsoleConf);
 	_options.automaticUpdates = ReadBoolean(reader, AutomaticUpdatesConf);
@@ -242,6 +248,10 @@ void LauncherConfiguration::LoadFromCLI() {
 	}
 
 	_cliOverrides.launchMode = sCLI->GetLaunchMode();
+
+	if (sCLI->StealthMode()) {
+		_cliOverrides.stealthMode = true;
+	}
 
 	if (sCLI->Stage()) {
 		_cliOverrides.levelStage = sCLI->Stage();
@@ -286,6 +296,7 @@ void LauncherConfiguration::Write() {
 	fprintf(f, "%s = %s\n", Keys::isaacExecutableKey.c_str(), IsaacExecutablePathIgnoreOverride().c_str());
 	fprintf(f, "%s = %d\n", Keys::ranWizard.c_str(), RanWizardIgnoreOverride() ? 1 : 0);
 	fprintf(f, "%s = %d\n", Keys::hideWindow.c_str(), HideWindowIgnoreOverride() ? 1 : 0);
+	fprintf(f, "%s = %d\n", Keys::stealthMode.c_str(), StealthModeIgnoreOverride() ? 1 : 0);
 
 	fprintf(f, "[%s]\n", Sections::repentogon.c_str());
 	fprintf(f, "%s = %d\n", Keys::console.c_str(), RepentogonConsoleIgnoreOverride());

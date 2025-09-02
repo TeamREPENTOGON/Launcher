@@ -30,6 +30,7 @@
 #include "launcher/windows/launcher.h"
 #include "launcher/windows/repentogon_installer.h"
 #include "launcher/windows/setup_wizard.h"
+#include "launcher/windows/launch_countdown.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/version.h"
 #include "shared/compat.h"
@@ -57,6 +58,7 @@ EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::LauncherMai
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_HIDE_WINDOW, Launcher::LauncherMainWindow::OnOptionSelected)
+EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_STEALTH_MODE, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::LauncherMainWindow::OnLuaHeapSizeCharacterWritten)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::LauncherMainWindow::Launch)
@@ -162,6 +164,10 @@ namespace Launcher {
 		repentogonExeSizer->Add(repentogonExeText, 0, wxRIGHT, 5);
 		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Expand().Border( wxRIGHT));
 		_configurationSizer->Add(repentogonExeSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
+
+		// _stealthMode = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_STEALTH_MODE, "Stealth Mode");
+		// _stealthMode->SetToolTip("When starting the launcher, skip the main window and automatically launch Isaac, then close the launcher afterwards.\n\nThe launcher will appear if an error occurs.");
+		// _configurationSizer->Add(_stealthMode, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 
 		_hideWindow = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_HIDE_WINDOW,
 			"Hide launcher window while the game is running");
@@ -375,6 +381,10 @@ namespace Launcher {
 			_configuration->HideWindow(box->GetValue());
 			break;
 
+		case WINDOW_CHECKBOX_STEALTH_MODE:
+			_configuration->StealthMode(box->GetValue());
+			break;
+
 		default:
 			return;
 		}
@@ -403,11 +413,6 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::Launch(wxCommandEvent&) {
-		if (SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //No point in running the updater if nonsteam....for now?, lol
-			_logWindow.Log("Checking for mod updates on Steam's folder:");
-			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "Mods", &_logWindow);
-			dlg.ShowModal();
-		}
 		LaunchIsaac();
 	}
 
@@ -449,6 +454,12 @@ namespace Launcher {
 	}
 
 	bool LauncherMainWindow::LaunchIsaac() {
+		if (SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //No point in running the updater if nonsteam....for now?, lol
+			_logWindow.Log("Checking for mod updates on Steam's folder:");
+			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "Mods", &_logWindow);
+			dlg.ShowModal();
+		}
+
 		const IsaacLaunchability launchability = GetIsaacLaunchability();
 		if (launchability != ISAAC_LAUNCH_OK) {
 			SetFocus();
@@ -504,7 +515,7 @@ namespace Launcher {
 
 		EnableInterface(false);
 
-		if (_configuration->HideWindow()) {
+		if (_configuration->HideWindow() || _configuration->StealthMode()) {
 			Show(false);
 		}
 		chained_futures::async(&::Launcher::Launch, &_logWindow, _exePath,
@@ -529,10 +540,6 @@ namespace Launcher {
 		 */
 		std::atomic_thread_fence(std::memory_order_relaxed);
 
-		if (_configuration->HideWindow()) {
-			Show(true);
-		}
-
 		std::string desc;
 		utils::ErrorCodeToString(exitCode, desc);
 
@@ -547,6 +554,10 @@ namespace Launcher {
 
 		if (exitCode == LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED) {
 			RelaunchIsaac();
+		} else if (_configuration->StealthMode()) {
+			Destroy();
+		} else if (!IsShown()) {
+			Show();
 		}
 	}
 
@@ -642,7 +653,7 @@ namespace Launcher {
 		}
 	}
 
-	void LauncherMainWindow::PreInit() {
+	void LauncherMainWindow::Init() {
 /* #ifdef LAUNCHER_UNSTABLE
 		wxMessageBox("You are running an unstable version of the REPENTOGON launcher.\n"
 			"If you wish to run a stable version, use the \"Self-update (stable version)\" button",
@@ -662,6 +673,26 @@ namespace Launcher {
 		OneTimeIsaacPathInitialization();
 		InitializeOptions();
 		UpdateRepentogonOptionsFromInstallation();
+
+		// If "Stealth Mode" is enabled, attempt to launch the game immediately instead of showing the main window.
+		// If this fails or is canceled, the main window will be shown as normal.
+		if (_configuration->StealthMode()) {
+			const int result = LaunchCountdownWindow(this).ShowModal();
+			if (result == wxID_OK) {
+				LaunchIsaac();
+				return;
+			} else if (result != wxID_CANCEL) {
+				_logWindow.LogWarn("Unexpected result from Launch Countdown modal: %d", result);
+				Logger::Warn("Unexpected result from LaunchCountdownWindow ShowModal: %d", result);
+			}
+			
+		}
+		
+		SetFocus();
+		EnableInterface(true);
+		if (!IsShown()) {
+			Show();
+		}
 	}
 
 	bool LauncherMainWindow::PromptBoolean(wxString const& message, wxString const& shortMessage) {
@@ -762,6 +793,9 @@ namespace Launcher {
 
 		_luaDebug->SetValue(_configuration->LuaDebug());
 		_luaDebug->Enable(!_configuration->LuaDebugHasCliOverride());
+
+		// _stealthMode->SetValue(_configuration->StealthMode());
+		// _stealthMode->Enable(!_configuration->StealthModeHasCliOverride());
 
 		_hideWindow->SetValue(_configuration->HideWindow());
 		_hideWindow->Enable(!_configuration->HideWindowHasCliOverride());

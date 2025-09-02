@@ -27,6 +27,8 @@ namespace Launcher {
 		std::string version, url;
 		curl::DownloadStringResult result;
 		if (checker.IsSelfUpdateAvailable(allowUnstable, force, version, url, &result)) {
+			mainWindow->Show();
+
 			std::ostringstream stream;
 			stream << "A new version of the launcher is available (version " <<
 				version << ", from version " << Launcher::version << ").\n" <<

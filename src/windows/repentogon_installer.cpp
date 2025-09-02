@@ -80,10 +80,7 @@ void RepentogonInstallerFrame::OnRepentogonInstalled(bool completed,
 	_downloadInstallResult = result;
 
 	if (_mainFrame) {
-		_mainFrame->PreInit();
-		_mainFrame->SetFocus();
-		_mainFrame->EnableInterface(true);
-		// _mainFrame->Show();
+		_mainFrame->CallAfter(&Launcher::LauncherMainWindow::Init);
 	}
 
 	if (!sCLI->RepentogonInstallerWait() && !_synchronous) {

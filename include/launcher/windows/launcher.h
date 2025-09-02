@@ -28,6 +28,7 @@ namespace Launcher {
 		WINDOW_CHECKBOX_REPENTOGON_UPDATES,
 		WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES,
 		WINDOW_CHECKBOX_HIDE_WINDOW,
+		WINDOW_CHECKBOX_STEALTH_MODE,
 		WINDOW_CHECKBOX_VANILLA_LUADEBUG,
 		WINDOW_TEXT_VANILLA_LUAHEAPSIZE,
 		WINDOW_BUTTON_LAUNCH_BUTTON,
@@ -67,7 +68,7 @@ namespace Launcher {
 		 * If no configuration is found, perform a "one-time setup" to get the
 		 * location of the Isaac installation.
 		 */
-		void PreInit();
+		void Init();
 
 		void EnableInterface(bool enable);
 
@@ -160,6 +161,7 @@ namespace Launcher {
 		wxCheckBox* _unstableRepentogon;
 		wxCheckBox* _luaDebug;
 		wxCheckBox* _hideWindow;
+		wxCheckBox* _stealthMode;
 		wxComboBox* _levelSelect;
 		wxComboBox* _launchMode;
 		wxTextCtrl* _luaHeapSize;

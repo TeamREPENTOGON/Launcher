@@ -40,6 +40,7 @@ struct Options {
 	/* Shared options */
 	std::optional<LaunchMode> launchMode;
 	std::optional<bool> hideWindow;
+	std::optional<bool> stealthMode;
 
 	/* Repentogon options */
 	std::optional<bool> console;
@@ -59,6 +60,7 @@ namespace Configuration::Defaults {
 	constexpr const bool ranWizard = false;
 	constexpr const LaunchMode launchMode = LAUNCH_MODE_REPENTOGON;
 	constexpr const bool hideWindow = true;
+	constexpr const bool stealthMode = false;
 	constexpr const bool console = false;
 	constexpr const bool automaticUpdates = true;
 	constexpr const bool unstableUpdates = false;
@@ -82,6 +84,7 @@ namespace Configuration::Keys {
 
 	const std::string launchMode("LaunchMode");
 	const std::string hideWindow("HideWindow");
+	const std::string stealthMode("StealthMode");
 
 	const std::string levelStage("LevelStage");
 	const std::string luaDebug("LuaDebug");
@@ -158,6 +161,7 @@ public:
 	CONFIGURATION_FIELD(bool, UnstableUpdates, unstableUpdates);
 	CONFIGURATION_FIELD(bool, LuaDebug, luaDebug);
 	CONFIGURATION_FIELD(bool, HideWindow, hideWindow);
+	CONFIGURATION_FIELD(bool, StealthMode, stealthMode);
 	CONFIGURATION_FIELD(bool, RanWizard, ranWizard);
 	CONFIGURATION_FIELD(long, Stage, levelStage);
 	CONFIGURATION_FIELD(long, StageType, stageType);
