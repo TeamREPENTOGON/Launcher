@@ -66,6 +66,15 @@ private:
     std::atomic<bool> cancelrequest;
 
     void PostProgressEvent(int prc,const std::string& message) {
+        if (!message.empty()) {
+            if (message.starts_with("ERROR")) {
+                Logger::Error(("[MODUPDATER] " + message + "\n").c_str());
+            }
+            else if (!message.starts_with("Processed ")) {
+                Logger::Info(("[MODUPDATER] " + message + "\n").c_str());
+            }
+        }
+
         wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
         evt->SetInt(prc);
         evt->SetString(message);
@@ -90,11 +99,9 @@ private:
         else {
             if (!msg.IsEmpty()) {
                 if (msg.StartsWith("ERROR")) {
-                    Logger::Error(("[MODUPDATER] " + msg + "\n").c_str());
                     launcherlogger->LogError(("[MODUPDATER] " + msg).c_str());
                 }
                 else {
-                    Logger::Info(("[MODUPDATER] " + msg + "\n").c_str());
                     launcherlogger->LogInfo(("[MODUPDATER] " + msg).c_str());
                 }
                 statuslog->Insert(msg, 0);
@@ -215,13 +222,13 @@ private:
     }
 
     void MainProc() {
+        if (!SteamAPI_Init()) {
+            PostProgressEvent(0, "Warning: SteamAPI_Init() failed or already initialized. Proceeding...");
+            return;
+        }
         if (!SteamAPI_IsSteamRunning()) {
             PostProgressEvent(0,"Steam is not running. Start Steam and try again.");
             PostProgressEvent(0,"DONE: Steam not running");
-            return;
-        }
-        if (!SteamAPI_Init()) {
-            PostProgressEvent(0,"Warning: SteamAPI_Init() failed or already initialized. Proceeding...");
             return;
         }
         int overallPct = 0;
