@@ -121,7 +121,7 @@ bool Launcher::App::OnInit() {
 		}
 	}
 
-	_mainFrame->Show(!__configuration.StealthMode());
+	_mainFrame->Show((!__configuration.StealthMode()) && !__configuration.IsBigPictureOrDeck());
 
 	std::optional<std::string> providedPath;
 	std::string cliIsaacPath = sCLI->IsaacPath();

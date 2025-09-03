@@ -515,7 +515,7 @@ namespace Launcher {
 
 		EnableInterface(false);
 
-		if (_configuration->HideWindow() || _configuration->StealthMode()) {
+		if (_configuration->HideWindow() || _configuration->StealthMode() || _configuration->IsBigPictureOrDeck()) {
 			Show(false);
 		}
 		chained_futures::async(&::Launcher::Launch, &_logWindow, _exePath,
@@ -554,7 +554,7 @@ namespace Launcher {
 
 		if (exitCode == LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED) {
 			RelaunchIsaac();
-		} else if (_configuration->StealthMode()) {
+		} else if (_configuration->StealthMode() || _configuration->IsBigPictureOrDeck()) {
 			Destroy();
 		} else if (!IsShown()) {
 			Show();
@@ -676,7 +676,7 @@ namespace Launcher {
 
 		// If "Stealth Mode" is enabled, attempt to launch the game immediately instead of showing the main window.
 		// If this fails or is canceled, the main window will be shown as normal.
-		if (_configuration->StealthMode()) {
+		if (_configuration->StealthMode() || _configuration->IsBigPictureOrDeck()) {
 			const int result = LaunchCountdownWindow(this).ShowModal();
 			if (result == wxID_OK) {
 				LaunchIsaac();

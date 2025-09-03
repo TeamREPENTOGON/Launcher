@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "steam_api.h"
 #include "inih/cpp/INIReader.h"
 #include "shared/loggable_gui.h"
 
@@ -138,6 +139,10 @@ public:
 		return _isLoaded;
 	}
 
+	inline bool IsBigPictureOrDeck() const {
+		return SteamAPI_Init() && (SteamUtils()->IsSteamInBigPictureMode() || SteamUtils()->IsSteamRunningOnSteamDeck());
+	}
+
 	/**
 	 * Load the configuration file.
 	 *
@@ -175,6 +180,7 @@ private:
 	void Load(INIReader const& reader);
 	void LoadFromFile(INIReader const& reader);
 	void LoadFromCLI();
+
 
 	/* Path to the folder containing the configuration of the launcher. */
 	static std::string _configurationPath;
