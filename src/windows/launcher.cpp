@@ -515,7 +515,7 @@ namespace Launcher {
 
 		EnableInterface(false);
 
-		if (_configuration->HideWindow() || _configuration->StealthMode() || _configuration->IsBigPictureOrDeck()) {
+		if (_configuration->HideWindow() || _configuration->AutoLaunch()) {
 			Show(false);
 		}
 		chained_futures::async(&::Launcher::Launch, &_logWindow, _exePath,
@@ -554,7 +554,7 @@ namespace Launcher {
 
 		if (exitCode == LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED) {
 			RelaunchIsaac();
-		} else if (_configuration->StealthMode() || _configuration->IsBigPictureOrDeck()) {
+		} else if (_configuration->AutoLaunch()) {
 			Destroy();
 		} else if (!IsShown()) {
 			Show();
@@ -653,6 +653,25 @@ namespace Launcher {
 		}
 	}
 
+	bool LauncherMainWindow::TryAutoLaunch() {
+		if (!_configuration->AutoLaunch()) {
+			return false;
+		}
+		if (_configuration->AutoLaunchNoCountdown()) {
+			// Skip the countdown, just try to launch the game.
+			return LaunchIsaac();
+		}
+		// Show the countdown modal that gives the user a chance to open the launcher.
+		const int result = LaunchCountdownWindow(this).ShowModal();
+		if (result == wxID_OK) {
+			return LaunchIsaac();
+		} else if (result != wxID_CANCEL) {
+			_logWindow.LogWarn("Unexpected result from Launch Countdown modal: %d", result);
+			Logger::Warn("Unexpected result from LaunchCountdownWindow ShowModal: %d", result);
+		}
+		return false;
+	}
+
 	void LauncherMainWindow::Init() {
 /* #ifdef LAUNCHER_UNSTABLE
 		wxMessageBox("You are running an unstable version of the REPENTOGON launcher.\n"
@@ -674,24 +693,14 @@ namespace Launcher {
 		InitializeOptions();
 		UpdateRepentogonOptionsFromInstallation();
 
-		// If "Stealth Mode" is enabled, attempt to launch the game immediately instead of showing the main window.
-		// If this fails or is canceled, the main window will be shown as normal.
-		if (_configuration->StealthMode() || _configuration->IsBigPictureOrDeck()) {
-			const int result = LaunchCountdownWindow(this).ShowModal();
-			if (result == wxID_OK) {
-				LaunchIsaac();
-				return;
-			} else if (result != wxID_CANCEL) {
-				_logWindow.LogWarn("Unexpected result from Launch Countdown modal: %d", result);
-				Logger::Warn("Unexpected result from LaunchCountdownWindow ShowModal: %d", result);
+		// Attempt to automatically launch isaac without showing the main window, depending on the cli/configs.
+		// Reveal the main window no auto-launch is performed (either due to no attempt, or a failed attempt).
+		if (!TryAutoLaunch()) {
+			SetFocus();
+			EnableInterface(true);
+			if (!IsShown()) {
+				Show();
 			}
-			
-		}
-		
-		SetFocus();
-		EnableInterface(true);
-		if (!IsShown()) {
-			Show();
 		}
 	}
 

@@ -33,6 +33,10 @@ public:
         return _stealthMode;
     }
 
+    inline bool BasementRenovator() const {
+        return _basementRenovator;
+    }
+
     inline static CLIParser* instance() {
         static CLIParser parser;
         return &parser;
@@ -135,6 +139,7 @@ private:
         static constexpr const char* repentogonInstallerRefresh = "repentogon-installer-refresh";
         static constexpr const char* skipSelfUpdate = "skip-self-update";
         static constexpr const char* stealthMode = "stealth-mode";
+        static constexpr const char* basementRenovator = "basement-renovator";
         static constexpr const char* curlLimit = "curl-limit";
         static constexpr const char* curlTimeout = "curl-timeout";
         static constexpr const char* curlConnectTimeout = "curl-connect-timeout";
@@ -167,6 +172,7 @@ private:
     bool _repentogonInstallerWaitOnFinished = false;
     bool _skipSelfUpdate = false;
     bool _stealthMode = false;
+    bool _basementRenovator = false;
     bool _strictThreadCancel = false;
     unsigned long _repentogonInstallerRefreshRate = Options::_repentogonInstallerDefaultRefreshRate;
     unsigned long _curlLimit = 0;

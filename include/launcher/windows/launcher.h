@@ -145,6 +145,12 @@ namespace Launcher {
 
 		bool SelectIsaacExecutablePath();
 
+		/* Attempts an "automatic" Isaac launch, if the current cli/configurations permit it.
+		 * Intended to be called on launcher initialization, before showing the window.
+		 * Returns true only on a successful auto-launch.
+		 */
+		bool TryAutoLaunch();
+
 		IsaacLaunchability GetIsaacLaunchability();
 		const char* GetIsaacLaunchabilityErrorMessage(const IsaacLaunchability state);
 

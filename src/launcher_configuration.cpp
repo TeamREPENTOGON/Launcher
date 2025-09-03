@@ -147,6 +147,14 @@ LauncherConfiguration::LauncherConfiguration() {
 
 }
 
+bool LauncherConfiguration::AutoLaunchNoCountdown() const {
+	return sCLI->BasementRenovator();
+}
+
+bool LauncherConfiguration::AutoLaunch() const {
+	return AutoLaunchNoCountdown() || StealthMode() || IsBigPictureOrDeck();
+}
+
 bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult) {
 	if (_configurationPath.empty()) {
 		Logger::Fatal("Attempting to load configuration when none was found");

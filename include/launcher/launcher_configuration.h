@@ -143,6 +143,13 @@ public:
 		return SteamAPI_Init() && (SteamUtils()->IsSteamInBigPictureMode() || SteamUtils()->IsSteamRunningOnSteamDeck());
 	}
 
+	// Returns true if the launcher should attempt to launch Isaac immediately on init,
+	// with a short countdown modal to give the user a chance to open the launcher window.
+	bool AutoLaunch() const;
+
+	// Same as AutoLaunch, except skipping the countdown part.
+	bool AutoLaunchNoCountdown() const;
+
 	/**
 	 * Load the configuration file.
 	 *

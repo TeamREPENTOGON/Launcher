@@ -23,6 +23,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         "installer window", wxCMD_LINE_VAL_NUMBER);
     parser.AddLongSwitch(Options::skipSelfUpdate, "Skip the self update checks at startup");
     parser.AddLongSwitch(Options::stealthMode, "Skip displaying launcher windows when possible, launch the game automatically if able, and close the launcher when the game closes.");
+    parser.AddLongSwitch(Options::basementRenovator, "Intended to identify a launch coming from a room editor application (ie, Basement Renovator). Enables behaviour similar to Stealth Mode.");
     parser.AddLongOption(Options::curlLimit, "Limit (in bytes per second) for the curl operations",
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::curlTimeout, "Timeout (in milliseconds) for curl transfers",
@@ -86,6 +87,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
 
     _skipSelfUpdate = parser.Found(Options::skipSelfUpdate);
     _stealthMode = parser.Found(Options::stealthMode);
+    _basementRenovator = parser.Found(Options::basementRenovator);
 
     long curlSpeedLimit = 0;
     if (parser.Found(Options::curlLimit, &curlSpeedLimit)) {
