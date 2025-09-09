@@ -21,6 +21,7 @@
 #include "curl/curl.h"
 #include "launcher/app.h"
 #include "launcher/windows/advanced_options.h"
+#include "launcher/windows/checklogs_modal.h"
 #include "launcher/installation.h"
 #include "launcher/isaac.h"
 #include "launcher/launcher_configuration.h"
@@ -32,6 +33,7 @@
 #include "launcher/windows/setup_wizard.h"
 #include "launcher/windows/launch_countdown.h"
 #include "launcher/repentogon_installer.h"
+#include "launcher/windows/options_ini.h"
 #include "launcher/version.h"
 #include "shared/compat.h"
 #include "shared/github.h"
@@ -64,8 +66,10 @@ EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::LauncherMainWindow
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::LauncherMainWindow::Launch)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::LauncherMainWindow::OnIsaacSelectClick)
 // EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::LauncherMainWindow::OnSelectRepentogonFolderClick)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_CHECKLOGS_BUTTON, Launcher::LauncherMainWindow::OnCheckLogsClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_OPTIONS, Launcher::LauncherMainWindow::OnAdvancedOptionsClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_MODMAN_BUTTON, Launcher::LauncherMainWindow::OnModManagerButtonPressed)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_CHANGEOPTIONS_BUTTON, Launcher::LauncherMainWindow::OnChangeOptions)
 wxEND_EVENT_TABLE()
 
 int chained_future_f(int a) {
@@ -120,7 +124,7 @@ namespace Launcher {
 		_verticalSizer->Add(logWindow, logFlags);
 		logFlags.Proportion(0);
 		_verticalSizer->Add(configurationSizer, logFlags);
-		_verticalSizer->Add(optionsSizer, logFlags);
+		_verticalSizer->Add(optionsSizer, 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
 
 		_configurationBox = configurationBox;
 		_configurationSizer = configurationSizer;
@@ -128,15 +132,20 @@ namespace Launcher {
 		_optionsBox = optionsBox;
 
 		AddLauncherConfigurationOptions();
+
+
+		_LeftSideSizer = new wxBoxSizer(wxVERTICAL);
 		AddRepentogonOptions();
-		AddVanillaOptions();
-
-		_launchnmoddingSizer = new wxBoxSizer(wxVERTICAL);
-
+		//AddVanillaOptions();
 		AddLaunchOptions();
-		AddModdingOptions();
+		_optionsSizer->Add(_LeftSideSizer, 0, wxALL, 0);
 
-		_optionsSizer->Add(_launchnmoddingSizer, 0, wxALL, 0);
+		_RightSideSizer = new wxBoxSizer(wxVERTICAL);
+
+		AddModdingOptions();
+		AddOptionsConfigOptions();
+
+		_optionsSizer->Add(_RightSideSizer, 0, wxALL, 0);
 
 		SetSizerAndFit(_verticalSizer);
 
@@ -175,11 +184,11 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::AddLaunchOptions() {
-		wxStaticBox* launchModeBox = new wxStaticBox(_optionsBox, -1, "Launch Options");
-		wxStaticBoxSizer* launchModeBoxSizer = new wxStaticBoxSizer(launchModeBox, wxVERTICAL);
+		wxStaticBox* launchModeBox = new wxStaticBox(_optionsBox, -1, "Launch Options",wxDefaultPosition,wxSize(-1,-1),wxEXPAND);
+		wxStaticBoxSizer* launchModeBoxSizer = new wxStaticBoxSizer(launchModeBox, wxVERTICAL );
 
 		wxSizer* box = new wxBoxSizer(wxHORIZONTAL);
-		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "));
+		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "), wxEXPAND | wxLEFT | wxRIGHT,5);
 
 		_launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game", wxDefaultPosition, wxSize(50, 50));
 		//launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
@@ -189,24 +198,62 @@ namespace Launcher {
 		_launchMode->Append(ComboBoxVanilla);
 		_launchMode->SetValue(ComboBoxRepentogon);
 
-		box->Add(_launchMode);
+		box->Add(_launchMode, wxEXPAND | wxRIGHT, 10);
 
-		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 0);
+		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 5);
 
-		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxBOTTOM, 0);
+		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxTOP | wxLEFT | wxRIGHT, 5);
 
-		_launchnmoddingSizer->Add(launchModeBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 0);
+		_LeftSideSizer->Add(launchModeBoxSizer, 1, wxEXPAND | wxRIGHT, 10);
 		_verticalSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
-		_launchnmoddingSizer->AddSpacer(10);
+		
 	}
 
 	void LauncherMainWindow::AddModdingOptions() {
 		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "Modding Options");
 		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxVERTICAL);
 
+		_luaDebug = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe)");
+		_luaDebug->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
+			if (_luaDebug->IsChecked()) {
+				_luaDebug->SetValue(false);
+				int res = wxMessageBox(
+					"By enabling this, you give all your auto-updating workshop mods FULL UNRESTRICTED ACCESS TO YOUR COMPUTER!!, they can delete files, encrypt your harddrive, mine bitcoins, send out your login tokens, you name it...\nAre you sure you want to enable it?",
+					"Enable luadebug",
+					wxYES_NO | wxNO_DEFAULT | wxICON_WARNING,
+					this
+				);
+				_luaDebug->SetValue(res == wxYES);
+			}
+		event.Skip();
+			});
+
+		repentogonBoxSizer->Add(_luaDebug, 0, wxLEFT | wxRIGHT, 5);
+
+		wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
+		wxTextCtrl* heapSizeCtrl = new wxTextCtrl(repentogonBox, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024M");
+		_luaHeapSize = heapSizeCtrl;
+		wxStaticText* heapSizeText = new wxStaticText(repentogonBox, -1, "Lua heap size: ");
+		heapSizeBox->Add(heapSizeText);
+		heapSizeBox->Add(heapSizeCtrl);
+		repentogonBoxSizer->Add(heapSizeBox, 0, wxLEFT | wxRIGHT | wxTOP, 5);
+
+		wxButton* checklogs = new wxButton(repentogonBox, WINDOW_BUTTON_CHECKLOGS_BUTTON, "Check Game Logs", wxDefaultPosition);
+		repentogonBoxSizer->Add(checklogs, 1, wxEXPAND | wxALL | wxTOP, 5);
+
 		wxButton* modman = new wxButton(repentogonBox, WINDOW_BUTTON_MODMAN_BUTTON, "Open Mod Manager", wxDefaultPosition);
 		repentogonBoxSizer->Add(modman, 1, wxEXPAND | wxALL, 5);
-		_launchnmoddingSizer->Add(repentogonBoxSizer, 1, wxEXPAND | wxALL, 0);
+		_RightSideSizer->Add(repentogonBoxSizer, 1, wxEXPAND | wxALL, 0);
+	}
+
+
+	void LauncherMainWindow::AddOptionsConfigOptions() { 
+		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "Game Options");
+		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxHORIZONTAL);
+
+		wxButton* modman = new wxButton(repentogonBox, WINDOW_BUTTON_CHANGEOPTIONS_BUTTON, "Change Game Options", wxDefaultPosition);
+		repentogonBoxSizer->Add(modman, 1,  wxALL, 5);
+		_RightSideSizer->Add(repentogonBoxSizer, 0, wxEXPAND | wxRIGHT, 0);
 	}
 
 	void LauncherMainWindow::AddRepentogonOptions() {
@@ -230,13 +277,13 @@ namespace Launcher {
 		_console = console;
 		_unstableRepentogon = unstable;
 
-		repentogonBoxSizer->Add(console, 0, wxTOP | wxLEFT | wxRIGHT, 5);
-		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxRIGHT, 5);
+		repentogonBoxSizer->Add(console, 0, wxLEFT | wxRIGHT | wxTOP, 5);
+		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, 5);
 		repentogonBoxSizer->Add(unstable, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
-		repentogonBoxSizer->Add(_advancedOptionsButton, 0, wxCENTER | wxBOTTOM, 5);
+		repentogonBoxSizer->Add(_advancedOptionsButton, 0, wxCENTER | wxBOTTOM | wxTOP, 10);
 
 		_repentogonOptions = repentogonBox;
-		_optionsSizer->Add(repentogonBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+		_LeftSideSizer->Add(repentogonBoxSizer, 0, wxRIGHT , 10);
 	}
 
 	void LauncherMainWindow::AddVanillaOptions() {
@@ -295,6 +342,14 @@ namespace Launcher {
 	void LauncherMainWindow::OnModManagerButtonPressed(wxCommandEvent&) {
 		ModManagerFrame* modWindow = new ModManagerFrame(this,_installation);
 		modWindow->Show();
+	}
+
+	void LauncherMainWindow::OnChangeOptions(wxCommandEvent& event) {
+		GameOptions opts;
+		opts.Load(fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/options.ini");
+
+		OptionsDialog dlg(this, opts);
+		dlg.ShowModal(); // modal; handles save internally
 	}
 
 	void LauncherMainWindow::OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl,
@@ -453,8 +508,8 @@ namespace Launcher {
 		}
 	}
 
-	bool LauncherMainWindow::LaunchIsaac() {
-		if (SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //No point in running the updater if nonsteam....for now?, lol
+	bool LauncherMainWindow::LaunchIsaac(bool relaunch) {
+		if (!relaunch && SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //No point in running the updater if nonsteam....for now?, lol
 			_logWindow.Log("Checking for mod updates on Steam's folder:");
 			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "Mods", &_logWindow);
 			dlg.ShowModal();
@@ -562,7 +617,7 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::RelaunchIsaac() {
-		LaunchIsaac();
+		LaunchIsaac(true);
 	}
 
 	void LauncherMainWindow::EnableInterface(bool enable) {
@@ -809,7 +864,7 @@ namespace Launcher {
 		_hideWindow->SetValue(_configuration->HideWindow());
 		_hideWindow->Enable(!_configuration->HideWindowHasCliOverride());
 
-		InitializeLevelSelectFromOptions();
+		//InitializeLevelSelectFromOptions();
 
 		if (_configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
 			_launchMode->SetValue(ComboBoxRepentogon);
@@ -955,6 +1010,36 @@ namespace Launcher {
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE:
 			ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
 			break;
+
+		default:
+			_logWindow.LogError("Unhandled result from ShowModal: %d", result);
+			break;
+		}
+	}
+
+	void LauncherMainWindow::OnCheckLogsClick(wxCommandEvent&) {
+		CheckLogsWindow window(this);
+		int result = window.ShowModal();
+
+		switch (result) {
+			// User exited the modal without doing anything
+		case wxID_CANCEL:
+		case CHECKLOGS_EVENT_NONE:
+			break;
+			
+		case CHECKLOGS_EVENT_LAUNCHERLOG:
+			wxLaunchDefaultBrowser("file:///" + fs::absolute("launcher.log").string());
+			break;
+		
+		case CHECKLOGS_EVENT_RGONLOG:
+			wxLaunchDefaultBrowser("file:///" + fs::absolute(_installation->GetIsaacInstallation()
+				.GetRepentogonInstallation().GetExePath()).parent_path().string() + "/repentogon.log");
+			break;
+		
+		case CHECKLOGS_EVENT_GAMELOG:
+			wxLaunchDefaultBrowser("file:///" + fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt");
+			break;
+
 
 		default:
 			_logWindow.LogError("Unhandled result from ShowModal: %d", result);

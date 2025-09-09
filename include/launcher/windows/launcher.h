@@ -35,7 +35,9 @@ namespace Launcher {
 		WINDOW_BUTTON_SELECT_ISAAC,
 		WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER,
 		WINDOW_BUTTON_ADVANCED_OPTIONS,
-		WINDOW_BUTTON_MODMAN_BUTTON
+		WINDOW_BUTTON_MODMAN_BUTTON,
+		WINDOW_BUTTON_CHECKLOGS_BUTTON,
+		WINDOW_BUTTON_CHANGEOPTIONS_BUTTON
 	};
 
 	class AdvancedOptionsWindow;
@@ -43,6 +45,7 @@ namespace Launcher {
 	class LauncherMainWindow : public wxFrame {
 	public:
 		friend class AdvancedOptionsWindow;
+		friend class CheckLogsWindow;
 
 		enum AdvancedOptionsEvents {
 			ADVANCED_EVENT_NONE,
@@ -50,6 +53,13 @@ namespace Launcher {
 			ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE,
 			ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE,
 			ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE
+		};
+		
+		enum CheckLogsEvents {
+			CHECKLOGS_EVENT_NONE,
+			CHECKLOGS_EVENT_LAUNCHERLOG,
+			CHECKLOGS_EVENT_RGONLOG,
+			CHECKLOGS_EVENT_GAMELOG
 		};
 
 		enum IsaacLaunchability {
@@ -84,6 +94,7 @@ namespace Launcher {
 		void AddRepentogonOptions();
 		void AddVanillaOptions();
 		void AddModdingOptions();
+		void AddOptionsConfigOptions(); //lol
 
 		void AddLauncherConfigurationTextField(const char* intro,
 			const char* buttonText, const char* emptyText, wxColour const& emptyColor,
@@ -109,10 +120,12 @@ namespace Launcher {
 		void OnLuaHeapSizeCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
+		void OnCheckLogsClick(wxCommandEvent& event);
 
 		void OnRepentogonUnstableStateSwitched();
 
 		void OnModManagerButtonPressed(wxCommandEvent& event);
+		void OnChangeOptions(wxCommandEvent& event);
 
 		void OnForceUpdateCompleted(std::shared_ptr<RepentogonInstallerFrame> ptr);
 
@@ -154,14 +167,15 @@ namespace Launcher {
 		IsaacLaunchability GetIsaacLaunchability();
 		const char* GetIsaacLaunchabilityErrorMessage(const IsaacLaunchability state);
 
-		bool LaunchIsaac();
+		bool LaunchIsaac(bool relaunch = false);
 		void OnIsaacCompleted(DWORD result);
 		void RelaunchIsaac();
 
 		wxStaticBoxSizer* _optionsSizer;
 		wxStaticBoxSizer* _configurationSizer;
 		wxSizer* _verticalSizer;
-		wxSizer* _launchnmoddingSizer;
+		wxSizer* _LeftSideSizer;
+		wxSizer* _RightSideSizer;
 		wxCheckBox* _console;
 		wxCheckBox* _updates;
 		wxCheckBox* _unstableRepentogon;
