@@ -624,6 +624,12 @@ namespace Launcher {
 		_configurationBox->Enable(enable);
 		_advancedOptionsButton->Enable(enable);
 		_optionsBox->Enable(enable);
+		if (enable) {
+			_launchButton->Enable();
+		}
+		else {
+			_launchButton->Disable();
+		}
 	}
 
 	bool LauncherMainWindow::SelectIsaacExecutablePath() {
