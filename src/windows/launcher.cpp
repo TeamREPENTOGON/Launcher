@@ -51,6 +51,9 @@
 #endif
 #include <launcher/modmanager.h>
 #include <launcher/modupdater.h>
+#include <shtypes.h>
+#include <ShObjIdl_core.h>
+#include <ShlObj_core.h>
 
 wxBEGIN_EVENT_TABLE(Launcher::LauncherMainWindow, wxFrame)
 EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LEVEL, Launcher::LauncherMainWindow::OnLevelSelect)
@@ -1023,6 +1026,16 @@ namespace Launcher {
 		}
 	}
 
+	void ShowFileInExplorer(const std::string& filePath) { //played around a few alternatives I found online, most suggested executing shell scripts....but those are slow as sin and if the user does anything before they execute, the fileexplorer window may not be on focus anymore....so its not ideal
+		std::wstring stemp = std::wstring(filePath.begin(), filePath.end());
+		PIDLIST_ABSOLUTE pidl = nullptr;
+		HRESULT hr = SHParseDisplayName(stemp.c_str(), nullptr, &pidl, 0, nullptr);
+		if (SUCCEEDED(hr)) {
+			SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
+			CoTaskMemFree(pidl);
+		}
+	}
+
 	void LauncherMainWindow::OnCheckLogsClick(wxCommandEvent&) {
 		CheckLogsWindow window(this);
 		int result = window.ShowModal();
@@ -1044,6 +1057,19 @@ namespace Launcher {
 		
 		case CHECKLOGS_EVENT_GAMELOG:
 			wxLaunchDefaultBrowser("file:///" + fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt");
+			break;
+		
+		case CHECKLOGS_EVENT_LAUNCHERLOG_LOCATE:
+			ShowFileInExplorer("file:///" + fs::absolute("launcher.log").string());
+			break;
+		
+		case CHECKLOGS_EVENT_RGONLOG_LOCATE:
+			ShowFileInExplorer("file:///" + fs::absolute(_installation->GetIsaacInstallation()
+				.GetRepentogonInstallation().GetExePath()).parent_path().string() + "/repentogon.log");
+			break;
+		
+		case CHECKLOGS_EVENT_GAMELOG_LOCATE:
+			ShowFileInExplorer("file:///" + fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt");
 			break;
 
 

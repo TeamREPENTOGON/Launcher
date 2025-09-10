@@ -43,6 +43,7 @@ public:
     int MultiplayerColorSet = 0;
     int OnlineInputDelay = 0; 
     int AcceptedPublicBeta_v1_9_7_12 = 0; //pointless
+    int AcceptedPublicBeta_v1_9_7_13 = 0; //pointless
     int AcceptedModDisclaimer = 0; //pointless
     int AcceptedDataCollectionDisclaimer = 0; //pointless
     int EnableDebugConsole = 0;
@@ -118,7 +119,8 @@ public:
     file << "OnlineChatFilterEnabled=" << OnlineChatFilterEnabled << "\n";
     file << "MultiplayerColorSet=" << MultiplayerColorSet << "\n";
     file << "OnlineInputDelay=" << OnlineInputDelay << "\n";
-    file << "AcceptedPublicBeta_v1.9.7.12=" << AcceptedPublicBeta_v1_9_7_12 << "\n";
+    file << "AcceptedPublicBeta_v1.9.7.12=1\n"; //fuck these, you accepted them I dont care
+    file << "AcceptedPublicBeta_v1.9.7.13=1\n"; //fuck these, you accepted them I dont care
     file << "AcceptedModDisclaimer=" << AcceptedModDisclaimer << "\n";
     file << "AcceptedDataCollectionDisclaimer=" << AcceptedDataCollectionDisclaimer << "\n";
     file << "EnableDebugConsole=" << EnableDebugConsole << "\n";
