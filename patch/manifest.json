@@ -9,8 +9,6 @@
     "resources\\scripts\\json.lua",
     "resources\\scripts\\main.lua",
     "tools\\IsaacAnimationEditor\\Layout.dat",
-    "tools\\ResourceExtractor\\Linux\\filelist.txt",
-    "tools\\ResourceExtractor\\filelist.txt",
-    "tools\\ResourceExtractor\\macOS\\filelist.txt"
+    "tools\\ResourceExtractor\\filelist.txt"
   ]
 }
