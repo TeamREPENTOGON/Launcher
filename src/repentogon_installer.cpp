@@ -644,7 +644,7 @@ namespace Launcher {
 			rapidjson::Document asJson;
 			asJson.Parse(allReleasesResult.string.c_str());
 
-			if (asJson.HasParseError()) {
+			if (asJson.HasParseError() || (allReleasesResult.string.find("API rate limit exceeded for") != std::string::npos)) {
 				Logger::Error("Unable to parse list of all Repentogon releases as JSON. Defaulting to latest release\n");
 				curl::DownloadMonitor monitor;
 				request.url = RepentogonURL;
@@ -663,13 +663,18 @@ namespace Launcher {
 
 				return Github::ValidateReleaseInfo(*descriptor, response, nullptr);
 			}
-
+			
 			auto releases = asJson.GetArray();
 			if (releases.Empty()) {
 				Logger::Error("Trying to download a new Repentogon release, but none available\n");
 				return Github::RELEASE_INFO_JSON_ERROR;
 			}
 
+			if (!releases[0].HasMember("url") || !releases[0]["url"].IsString()) {
+				Logger::Error("Trying to download a new Repentogon release, but you ran out of requests! (try again next hour!)\n");
+				return Github::RELEASE_INFO_JSON_ERROR;
+			}
+			
 			curl::DownloadMonitor monitor;
 			request.url = releases[0]["url"].GetString();
 			std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> releasesDesc =
