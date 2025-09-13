@@ -35,6 +35,8 @@ The tool depends on bsdiff4. You can install it through the normal means, e.g.
   the entire program will still run.
 * Flag `-y` can be given for automation. If given, the tool will not ask for
   confirmation before erasing the output folder if it already exists.
+  
+  NOTE: make sure you remove all tools/ patches from the manifest.json after its done, for better results, also dont forget to change the version on version.txt in the folder of the patch (and make sure it starts with v)
 
 # REPENTOGON specifics
 

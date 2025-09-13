@@ -2,8 +2,8 @@
   "delete": [],
   "create": {},
   "patch": [
-    "isaac-ng.exe",
     "OpenAL32.dll",
+    "isaac-ng.exe",
     "resources\\packed\\afterbirthp.a",
     "resources\\scripts\\enums.lua",
     "resources\\scripts\\json.lua",

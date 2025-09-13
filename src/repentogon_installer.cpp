@@ -673,7 +673,7 @@ namespace Launcher {
 			if (!releases[0].HasMember("url") || !releases[0]["url"].IsString()) {
 				Logger::Error("Trying to download a new Repentogon release, but you ran out of requests! (try again next hour!)\n");
 				return Github::RELEASE_INFO_JSON_ERROR;
-			}
+			} 
 			
 			curl::DownloadMonitor monitor;
 			request.url = releases[0]["url"].GetString();
