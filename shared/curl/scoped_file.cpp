@@ -13,6 +13,12 @@ ScopedFile::~ScopedFile() {
 		fclose(_f);
 }
 
+FILE* ScopedFile::Release() {
+	FILE* f = _f;
+	_f = nullptr;
+	return f;
+}
+
 ScopedFile& ScopedFile::operator=(FILE* f) {
 	if (_f)
 		fclose(_f);

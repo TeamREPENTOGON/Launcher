@@ -9,6 +9,7 @@ public:
 	ScopedFile(FILE* f);
 	~ScopedFile();
 
+	FILE* Release();
 	ScopedFile& operator=(FILE* f);
 	operator FILE* () const;
 	operator bool() const;
