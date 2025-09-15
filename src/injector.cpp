@@ -14,11 +14,13 @@
 
 #include "launcher/app.h"
 #include "launcher/cli.h"
+#include "launcher/diff_patcher.h"
 #include "launcher/launcher_configuration.h"
 #include "launcher/loader.h"
 
 #include "shared/externals.h"
 #include "shared/logger.h"
+#include "shared/pe32.h"
 
 /* Perform the early setup for the injection: create the Isaac process,
  * allocate memory for the remote thread function etc.
@@ -173,9 +175,47 @@ int UpdateMemory(LauncherConfiguration const* configuration, HANDLE process,
 }
 // #pragma code_seg(pop, r1)
 
+static bool SanitizeRepentogonStartup(const char* path) {
+	Logger::Info("Sanitizing Repentogon startup\n");
+
+	try {
+		PE32 pe32(path);
+		auto [textSectionHeader, _] = pe32.GetSection(".text");
+		if (!textSectionHeader) {
+			Logger::Error("SanitizeRepentogonStartup: no .text found in %s\n", path);
+			return false;
+		}
+
+		char signature[sizeof(diff_patcher::ISAAC_MAIN_SIGNATURE)];
+		strcpy(signature, diff_patcher::ISAAC_MAIN_SIGNATURE);
+
+		signature[0] = diff_patcher::ISAAC_POISON_BYTE;
+
+		if (!pe32.Lookup(signature, textSectionHeader)) {
+			Logger::Warn("SanitizeRepentogonStartup: poisoned main not found in %s, emergency patching\n", path);
+
+			if (!diff_patcher::PatchIsaacMain(path)) {
+				Logger::Error("SanitizeRepentogonStartup: unable to poison main in %s\n", path);
+				return false;
+			}
+		}
+
+		return true;
+	} catch (std::runtime_error const& e) {
+		Logger::Error("Error while sanitizing Repentogon startup: %s\n", e.what());
+		return false;
+	}
+}
+
 int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const* configuration,
 	HANDLE* outProcess, void** page, size_t* functionOffset, size_t* paramOffset,
 	PROCESS_INFORMATION* processInfo) {
+	if (!isLegacy) {
+		if (!SanitizeRepentogonStartup(path)) {
+			return -1;
+		}
+	}
+
 	Logger::Info("Starting injector\n");
 	DWORD processId = CreateIsaac(path, isLegacy, configuration, processInfo);
 	if (processId == 0) {
@@ -261,13 +301,13 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 
 	if (FirstStageInit(path, isLegacy, configuration, &process, &remotePage, &functionOffset, &paramOffset, &processInfo)) {
 		gui->LogError("Low level error encountered while starting the game, check log files\n");
-		return -1;
+		return 0xFFFFFFFF;
 	}
 
 	if (configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
 		if (CreateAndWait(process, remotePage, functionOffset, paramOffset)) {
 			gui->LogError("Error encountered while injecting Repentogon, check log files\n");
-			return -1;
+			return 0xFFFFFFFF;
 		}
 	}
 
@@ -275,7 +315,7 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 	if (result == -1) {
 		Logger::Error("Failed to resume isaac-ng.exe main thread: %d\n", GetLastError());
 		gui->LogError("Game was unable to leave its suspended state, aborting launch\n");
-		return -1;
+		return 0xFFFFFFFF;
 	} else {
 		Logger::Info("Resumed main thread of isaac-ng.exe, previous supend count was %d\n", result);
 	}

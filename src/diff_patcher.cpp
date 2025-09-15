@@ -16,6 +16,7 @@
 
 #include "launcher/diff_patcher.h"
 #include "shared/logger.h"
+#include "shared/pe32.h"
 #include "shared/scoped_file.h"
 
 namespace fs = std::filesystem;
@@ -199,6 +200,39 @@ void bspatch_stream(const char* oldfile, const char* patchfile, const char* newf
 }
 
 namespace diff_patcher {
+    bool PatchIsaacMain(const char* file) {
+        try {
+            PE32 pe32(file);
+            auto [textSectionHeader, textStart] = pe32.GetSection(".text");
+
+            if (!textSectionHeader) {
+                Logger::Error("diff_patcher::PatchIsaacMain: executable %s has no .text section\n", file);
+                return false;
+            }
+
+            PE32Byte mainFn = pe32.Lookup(ISAAC_MAIN_SIGNATURE, textSectionHeader);
+            if (!mainFn) {
+                Logger::Error("diff_patcher::PatchIsaacMain: main() not found in executable %s\n", file);
+                return false;
+            }
+
+            if (!pe32.Patch(mainFn, std::string(&ISAAC_POISON_BYTE).c_str())) {
+                Logger::Error("diff_patcher::PatchIsaacMain: error while patching main in %s\n", file);
+                return false;
+            }
+
+            if (!pe32.Write()) {
+                Logger::Error("diff_patcher::PatchIsaacMain: error while writing back %s\n", file);
+                return false;
+            }
+
+            return true;
+        } catch (std::runtime_error const& e) {
+            Logger::Error("diff_patcher::PatchIsaacMain: error while processing %s as a PE executable\n", file);
+            return false;
+        }
+    }
+
     static void PushError(std::vector<PatchError>* errors, std::string name,
         PatchOperation op, std::error_code errc) {
         if (errors) {
@@ -281,8 +315,15 @@ namespace diff_patcher {
                 Logger::Info("PatchFolder: Patching `%s` using patch file `%s`\n", original.string().c_str(), patch.string().c_str());
 
                 try {
+                    std::string s = temporary.string();
                     bspatch_stream(original.string().c_str(), patch.string().c_str(),
-                        temporary.string().c_str());
+                        s.c_str());
+
+                    if (const char* substring = strstr(s.c_str(), "isaac-ng.exe")) {
+                        if (!strcmp(substring, "isaac-ng.exe")) {
+                            PatchIsaacMain(substring);
+                        }
+                    }
                 } catch (std::exception& e) {
                     Logger::Error("PatchFolder: unable to apply patch for %s (%s)\n", name.c_str(),
                         e.what());

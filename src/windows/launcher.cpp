@@ -209,7 +209,7 @@ namespace Launcher {
 
 		_LeftSideSizer->Add(launchModeBoxSizer, 1, wxEXPAND | wxRIGHT, 10);
 		_verticalSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
-		
+
 	}
 
 	void LauncherMainWindow::AddModdingOptions() {
@@ -250,7 +250,7 @@ namespace Launcher {
 	}
 
 
-	void LauncherMainWindow::AddOptionsConfigOptions() { 
+	void LauncherMainWindow::AddOptionsConfigOptions() {
 		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "Game Options");
 		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxHORIZONTAL);
 
@@ -603,7 +603,9 @@ namespace Launcher {
 
 		if (exitCode && exitCode != LauncherInterface::LAUNCHER_EXIT_MODS_CHANGED &&
 			exitCode != STATUS_CONTROL_C_EXIT) {
-			_logWindow.LogWarn("Game exited with error code %#lx (%s)\n", exitCode, desc.c_str());
+			if (exitCode != 0xFFFFFFFF) {
+				_logWindow.LogWarn("Game exited with error code %#lx (%s)\n", exitCode, desc.c_str());
+			}
 		} else {
 			_logWindow.LogInfo("Game sucessfully exited\n");
 		}
@@ -1045,29 +1047,29 @@ namespace Launcher {
 		case wxID_CANCEL:
 		case CHECKLOGS_EVENT_NONE:
 			break;
-			
+
 		case CHECKLOGS_EVENT_LAUNCHERLOG:
 			wxLaunchDefaultBrowser("file:///" + fs::absolute("launcher.log").string());
 			break;
-		
+
 		case CHECKLOGS_EVENT_RGONLOG:
 			wxLaunchDefaultBrowser("file:///" + fs::absolute(_installation->GetIsaacInstallation()
 				.GetRepentogonInstallation().GetExePath()).parent_path().string() + "/repentogon.log");
 			break;
-		
+
 		case CHECKLOGS_EVENT_GAMELOG:
 			wxLaunchDefaultBrowser("file:///" + fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt");
 			break;
-		
+
 		case CHECKLOGS_EVENT_LAUNCHERLOG_LOCATE:
 			ShowFileInExplorer("file:///" + fs::absolute("launcher.log").string());
 			break;
-		
+
 		case CHECKLOGS_EVENT_RGONLOG_LOCATE:
 			ShowFileInExplorer("file:///" + fs::absolute(_installation->GetIsaacInstallation()
 				.GetRepentogonInstallation().GetExePath()).parent_path().string() + "/repentogon.log");
 			break;
-		
+
 		case CHECKLOGS_EVENT_GAMELOG_LOCATE:
 			ShowFileInExplorer("file:///" + fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt");
 			break;
