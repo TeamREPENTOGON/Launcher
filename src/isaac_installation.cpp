@@ -11,6 +11,7 @@
 #include "launcher/repentogon_installation.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
+#include "shared/pe32.h"
 #include "shared/scoped_file.h"
 #include "shared/sha256.h"
 #include "shared/steam.h"
@@ -265,166 +266,42 @@ bool IsaacInstallation::ValidateRepentogon(std::string const& folder) {
 	return true;
 }
 
-#pragma pack(1)
-struct COFFHeader {
-	uint16_t Machine;
-	uint16_t NumberOfSections;
-	uint32_t TimeDateStamp;
-	void* PointerToSymbolTable;
-	uint32_t NumberOfSymbols;
-	uint16_t SizeOfOptionalHeader;
-	uint16_t Characteristics;
-};
-
-static_assert(sizeof(COFFHeader) == 20);
-
-#pragma pack(1)
-struct SectionHeader {
-	char Name[8];
-	uint32_t VirtualSize;
-	uint32_t VirtualAddress;
-	uint32_t SizeOfRawData;
-	uint32_t PointerToRawData;
-	uint32_t PointerToRelocations;
-	uint32_t PointerToLineNumbers;
-	uint16_t NumberOfRelocations;
-	uint16_t NumberOfLineNumbers;
-	uint32_t Characteristics;
-};
-
-static_assert(sizeof(SectionHeader) == 40);
-
 IsaacInstallation::IsaacInstallation(ILoggableGUI* gui) : _gui(gui) { }
 
 std::optional<std::string> InstallationData::GetVersionStringFromMemory(std::string const& path) {
-	if (path.empty()) {
-		Logger::Error("Installation::GetVersionString: no executable\n");
-		return std::nullopt;
-	}
+	try {
+		PE32 pe32(path.c_str());
+		auto [rdataSectionHeader, sectionStart] = pe32.GetSection(".rdata");
 
-	FILE* exe = fopen(path.c_str(), "rb");
-	if (!exe) {
-		Logger::Error("Installation::GetVersionString: could not open %s\n", path.c_str());
-		return std::nullopt;
-	}
-
-	ScopedFile scopedFile(exe);
-
-	DWORD highOrder = 0;
-	HANDLE exeHandle = (HANDLE)_get_osfhandle(_fileno(exe));
-	DWORD size = GetFileSize(exeHandle, &highOrder);
-	DWORD minSize = 0x40; // DOS header
-
-	if (highOrder != 0) {
-		Logger::Error("Installation::GetVersionString: isaac-ng.exe size > 4GB\n");
-		return std::nullopt;
-	}
-
-	if (size < minSize) {
-		Logger::Error("Installation::GetVersionString: executable too short (< 0x40 bytes)\n");
-		return std::nullopt;
-	}
-
-	char* content = (char*)malloc(size);
-	if (!content) {
-		Logger::Error("Installation::GetVersionString: unable to allocate memory to store isaac-ng.exe\n");
-		return std::nullopt;
-	}
-
-	unique_free_ptr<char> scopedPtr(content);
-
-	if (fread(content, size, 1, exe) != 1) {
-		Logger::Error("Installation::GetVersionString: error while reading file content into memory\n");
-		return std::nullopt;
-	}
-
-	uint32_t* peOffset = (uint32_t*)(content + 0x3c);
-	minSize = *peOffset + 0x4; // DOS header + PE signature
-	if (size <= minSize) {
-		Logger::Error("Installation::GetVersionString: executable too short (no PE header)\n");
-		return std::nullopt;
-	}
-
-	uint32_t* peSignaturePtr = (uint32_t*)(content + *peOffset);
-	if (*peSignaturePtr != 0x00004550) {
-		Logger::Error("Installation::GetVersionString: executable is not a PE executable\n");
-		return std::nullopt;
-	}
-
-	minSize += 20; // DOS header + PE signature + COFF Header
-	if (size < minSize) {
-		Logger::Error("Installation::GetVersionString: executable too short (no COFF header)\n");
-		return std::nullopt;
-	}
-
-	COFFHeader* coffHeader = (COFFHeader*)(content + *peOffset + 0x4);
-
-	minSize += coffHeader->SizeOfOptionalHeader;
-	if (size < minSize) {
-		Logger::Error("Installation::GetVersionString: executable too short (malformed optional header)\n");
-		return std::nullopt;
-	}
-
-	SectionHeader* sections = (SectionHeader*)(content + minSize);
-	minSize += coffHeader->NumberOfSections * sizeof(*coffHeader);
-
-	if (size < minSize) {
-		Logger::Error("Installation::GetVersionString: executable too short (malformed section headers)\n");
-		return std::nullopt;
-	}
-
-	SectionHeader* rdataSectionHeader = NULL;
-	for (uint16_t i = 0; i < coffHeader->NumberOfSections; ++i) {
-		SectionHeader* currentSection = sections + i;
-		if (!strncmp(".rdata", currentSection->Name, 8)) {
-			rdataSectionHeader = currentSection;
-			break;
+		if (!pe32.IsSectionSizeValid(rdataSectionHeader)) {
+			Logger::Error("InstallationData::GetVersionStringFromMemory: .rdata section extends past file's bounds\n");
+			return std::nullopt;
 		}
-	}
 
-	if (!rdataSectionHeader) {
-		Logger::Error("Installation::GetVersionString: no .rdata section found\n");
+		size_t needleLen = strlen(__versionNeedle);
+		size_t limit = rdataSectionHeader->SizeOfRawData - needleLen;
+
+		const char* startVersion = pe32.Lookup(__versionNeedle, rdataSectionHeader);
+		if (!startVersion) {
+			Logger::Error("Installation::GetVersionString: invalid executable (no version string found)\n");
+			return std::nullopt;
+		}
+		const char* endVersion = startVersion;
+
+		while (*endVersion && endVersion < (const char*)sectionStart + limit)
+			++endVersion;
+
+		if (*endVersion) {
+			Logger::Error("Installation::GetVersionString: invalid executable (version string goes out of rdata section)\n");
+			return std::nullopt;
+		}
+
+		std::string result(startVersion, endVersion);
+		return result;
+	} catch (std::runtime_error const& e) {
+		Logger::Error("InstallationData::GetVersionStringFromMemory: %s\n", e.what());
 		return std::nullopt;
 	}
-
-	char* sectionStart = content + rdataSectionHeader->PointerToRawData;
-	if (size < rdataSectionHeader->PointerToRawData + rdataSectionHeader->SizeOfRawData) {
-		Logger::Error("Installation::GetVersionString: executable too short (malformed rdata section header)\n");
-		return std::nullopt;
-	}
-
-	size_t needleLen = strlen(__versionNeedle);
-	if (rdataSectionHeader->SizeOfRawData < needleLen) {
-		Logger::Error("Installation::GetVersionString: executable too short (version string does not fit)\n");
-	}
-
-	size_t limit = rdataSectionHeader->SizeOfRawData - needleLen;
-	int32_t offset = -1;
-	for (int32_t i = 0; i < limit; ++i) {
-		if (memcmp(sectionStart + i, __versionNeedle, needleLen))
-			continue;
-		offset = i;
-		break;
-	}
-
-	if (offset == -1) {
-		Logger::Error("Installation::GetVersionString: invalid executable (no version string found)\n");
-		return std::nullopt;
-	}
-
-	char* startVersion = sectionStart + offset;
-	char* endVersion = startVersion;
-
-	while (*endVersion && endVersion < sectionStart + limit)
-		++endVersion;
-
-	if (*endVersion) {
-		Logger::Error("Installation::GetVersionString: invalid executable (version string goes out of rdata section)\n");
-		return std::nullopt;
-	}
-
-	std::string result(startVersion, endVersion);
-	return result;
 }
 
 std::optional<std::string> InstallationData::ComputeVersion(std::string const& path) {
