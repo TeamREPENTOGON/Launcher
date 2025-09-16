@@ -320,8 +320,8 @@ namespace diff_patcher {
                         s.c_str());
 
                     if (const char* substring = strstr(s.c_str(), "isaac-ng.exe")) {
-                        if (!strcmp(substring, "isaac-ng.exe")) {
-                            PatchIsaacMain(substring);
+                        if (!strcmp(substring, "isaac-ng.exe.patched")) {
+                            PatchIsaacMain(s.c_str());
                         }
                     }
                 } catch (std::exception& e) {
