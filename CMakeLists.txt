@@ -3,6 +3,9 @@ project (Launcher CXX)
 set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/;${CMAKE_MODULE_PATH}")
 
+# Prevents missing DLL errors for debug builds during launcher alpha/beta
+set (CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 option (LAUNCHER_UNSTABLE "Build unstable version instead of release version" OFF)
 
 # Stupid MSVC
