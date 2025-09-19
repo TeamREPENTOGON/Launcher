@@ -630,9 +630,8 @@ namespace Launcher {
 		_advancedOptionsButton->Enable(enable);
 		_optionsBox->Enable(enable);
 		if (enable) {
-			_launchButton->Enable();
-		}
-		else {
+			UpdateLaunchButtonEnabledState();
+		} else {
 			_launchButton->Disable();
 		}
 	}
@@ -650,13 +649,11 @@ namespace Launcher {
 		if (mainData.IsValid()) {
 			_isaacFileText->SetForegroundColour(*wxBLACK);
 			_isaacFileText->SetValue(mainData.GetExePath());
-			_launchButton->Enable();
 		} else {
 			_isaacFileText->SetForegroundColour(*wxRED);
 			_isaacFileText->SetValue("No valid Isaac installation specified");
 			_logWindow.LogError("No valid Isaac installation provided, "
 				"cannot start until a correct value is provided !");
-			_launchButton->Disable();
 		}
 
 		if (repentogonInstallation.IsValid()) {
