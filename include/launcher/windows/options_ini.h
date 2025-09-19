@@ -43,7 +43,6 @@ public:
     int MultiplayerColorSet = 0;
     int OnlineInputDelay = 0; 
     int AcceptedPublicBeta_v1_9_7_12 = 0; //pointless
-    int AcceptedPublicBeta_v1_9_7_13 = 0; //pointless
     int AcceptedModDisclaimer = 0; //pointless
     int AcceptedDataCollectionDisclaimer = 0; //pointless
     int EnableDebugConsole = 0;
@@ -62,6 +61,7 @@ public:
     int WindowHeight = 0;
     int WindowPosX = 0;
     int WindowPosY = 0;
+    std::unordered_map<std::string, std::string> unsupportedoptions;
 
     bool Load(const std::string& filename) {
         filepath = filename;
@@ -119,8 +119,7 @@ public:
     file << "OnlineChatFilterEnabled=" << OnlineChatFilterEnabled << "\n";
     file << "MultiplayerColorSet=" << MultiplayerColorSet << "\n";
     file << "OnlineInputDelay=" << OnlineInputDelay << "\n";
-    file << "AcceptedPublicBeta_v1.9.7.12=1\n"; //fuck these, you accepted them I dont care
-    file << "AcceptedPublicBeta_v1.9.7.13=1\n"; //fuck these, you accepted them I dont care
+    file << "AcceptedPublicBeta_v1.9.7.12=" << AcceptedPublicBeta_v1_9_7_12 << "\n"; //fuck these, you accepted them I dont care    
     file << "AcceptedModDisclaimer=" << AcceptedModDisclaimer << "\n";
     file << "AcceptedDataCollectionDisclaimer=" << AcceptedDataCollectionDisclaimer << "\n";
     file << "EnableDebugConsole=" << EnableDebugConsole << "\n";
@@ -140,12 +139,17 @@ public:
     file << "WindowPosX=" << WindowPosX << "\n";
     file << "WindowPosY=" << WindowPosY << "\n";
 
+    for (auto& entry : unsupportedoptions) {
+        file << entry.first << "=" << entry.second << "\n";
+    }
+
         return true;
     }
 
 private:
     void SetOption(const std::string& key, const std::string& val) {
         std::istringstream ss(val);
+
 
         if (key == "Language") ss >> Language; //could make an elaborated structure but fuck it, a script did it, not me!....also got tricky for a structure because of fucking types...
         else if (key == "MusicVolume") ss >> MusicVolume;
@@ -198,6 +202,7 @@ private:
         else if (key == "WindowHeight") ss >> WindowHeight;
         else if (key == "WindowPosX") ss >> WindowPosX;
         else if (key == "WindowPosY") ss >> WindowPosY;
+        else unsupportedoptions[key] = val;
     }
 };
 
