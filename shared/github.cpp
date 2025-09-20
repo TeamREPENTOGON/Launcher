@@ -61,10 +61,10 @@ namespace Github {
 
 		const char* remoteVersion = response["name"].GetString();
 		if (strcmp(remoteVersion, installed)) {
-			Logger::Info("CheckUpdates: %s: new version available: %s", tool, remoteVersion);
+			Logger::Info("CheckUpdates: %s: new version available: '%s'\n", tool, remoteVersion);
 			return VERSION_CHECK_NEW;
 		} else {
-			Logger::Info("CheckUpdates: %s: up-to-date", tool);
+			Logger::Info("CheckUpdates: %s: up-to-date\n", tool);
 			return VERSION_CHECK_UTD;
 		}
 	}
