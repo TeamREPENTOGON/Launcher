@@ -105,6 +105,8 @@ namespace Launcher {
 			return false;
 		}
 
+		PushNotification(false, "Copying Isaac files, please wait...");
+
 		if (!standalone_rgon::CopyFiles(_installation->GetIsaacInstallation()
 			.GetMainInstallation().GetFolderPath(),
 			outputDir)) {
@@ -120,7 +122,7 @@ namespace Launcher {
 		}
 
 		if (isaacData.NeedsPatch()) {
-			PushNotification(false, "Patching Isaac files...");
+			PushNotification(false, "Patching Isaac files, please wait...");
 			if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "patch").string())) {
 				Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to patch Isaac files\n");
 				_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH;
