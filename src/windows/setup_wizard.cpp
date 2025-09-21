@@ -245,13 +245,11 @@ void LauncherWizard::ConfigureRepentogonSetupPage() {
         installationText->SetLabel("No valid installation of Repentogon found. An installation will be performed.");
     }
 
-    if (_configuration->Loaded()) {
-        _repentogonSetup._autoUpdates->SetValue(_configuration->AutomaticUpdates());
-        _repentogonSetup._unstableUpdates->SetValue(_configuration->UnstableUpdates());
-    } else {
-        _configuration->AutomaticUpdates(_repentogonSetup._autoUpdates->GetValue());
-        _configuration->UnstableUpdates(_repentogonSetup._unstableUpdates->GetValue());
-    }
+    _repentogonSetup._autoUpdates->SetValue(_configuration->AutomaticUpdates());
+    _repentogonSetup._autoUpdates->Enable(!_configuration->AutomaticUpdatesHasOverride());
+
+    _repentogonSetup._unstableUpdates->SetValue(_configuration->UnstableUpdates());
+    _repentogonSetup._unstableUpdates->Enable(!_configuration->UnstableUpdatesHasOverride());
 }
 
 void LauncherWizard::AddRepentogonInstallationPage() {
@@ -284,6 +282,7 @@ void LauncherWizard::OnPageChanged(wxWizardEvent& event) {
     source->Layout();
     if (source == _isaacSetupPage) {
         UpdateIsaacSetupNextButton();
+        _isaacSetup._selectButton->Enable(!_configuration->IsaacExecutablePathHasOverride());
     } else if (source == _repentogonSetupPage) {
         ConfigureRepentogonSetupPage();
     } else if (source == _repentogonInstallationPage) {
@@ -370,7 +369,7 @@ void LauncherWizard::UpdateFinalPage(bool finished,
 }
 
 void LauncherWizard::StartRepentogonInstallation() {
-    _configuration->RanWizard(true);
+    _configuration->SetRanWizard(true);
     std::unique_lock<std::recursive_mutex> lck(_installerMutex);
     _installer = std::make_unique<RepentogonInstallerHelper>(this, _installation,
         _repentogonSetup._unstableUpdates->GetValue(), false, _repentogonInstallation._logText);
@@ -487,11 +486,11 @@ void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
         }
     }
 
-    _configuration->UnstableUpdates(((wxCheckBox*)event.GetEventObject())->GetValue());
+    _configuration->SetUnstableUpdates(((wxCheckBox*)event.GetEventObject())->GetValue());
 }
 
 void LauncherWizard::OnAutomaticUpdatesCheckBoxClicked(wxCommandEvent& event) {
-    _configuration->AutomaticUpdates(((wxCheckBox*)event.GetEventObject())->GetValue());
+    _configuration->SetAutomaticUpdates(((wxCheckBox*)event.GetEventObject())->GetValue());
 }
 
 void LauncherWizard::OnCancel(wxWizardEvent& event) {

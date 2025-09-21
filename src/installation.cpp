@@ -45,6 +45,9 @@ namespace Launcher {
 			std::string result = _launcherConfiguration->IsaacExecutablePath();
 			if (_isaacInstallation.Validate(result, standalone)) {
 				return result;
+			} else if (_launcherConfiguration->IsaacExecutablePathHasOverride()) {
+				Logger::Warn("Isaac path provided via command-line %s is not a valid Isaac installation\n", result.c_str());
+				return std::nullopt;
 			} else {
 				Logger::Warn("Configured Isaac path %s is not a valid Isaac installation, "
 					"attempting to auto-detect\n", result.c_str());
@@ -86,7 +89,7 @@ namespace Launcher {
 		std::optional<std::string> const& isaacPath, bool* standalone) {
 		std::optional<std::string> locatedIsaacPath = LocateIsaac(isaacPath, standalone);
 		if (locatedIsaacPath) {
-			_launcherConfiguration->IsaacExecutablePath(
+			_launcherConfiguration->SetIsaacExecutablePath(
 				_isaacInstallation.GetMainInstallation().GetExePath());
 		}
 		bool repentogonOk = locatedIsaacPath ? CheckRepentogonInstallation() : false;
@@ -97,7 +100,7 @@ namespace Launcher {
 	int Installation::SetIsaacExecutable(std::string const& file, bool* standalone) {
 		bool ok = _isaacInstallation.Validate(file, standalone);
 		if (ok) {
-			_launcherConfiguration->IsaacExecutablePath(
+			_launcherConfiguration->SetIsaacExecutablePath(
 				_isaacInstallation.GetMainInstallation().GetExePath());
 			if (CheckRepentogonInstallation()) {
 				return BothInstallationsValid;

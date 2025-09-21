@@ -26,7 +26,7 @@ bool Launcher::App::RunWizard(Launcher::LauncherMainWindow* mainWindow, bool* in
 	 * This is the only place where we are 100% sure the wizard has not run
 	 * yet.
 	 */
-	__configuration.RanWizard(false);
+	__configuration.SetRanWizard(false);
 	LauncherWizard* wizard = new LauncherWizard(mainWindow, __installation, &__configuration);
 	wizard->AddPages(false);
 	bool wizardOk = wizard->Run();
@@ -139,7 +139,7 @@ bool Launcher::App::OnInit() {
 	bool wizardOk = false, wizardRan = false;
 	bool wizardInstalledRepentogon = false;
 	bool isIsaacValid = __installation->GetIsaacInstallation().GetMainInstallation().IsValid();
-	if (!sCLI->SkipWizard()) {
+	if (!sCLI->SkipWizard() && !__configuration.IsaacExecutablePathHasOverride()) {
 		if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid || isStandalone || !__configuration.RanWizard()) {
 			if (sCLI->ForceWizard()) {
 				Logger::Info("Force starting wizard due to command-line\n");

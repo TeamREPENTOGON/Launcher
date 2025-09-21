@@ -246,43 +246,43 @@ void LauncherConfiguration::LoadFromFile(INIReader const& reader) {
 void LauncherConfiguration::LoadFromCLI() {
 	std::string const& isaacPath = sCLI->IsaacPath();
 	if (!isaacPath.empty()) {
-		_cliOverrides.isaacExecutablePath = isaacPath;
+		_overrides.isaacExecutablePath = isaacPath;
 	}
 
 	if (sCLI->SkipWizard()) {
-		_cliOverrides.ranWizard = true;
+		_overrides.ranWizard = true;
 	} else if (sCLI->ForceWizard()) {
-		_cliOverrides.ranWizard = false;
+		_overrides.ranWizard = false;
 	}
 
-	_cliOverrides.launchMode = sCLI->GetLaunchMode();
+	_overrides.launchMode = sCLI->GetLaunchMode();
 
 	if (sCLI->StealthMode()) {
-		_cliOverrides.stealthMode = true;
+		_overrides.stealthMode = true;
 	}
 
 	if (sCLI->Stage()) {
-		_cliOverrides.levelStage = sCLI->Stage();
-		_cliOverrides.stageType = sCLI->StageType();
+		_overrides.levelStage = sCLI->Stage();
+		_overrides.stageType = sCLI->StageType();
 	}
 	if (sCLI->LuaDebug()) {
-		_cliOverrides.luaDebug = true;
+		_overrides.luaDebug = true;
 	}
 	if (!sCLI->LoadRoom().empty()) {
-		_cliOverrides.loadRoom = sCLI->LoadRoom();
+		_overrides.loadRoom = sCLI->LoadRoom();
 	}
 	if (!sCLI->LuaHeapSize().empty()) {
-		_cliOverrides.luaHeapSize = sCLI->LuaHeapSize();
+		_overrides.luaHeapSize = sCLI->LuaHeapSize();
 	}
 
 	if (sCLI->RepentogonConsole()) {
-		_cliOverrides.console = true;
+		_overrides.console = true;
 	}
 	if (sCLI->UnstableUpdates()) {
-		_cliOverrides.unstableUpdates = true;
+		_overrides.unstableUpdates = true;
 	}
 	if (sCLI->AutomaticUpdates()) {
-		_cliOverrides.automaticUpdates = true;
+		_overrides.automaticUpdates = true;
 	}
 }
 

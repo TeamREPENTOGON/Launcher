@@ -376,20 +376,20 @@ namespace Launcher {
 		if (std::regex_search(text, match, std::basic_regex("([0-9]+)\\.([0-9]+)"))) {
 			int stage = std::stoi(match[1].str());
 			int type = std::stoi(match[2].str());
-			_configuration->Stage(stage);
-			_configuration->StageType(type);
+			_configuration->SetStage(stage);
+			_configuration->SetStageType(type);
 		} else {
-			_configuration->Stage(0);
-			_configuration->StageType(0);
+			_configuration->SetStage(0);
+			_configuration->SetStageType(0);
 		}
 	}
 
 	void LauncherMainWindow::OnLaunchModeSelect(wxCommandEvent& event) {
 		wxComboBox* box = dynamic_cast<wxComboBox*>(event.GetEventObject());
 		if (box->GetValue() == ComboBoxVanilla) {
-			_configuration->IsaacLaunchMode(LAUNCH_MODE_VANILLA);
+			_configuration->SetIsaacLaunchMode(LAUNCH_MODE_VANILLA);
 		} else {
-			_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
+			_configuration->SetIsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
 		}
 		UpdateLaunchButtonEnabledState();
 	}
@@ -402,9 +402,9 @@ namespace Launcher {
 
 		std::cmatch match;
 		if (std::regex_match(luaHeapSize.c_str(), match, LuaHeapSizeRegex)) {
-			_configuration->LuaHeapSize(luaHeapSize);
+			_configuration->SetLuaHeapSize(luaHeapSize);
 		} else if (luaHeapSize == "K" || luaHeapSize == "M" || luaHeapSize == "G") {
-			_configuration->LuaHeapSize("");
+			_configuration->SetLuaHeapSize("");
 		} else {
 			wxBell();
 			const long ip = ctrl->GetInsertionPoint() - 1;
@@ -417,30 +417,30 @@ namespace Launcher {
 		wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
 		switch (box->GetId()) {
 		case WINDOW_CHECKBOX_REPENTOGON_CONSOLE:
-			_configuration->RepentogonConsole(box->GetValue());
+			_configuration->SetRepentogonConsole(box->GetValue());
 			break;
 
 		case WINDOW_CHECKBOX_REPENTOGON_UPDATES:
-			_configuration->AutomaticUpdates(box->GetValue());
+			_configuration->SetAutomaticUpdates(box->GetValue());
 			break;
 
 		case WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES:
-			_configuration->UnstableUpdates(box->GetValue());
+			_configuration->SetUnstableUpdates(box->GetValue());
 			if (box->GetValue() != _initialUnstableUpdates) {
 				OnRepentogonUnstableStateSwitched();
 			}
 			break;
 
 		case WINDOW_CHECKBOX_VANILLA_LUADEBUG:
-			_configuration->LuaDebug(box->GetValue());
+			_configuration->SetLuaDebug(box->GetValue());
 			break;
 
 		case WINDOW_CHECKBOX_HIDE_WINDOW:
-			_configuration->HideWindow(box->GetValue());
+			_configuration->SetHideWindow(box->GetValue());
 			break;
 
 		case WINDOW_CHECKBOX_STEALTH_MODE:
-			_configuration->StealthMode(box->GetValue());
+			_configuration->SetStealthMode(box->GetValue());
 			break;
 
 		default:
@@ -805,7 +805,7 @@ namespace Launcher {
 		LaunchMode mode = _configuration->IsaacLaunchMode();
 		if (mode != LAUNCH_MODE_REPENTOGON && mode != LAUNCH_MODE_VANILLA) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default", mode, c::Keys::launchMode.c_str());
-			_configuration->IsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
+			_configuration->SetIsaacLaunchMode(LAUNCH_MODE_REPENTOGON);
 		}
 
 		std::string luaHeapSize = _configuration->LuaHeapSize();
@@ -815,9 +815,9 @@ namespace Launcher {
 			if (!std::regex_match(luaHeapSize.c_str(), match, LuaHeapSizeRegex)) {
 				_logWindow.LogWarn("Invalid value %s for %s field in configuration file. Ignoring\n",
 					luaHeapSize.c_str(), c::Keys::luaHeapSize.c_str());
-				_configuration->LuaHeapSize(c::Defaults::luaHeapSize);
+				_configuration->SetLuaHeapSize(c::Defaults::luaHeapSize);
 			} else {
-				_configuration->LuaHeapSize(luaHeapSize);
+				_configuration->SetLuaHeapSize(luaHeapSize);
 			}
 		}
 
@@ -826,8 +826,8 @@ namespace Launcher {
 		if (levelStage < IsaacInterface::STAGE_NULL || levelStage > IsaacInterface::STAGE8) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default",
 				levelStage, c::Keys::levelStage.c_str());
-			_configuration->Stage(c::Defaults::levelStage);
-			_configuration->StageType(c::Defaults::stageType);
+			_configuration->SetStage(c::Defaults::levelStage);
+			_configuration->SetStageType(c::Defaults::stageType);
 		}
 
 		// Validate StageType
@@ -835,7 +835,7 @@ namespace Launcher {
 		if (stageType < IsaacInterface::STAGETYPE_ORIGINAL || stageType > IsaacInterface::STAGETYPE_REPENTANCE_B) {
 			_logWindow.LogWarn("Invalid value %d for %s field in configuration file. Overriding with default",
 				stageType, c::Keys::stageType.c_str());
-			_configuration->StageType(c::Defaults::stageType);
+			_configuration->SetStageType(c::Defaults::stageType);
 		}
 
 		// Validate the combination of LevelStage+StageType
@@ -843,34 +843,34 @@ namespace Launcher {
 			_logWindow.LogWarn("Invalid value %d for %s field associated with value %d "
 				"for %s field in configuration file. Overriding with default", stageType, c::Keys::stageType.c_str(),
 				levelStage, c::Keys::levelStage.c_str());
-			_configuration->StageType(c::Defaults::stageType);
+			_configuration->SetStageType(c::Defaults::stageType);
 		}
 	}
 
 	void LauncherMainWindow::InitializeGUIFromOptions() {
-		_configurationBox->GetWindowChild(WINDOW_BUTTON_SELECT_ISAAC)->Enable(!_configuration->IsaacExecutablePathHasCliOverride());
+		_configurationBox->GetWindowChild(WINDOW_BUTTON_SELECT_ISAAC)->Enable(!_configuration->IsaacExecutablePathHasOverride());
 
 		_console->SetValue(_configuration->RepentogonConsole());
-		_console->Enable(!_configuration->RepentogonConsoleHasCliOverride());
+		_console->Enable(!_configuration->RepentogonConsoleHasOverride());
 
 		_updates->SetValue(_configuration->AutomaticUpdates());
-		_updates->Enable(!_configuration->AutomaticUpdatesHasCliOverride());
+		_updates->Enable(!_configuration->AutomaticUpdatesHasOverride());
 
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
-		_unstableRepentogon->Enable(!_configuration->UnstableUpdatesHasCliOverride());
+		_unstableRepentogon->Enable(!_configuration->UnstableUpdatesHasOverride());
 		_initialUnstableUpdates = _unstableRepentogon->GetValue();
 
 		_luaHeapSize->SetValue(_configuration->LuaHeapSize());
-		_luaHeapSize->Enable(!_configuration->LuaHeapSizeHasCliOverride());
+		_luaHeapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
 
 		_luaDebug->SetValue(_configuration->LuaDebug());
-		_luaDebug->Enable(!_configuration->LuaDebugHasCliOverride());
+		_luaDebug->Enable(!_configuration->LuaDebugHasOverride());
 
 		// _stealthMode->SetValue(_configuration->StealthMode());
-		// _stealthMode->Enable(!_configuration->StealthModeHasCliOverride());
+		// _stealthMode->Enable(!_configuration->StealthModeHasOverride());
 
 		_hideWindow->SetValue(_configuration->HideWindow());
-		_hideWindow->Enable(!_configuration->HideWindowHasCliOverride());
+		_hideWindow->Enable(!_configuration->HideWindowHasOverride());
 
 		//InitializeLevelSelectFromOptions();
 
@@ -879,7 +879,7 @@ namespace Launcher {
 		} else {
 			_launchMode->SetValue(ComboBoxVanilla);
 		}
-		_launchMode->Enable(!_configuration->IsaacLaunchModeHasCliOverride());
+		_launchMode->Enable(!_configuration->IsaacLaunchModeHasOverride());
 	}
 
 	void LauncherMainWindow::InitializeLevelSelectFromOptions() {
@@ -892,7 +892,7 @@ namespace Launcher {
 		} else {
 			_levelSelect->SetSelection(0);
 		}
-		_levelSelect->Enable(!_configuration->StageHasCliOverride());
+		_levelSelect->Enable(!_configuration->StageHasOverride());
 	}
 
 	void LauncherMainWindow::UpdateLaunchButtonEnabledState() {

@@ -25,6 +25,16 @@ enum LaunchMode {
 	LAUNCH_MODE_REPENTOGON
 };
 
+/**
+ * Each option must have 3 things:
+ * 
+ * 1. Add it to the "Options" struct. It MUST be std::optional wrapped.
+ * 2. Add a default value for it to the Configuration::Defaults namespace.
+ * 3. Add functions to the LauncherConfiguration class using the CONFIGURATION_FIELD macro.
+ * 
+ * The exact same field name must be used in all three locations.
+ */
+
 struct Options {
 	/* General options */
 	std::optional<std::string> isaacExecutablePath;
@@ -98,26 +108,47 @@ namespace Configuration::Keys {
 	const std::string unstableUpdates("UnstableUpdates");
 }
 
+/**
+ * On "Overrides":
+ * 
+ * If an "override" value is set for an option, that value will override
+ * whatever value was loaded from the configuration file, but will NOT
+ * be written back to the configuration file. Typically, this is used
+ * for when options are set via the command line so that those values
+ * are not saved back to the user's config file, but can be used for
+ * other things if we want to "lock" an option without modifying the
+ * user's settings in their configuration file.
+ *
+ * It is expected that overridden options will have their respective
+ * UI elements locked so that they cannot be changed by the user.
+ * However, if the value is changed somehow, it will just change the
+ * current value of the override and will still not be written back
+ * to the user's config file.
+ */
+
 #undef CONFIGURATION_FIELD
 #define CONFIGURATION_FIELD(T, NAME, FIELD)\
 inline const T NAME##IgnoreOverride() const {\
 	return _options.FIELD.value_or(Configuration::Defaults::FIELD);\
 }\
 inline const T NAME() const {\
-	if (_cliOverrides.FIELD.has_value()) {\
-		return *_cliOverrides.FIELD;\
+	if (_overrides.FIELD.has_value()) {\
+		return *_overrides.FIELD;\
 	}\
 	return NAME##IgnoreOverride();\
 }\
-inline void NAME(const std::optional<T> value) {\
-	if (NAME##HasCliOverride()) {\
-		_cliOverrides.FIELD = value;\
+inline void Set##NAME##Override(const std::optional<T> value) {\
+	_overrides.FIELD = value;\
+}\
+inline void Set##NAME(const std::optional<T> value) {\
+	if (NAME##HasOverride()) {\
+		Set##NAME##Override(value);\
 	} else {\
 		_options.FIELD = value;\
 	}\
 }\
-inline bool NAME##HasCliOverride() const {\
-	return _cliOverrides.FIELD.has_value();\
+inline bool NAME##HasOverride() const {\
+	return _overrides.FIELD.has_value();\
 }
 
 class LauncherConfiguration {
@@ -198,7 +229,7 @@ private:
 	bool _isLoaded = false;
 
 	Options _options;
-	Options _cliOverrides;
+	Options _overrides;
 };
 
 #undef CONFIGURATION_FIELD
