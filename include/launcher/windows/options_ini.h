@@ -42,7 +42,6 @@ public:
     int OnlineChatFilterEnabled = 0;
     int MultiplayerColorSet = 0;
     int OnlineInputDelay = 0; 
-    int AcceptedPublicBeta_v1_9_7_12 = 0; //pointless
     int AcceptedModDisclaimer = 0; //pointless
     int AcceptedDataCollectionDisclaimer = 0; //pointless
     int EnableDebugConsole = 0;
@@ -119,7 +118,6 @@ public:
     file << "OnlineChatFilterEnabled=" << OnlineChatFilterEnabled << "\n";
     file << "MultiplayerColorSet=" << MultiplayerColorSet << "\n";
     file << "OnlineInputDelay=" << OnlineInputDelay << "\n";
-    file << "AcceptedPublicBeta_v1.9.7.12=" << AcceptedPublicBeta_v1_9_7_12 << "\n"; //fuck these, you accepted them I dont care    
     file << "AcceptedModDisclaimer=" << AcceptedModDisclaimer << "\n";
     file << "AcceptedDataCollectionDisclaimer=" << AcceptedDataCollectionDisclaimer << "\n";
     file << "EnableDebugConsole=" << EnableDebugConsole << "\n";
@@ -183,7 +181,6 @@ private:
         else if (key == "OnlineChatFilterEnabled") ss >> OnlineChatFilterEnabled;
         else if (key == "MultiplayerColorSet") ss >> MultiplayerColorSet;
         else if (key == "OnlineInputDelay") ss >> OnlineInputDelay;
-        else if (key == "AcceptedPublicBeta_v1.9.7.12") ss >> AcceptedPublicBeta_v1_9_7_12;
         else if (key == "AcceptedModDisclaimer") ss >> AcceptedModDisclaimer;
         else if (key == "AcceptedDataCollectionDisclaimer") ss >> AcceptedDataCollectionDisclaimer;
         else if (key == "EnableDebugConsole") ss >> EnableDebugConsole;
@@ -235,7 +232,6 @@ public:
         AddCheckBox(ROW1, "Chargebars", &optionss.ChargeBars, chargebarsChk);
         AddCheckBox(ROW1, "Bullet Visibility", &optionss.BulletVisibility, bulletVisibilityChk);
         AddCheckBox(ROW1, "Pause on Focus Lost", &optionss.PauseOnFocusLost, pauseOnFocusChk);
-        //AddCheckBox(ROW1, "Accepted Public Beta", &optionss.AcceptedPublicBeta_v1_9_7_12, acceptedPublicBetaChk);
         AddCheckBox(ROW1, "Try Import Save", &optionss.TryImportSave, tryImportSaveChk);
 
         AddCheckBox(ROW2, "Save Command History", &optionss.SaveCommandHistory, saveHistoryChk);
@@ -335,8 +331,7 @@ private:
     wxCheckBox* onlineChatEnabledChk;
     wxCheckBox* onlineChatFilterChk;
     wxChoice* multiplayerColorSetDrp;
-    wxTextCtrl* onlineInputDelayTxt; 
-    wxCheckBox* acceptedPublicBetaChk;
+    wxTextCtrl* onlineInputDelayTxt;
     wxCheckBox* acceptedModDisclaimerChk;
     wxCheckBox* acceptedDataDisclaimerChk;
     wxCheckBox* enableDebugConsoleChk;
