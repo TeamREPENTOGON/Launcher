@@ -165,6 +165,7 @@ namespace Launcher {
 		void SanitizeLauncherUpdate();
 
 		bool SelectIsaacExecutablePath();
+		void RefreshGUIFromInstallation();
 
 		/* Attempts an "automatic" Isaac launch, if the current cli/configurations permit it.
 		 * Intended to be called on launcher initialization, before showing the window.

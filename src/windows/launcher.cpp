@@ -642,6 +642,12 @@ namespace Launcher {
 		bool ok = wizard->Run();
 		wizard->Destroy();
 
+		RefreshGUIFromInstallation();
+
+		return ok;
+	}
+
+	void LauncherMainWindow::RefreshGUIFromInstallation() {
 		IsaacInstallation const& isaacInstallation = _installation->GetIsaacInstallation();
 		RepentogonInstallation const& repentogonInstallation = _installation->GetRepentogonInstallation();
 
@@ -669,8 +675,6 @@ namespace Launcher {
 		UpdateRepentogonOptionsFromInstallation();
 		_updates->SetValue(_configuration->AutomaticUpdates());
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
-
-		return ok;
 	}
 
 	bool LauncherMainWindow::SanityCheckLauncherUpdate() {
@@ -927,6 +931,7 @@ namespace Launcher {
 			frame->GetDownloadInstallResult();
 
 		frame->Destroy();
+		RefreshGUIFromInstallation();
 		SetFocus();
 		EnableInterface(true);
 
@@ -942,7 +947,6 @@ namespace Launcher {
 		} else {
 			_logWindow.Log("State of the Repentogon installation:\n");
 			Launcher::DisplayRepentogonFilesVersion(_installation, 1, true, _logWindow.Get());
-			UpdateRepentogonOptionsFromInstallation();
 
 			_initialUnstableUpdates = _unstableRepentogon->GetValue();
 			_canPromptOnUnstableSwitch = true;
