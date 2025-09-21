@@ -106,7 +106,7 @@ namespace Launcher {
 	LauncherMainWindow::LauncherMainWindow(Installation* installation, LauncherConfiguration* configuration) :
 		wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
 		_installation(installation), _configuration(configuration),
-		_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, -1),
+		_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, 125),
 			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)) {
 		// _optionsGrid = new wxGridBagSizer(0, 20);
 		_console = nullptr;
