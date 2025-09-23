@@ -209,7 +209,7 @@ class OptionsDialog : public wxDialog {
 public:
     OptionsDialog(wxWindow* parent, GameOptions& opts)
         : wxDialog(parent, wxID_ANY, "Game Options", wxDefaultPosition, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER),
-          optionss(opts)
+          optionss(opts), originalOptions(opts)
     {
         wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
 
@@ -293,6 +293,7 @@ public:
 
         Bind(wxEVT_BUTTON, &OptionsDialog::OnAccept, this, wxID_OK);
         Bind(wxEVT_BUTTON, [this](wxCommandEvent&){ EndModal(wxID_CANCEL); }, wxID_CANCEL);
+        Bind(wxEVT_CLOSE_WINDOW, &OptionsDialog::OnClose, this);
 
         Center();
     }
@@ -300,6 +301,7 @@ public:
 private:
 
     GameOptions& optionss;
+    GameOptions originalOptions;
 
     wxCheckBox* filterCheck;
     wxCheckBox* fullscreenCheck;
@@ -458,6 +460,77 @@ private:
         if (!TransferDataFromWindow()) return; //wxwidgets needs this shit to run to sinc th validators with the fields, its kind of ass...but, it gives an opportunity to filter out invalid inputs....by throwing an exception, lol (worst case scenario)
         optionss.Save();
         EndModal(wxID_OK);
+    }
+
+    bool Changed() {
+        return  optionss.Language != originalOptions.Language
+            || optionss.MusicVolume != originalOptions.MusicVolume
+            || optionss.MusicEnabled != originalOptions.MusicEnabled
+            || optionss.SFXVolume != originalOptions.SFXVolume
+            || optionss.MapOpacity != originalOptions.MapOpacity
+            || optionss.Fullscreen != originalOptions.Fullscreen
+            || optionss.Filter != originalOptions.Filter
+            || optionss.Exposure != originalOptions.Exposure
+            || optionss.Gamma != originalOptions.Gamma
+            || optionss.ControllerHotplug != originalOptions.ControllerHotplug
+            || optionss.PopUps != originalOptions.PopUps
+            || optionss.CameraStyle != originalOptions.CameraStyle
+            || optionss.ShowRecentItems != originalOptions.ShowRecentItems
+            || optionss.HudOffset != originalOptions.HudOffset
+            || optionss.TryImportSave != originalOptions.TryImportSave
+            || optionss.FoundHUD != originalOptions.FoundHUD
+            || optionss.EnableMods != originalOptions.EnableMods
+            || optionss.RumbleEnabled != originalOptions.RumbleEnabled
+            || optionss.ChargeBars != originalOptions.ChargeBars
+            || optionss.BulletVisibility != originalOptions.BulletVisibility
+            || optionss.TouchMode != originalOptions.TouchMode
+            || optionss.AimLock != originalOptions.AimLock
+            || optionss.JacobEsauControls != originalOptions.JacobEsauControls
+            || optionss.AscentVoiceOver != originalOptions.AscentVoiceOver
+            || optionss.OnlineHud != originalOptions.OnlineHud
+            || optionss.StreamerMode != originalOptions.StreamerMode
+            || optionss.OnlinePlayerVolume != originalOptions.OnlinePlayerVolume
+            || optionss.OnlinePlayerOpacity != originalOptions.OnlinePlayerOpacity
+            || optionss.OnlineChatEnabled != originalOptions.OnlineChatEnabled
+            || optionss.OnlineChatFilterEnabled != originalOptions.OnlineChatFilterEnabled
+            || optionss.MultiplayerColorSet != originalOptions.MultiplayerColorSet
+            || optionss.OnlineInputDelay != originalOptions.OnlineInputDelay
+            || optionss.AcceptedModDisclaimer != originalOptions.AcceptedModDisclaimer
+            || optionss.AcceptedDataCollectionDisclaimer != originalOptions.AcceptedDataCollectionDisclaimer
+            || optionss.EnableDebugConsole != originalOptions.EnableDebugConsole
+            || optionss.MaxScale != originalOptions.MaxScale
+            || optionss.MaxRenderScale != originalOptions.MaxRenderScale
+            || optionss.VSync != optionss.VSync
+            || optionss.PauseOnFocusLost != originalOptions.PauseOnFocusLost
+            || optionss.SteamCloud != originalOptions.SteamCloud
+            || optionss.MouseControl != originalOptions.MouseControl
+            || optionss.BossHpOnBottom != originalOptions.BossHpOnBottom
+            || optionss.AnnouncerVoiceMode != originalOptions.AnnouncerVoiceMode
+            || optionss.ConsoleFont != originalOptions.ConsoleFont
+            || optionss.FadedConsoleDisplay != originalOptions.FadedConsoleDisplay
+            || optionss.SaveCommandHistory != originalOptions.SaveCommandHistory
+            || optionss.WindowWidth != originalOptions.WindowWidth
+            || optionss.WindowHeight != originalOptions.WindowHeight
+            || optionss.WindowPosX != originalOptions.WindowPosX
+            || optionss.WindowPosY != originalOptions.WindowPosY;
+    }
+
+    void OnClose(wxCloseEvent& event) {
+        TransferDataFromWindow();
+
+        if ((m_returnCode != wxID_OK) && Changed()) {
+            wxMessageDialog dlg(this,
+                "You have unsaved changes. Are you sure you want to leave?",
+                "Unsaved Changes",
+                wxYES_NO | wxNO_DEFAULT | wxICON_WARNING);
+
+            if (dlg.ShowModal() == wxID_NO) {
+                event.Veto(); // stop close
+                return;
+            }
+        }
+
+        event.Skip(); // allow normal close
     }
 
 };
