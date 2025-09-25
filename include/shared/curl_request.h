@@ -105,4 +105,6 @@ namespace curl {
 
 	DownloadFileDescriptor DownloadFile(RequestParameters const& parameters,
 		std::string const& filename);
+
+	void SetupProxyForCurl(CURL* curl);
 }
