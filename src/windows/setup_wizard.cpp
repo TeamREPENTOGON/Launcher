@@ -460,7 +460,7 @@ void LauncherWizard::BeforePageChanged(wxWizardEvent& event) {
         bool shouldContinue = CheckRepentogonCompatibilityOnPageChange();
         if (!shouldContinue) {
             event.Veto();
-            Close();
+            // Close();
         }
     }
 }
@@ -471,11 +471,20 @@ bool LauncherWizard::CheckRepentogonCompatibilityOnPageChange() {
     }
 
     wxMessageDialog dialog(this, "This version of Isaac is not compatible with Repentogon.\n"
+        "The latest official version of Repentance+ is required to perform installation.\n"
+        "If a new patch recently came out, you may need to update the REPENTOGON Launcher.",
+        "Incompatibility with Repentogon",
+        wxOK);
+    dialog.ShowModal();
+    return false;
+    /*
+    wxMessageDialog dialog(this, "This version of Isaac is not compatible with Repentogon.\n"
         "Do you still want to proceed with the configuration and installation of Repentogon ?",
         "Incompatibility with Repentogon",
         wxYES_NO);
     int result = dialog.ShowModal();
     return result == wxID_YES;
+    */
 }
 
 void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
