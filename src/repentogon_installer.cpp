@@ -105,30 +105,34 @@ namespace Launcher {
 			return false;
 		}
 
-		PushNotification(false, "Copying Isaac files, please wait...");
+		if (isaacData.IsCompatibleWithRepentogon()) {
+			PushNotification(false, "Copying Isaac files, please wait...");
 
-		if (!standalone_rgon::CopyFiles(_installation->GetIsaacInstallation()
-			.GetMainInstallation().GetFolderPath(),
-			outputDir)) {
-			Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to copy Isaac files\n");
-			_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_COPY;
-			return false;
-		}
-
-		if (!standalone_rgon::CreateSteamAppIDFile(outputDir)) {
-			Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create steam_appid.txt\n");
-			_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID;
-			return false;
-		}
-
-		if (isaacData.NeedsPatch()) {
-			PushNotification(false, "Patching Isaac files, please wait...");
-			if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "patch").string())) {
-				Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to patch Isaac files\n");
-				_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH;
+			if (!standalone_rgon::CopyFiles(_installation->GetIsaacInstallation()
+				.GetMainInstallation().GetFolderPath(),
+				outputDir)) {
+				Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to copy Isaac files\n");
+				_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_COPY;
 				return false;
-
 			}
+
+			if (!standalone_rgon::CreateSteamAppIDFile(outputDir)) {
+				Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create steam_appid.txt\n");
+				_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID;
+				return false;
+			}
+
+			if (isaacData.NeedsPatch()) {
+				PushNotification(false, "Patching Isaac files, please wait...");
+				if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "patch").string())) {
+					Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to patch Isaac files\n");
+					_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH;
+					return false;
+
+				}
+			}
+		} else {
+			Logger::Warn("RepentogonInstaller::InstallRepentogonThread: Skipped copy/patch routine since the vanilla installation is not compatible\n");
 		}
 
 		PushNotification(false, "Sucessfully installed Repentogon\n");
