@@ -371,8 +371,12 @@ void LauncherWizard::UpdateFinalPage(bool finished,
 void LauncherWizard::StartRepentogonInstallation() {
     _configuration->SetRanWizard(true);
     std::unique_lock<std::recursive_mutex> lck(_installerMutex);
+    // Force a full reinstall if the current installation is broken, even if rgon itself is up to date.
+    const bool force = !_installation->GetRepentogonInstallation().IsValid()
+        || !_installation->GetIsaacInstallation().GetRepentogonInstallation().IsValid()
+        || !_installation->GetIsaacInstallation().GetRepentogonInstallation().IsCompatibleWithRepentogon();
     _installer = std::make_unique<RepentogonInstallerHelper>(this, _installation,
-        _repentogonSetup._unstableUpdates->GetValue(), false, _repentogonInstallation._logText);
+        _repentogonSetup._unstableUpdates->GetValue(), force, _repentogonInstallation._logText);
     _installer->Install(std::bind_front(&LauncherWizard::OnRepentogonInstallationCompleted, this));
 }
 
