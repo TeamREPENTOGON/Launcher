@@ -278,15 +278,22 @@ std::optional<std::string> InstallationData::GetVersionStringFromMemory(std::str
 			return std::nullopt;
 		}
 
-		size_t needleLen = strlen(__versionNeedle);
-		size_t limit = rdataSectionHeader->SizeOfRawData - needleLen;
-
 		const char* startVersion = pe32.Lookup(__versionNeedle, rdataSectionHeader);
 		if (!startVersion) {
+			Logger::Info("Installation::GetVersionString: Version needle not found. Trying regex...\n");
+			std::string sectionData(sectionStart, sectionStart + rdataSectionHeader->SizeOfRawData);
+			const std::regex rgx("Binding of Isaac: [a-zA-Z]+[+]{0,1} (v[0-9a-zA-Z.]+)");
+			std::smatch match;
+			if (std::regex_search(sectionData, match, rgx) && match.size() > 1) {
+				return match[1];
+			}
 			Logger::Error("Installation::GetVersionString: invalid executable (no version string found)\n");
 			return std::nullopt;
 		}
 		const char* endVersion = startVersion;
+
+		size_t needleLen = strlen(__versionNeedle);
+		size_t limit = rdataSectionHeader->SizeOfRawData - needleLen;
 
 		while (*endVersion && endVersion < (const char*)sectionStart + limit)
 			++endVersion;
@@ -296,8 +303,7 @@ std::optional<std::string> InstallationData::GetVersionStringFromMemory(std::str
 			return std::nullopt;
 		}
 
-		std::string result(startVersion, endVersion);
-		return result;
+		return StripVersion(std::string(startVersion, endVersion));
 	} catch (std::runtime_error const& e) {
 		Logger::Error("InstallationData::GetVersionStringFromMemory: %s\n", e.what());
 		return std::nullopt;
@@ -305,13 +311,7 @@ std::optional<std::string> InstallationData::GetVersionStringFromMemory(std::str
 }
 
 std::optional<std::string> InstallationData::ComputeVersion(std::string const& path) {
-	std::optional<std::string> versionString = GetVersionStringFromMemory(path);
-	// Can't use a ternary because type unification is tricky here
-	if (versionString) {
-		return StripVersion(*versionString);
-	} else {
-		return std::nullopt;
-	}
+	return GetVersionStringFromMemory(path);
 }
 
 bool InstallationData::PatchIsAvailable() const {
