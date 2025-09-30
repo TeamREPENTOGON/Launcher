@@ -10,4 +10,6 @@ namespace curl::detail {
     DownloadFileDescriptor DownloadFile(RequestParameters const& parameters,
         std::string const& filename,
         std::shared_ptr<AsynchronousDownloadFileDescriptor> const& desc);
+
+    std::optional<std::string> GetCurlProxyString();
 }

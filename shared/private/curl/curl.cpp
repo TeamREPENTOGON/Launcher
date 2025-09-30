@@ -6,6 +6,8 @@
 #include "shared/curl/string_response_handler.h"
 #include "shared/private/curl/curl_request.h"
 
+#include <winhttp.h> // for proxy detect in windows
+
 namespace curl::detail {
 	static bool MonitorNotifyOnDataReceived(Threading::Monitor<DownloadNotification>* monitor,
 		const char* name, std::atomic<bool>* cancel, uint32_t id, bool first,
@@ -125,6 +127,50 @@ namespace curl::detail {
 		return result;
 	}
 
+	std::optional<std::string> GetCurlProxyString() {
+		// Environment variables is not standard, and will not be set in windows or linux platform by default.
+		// The common behavior is, use HTTPS_PROXY if we are requesting an https url, and use HTTP_PROXY if we are requesting an http url.
+		// However, we just use HTTPS_PROXY here for simplicity.
+		auto https_proxy = getenv("HTTPS_PROXY");
+		if (!https_proxy) {
+			https_proxy = getenv("https_proxy");
+		}
+		if (https_proxy) {
+			return https_proxy;
+		}
+
+		std::optional<std::string> proxyString;
+		WINHTTP_CURRENT_USER_IE_PROXY_CONFIG proxyInfo;
+		if (WinHttpGetIEProxyConfigForCurrentUser(&proxyInfo)) {
+			if (!proxyInfo.fAutoDetect && proxyInfo.lpszProxy) {
+				char proxy[1024];
+				if (WideCharToMultiByte(CP_ACP,0, proxyInfo.lpszProxy, -1, proxy, sizeof(proxy), NULL, NULL)) {
+					/*
+					Example proxy value on windows:
+
+					127.0.0.1:1080
+					http://127.0.0.1:1080
+					Both of these values are possible.
+					In the first case, the config in the internet setthings is "http://127.0.0.1" with port "1080".
+					There is no "http://" prefix from the win32 api, and CURLOPT_PROXYPORT will be used to detect the
+					protocol as libcurl documented, which is http proxy protocol by default.
+					
+					https://127.0.0.1:1080
+					In this case, the config in the internet setthings is "https://127.0.0.1" with port "1080".
+					*/
+					proxyString = std::string(proxy);
+				}
+			}
+			if (proxyInfo.lpszProxy)
+				GlobalFree(proxyInfo.lpszProxy);
+			if (proxyInfo.lpszProxyBypass)
+				GlobalFree(proxyInfo.lpszProxyBypass);
+			if (proxyInfo.lpszAutoConfigUrl)
+				GlobalFree(proxyInfo.lpszAutoConfigUrl);
+		}
+		return proxyString;
+	}
+
 	void InitCurlSession(CURL* curl, RequestParameters const& request,
 		AbstractCurlResponseHandler* handler) {
 		struct curl_slist* headers = NULL;
@@ -138,6 +184,11 @@ namespace curl::detail {
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, AbstractCurlResponseHandler::ResponseSkeleton);
 		curl_easy_setopt(curl, CURLOPT_WRITEDATA, handler);
 		curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+		auto proxyString = GetCurlProxyString();
+		if (proxyString.has_value()) {
+			curl_easy_setopt(curl, CURLOPT_PROXY, proxyString.value().c_str());
+		}
 
 		if (request.maxSpeed) {
 			curl_easy_setopt(curl, CURLOPT_MAX_RECV_SPEED_LARGE, request.maxSpeed);
