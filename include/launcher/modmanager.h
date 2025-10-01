@@ -60,6 +60,11 @@ public:
     ModManagerFrame(wxWindow* parent, Launcher::Installation* Instalation);
     void RefreshLists();
 
+    void OnThreadUpdate(wxThreadEvent& evt) {
+        wxBitmap bmp = evt.GetPayload<wxBitmap>();
+        thumbnailCtrl->SetBitmap(bmp);
+    }
+
 private:
     wxStaticBitmap* thumbnailCtrl;
     wxRichTextCtrl* descriptionCtrl;

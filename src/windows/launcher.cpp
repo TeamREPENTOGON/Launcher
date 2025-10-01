@@ -181,9 +181,11 @@ namespace Launcher {
 		// _stealthMode->SetToolTip("When starting the launcher, skip the main window and automatically launch Isaac, then close the launcher afterwards.\n\nThe launcher will appear if an error occurs.");
 		// _configurationSizer->Add(_stealthMode, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 
+		/*
 		_hideWindow = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_HIDE_WINDOW,
 			"Hide launcher window while the game is running");
 		_configurationSizer->Add(_hideWindow, 0, wxLEFT | wxRIGHT | wxTOP, 5);
+		*/
 	}
 
 	void LauncherMainWindow::AddLaunchOptions() {
@@ -873,8 +875,8 @@ namespace Launcher {
 		// _stealthMode->SetValue(_configuration->StealthMode());
 		// _stealthMode->Enable(!_configuration->StealthModeHasOverride());
 
-		_hideWindow->SetValue(_configuration->HideWindow());
-		_hideWindow->Enable(!_configuration->HideWindowHasOverride());
+		//_hideWindow->SetValue(_configuration->HideWindow());
+		//_hideWindow->Enable(!_configuration->HideWindowHasOverride());
 
 		//InitializeLevelSelectFromOptions();
 

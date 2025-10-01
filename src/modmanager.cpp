@@ -209,6 +209,8 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     panel->SetSizer(topSizer);
     LoadModsFromFolder();
     RefreshLists();
+
+    Bind(wxEVT_THREAD, &ModManagerFrame::OnThreadUpdate, this);
 }
 
 void ModManagerFrame::LoadModsFromFolder() {
@@ -842,17 +844,24 @@ void ModManagerFrame::OnSelectMod(ModInfo mod) {
                         wxImage img;
                         if (LoadImageQuietly(imagePath.string(), img)) {
                             img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
-                            this->CallAfter([this, bmp = wxBitmap(img), idx = id] {
-                                if (selectedMod.id == idx) { //so it doesnt get replaced if the mod changes while other thumbs are loading
-                                    thumbnailCtrl->SetBitmap(bmp);
+                                if (selectedMod.id == id) { //so it doesnt get replaced if the mod changes while other thumbs are loading
+                                    wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
+                                    evt->SetPayload<wxBitmap>(wxBitmap(img));
+                                    if (!IsBeingDeleted()) {
+                                        wxQueueEvent(this, evt);
+                                    }
                                 }
-                                });
+                                
                         }
                         }
                         catch (...) {} //dont give a shit, this is not critical at all
                     }
                     else {
-                        thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
+                        wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
+                        evt->SetPayload<wxBitmap>(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
+                        if (!IsBeingDeleted()) {
+                            wxQueueEvent(this, evt);
+                        }
                     }
                     }).detach();
                 }
