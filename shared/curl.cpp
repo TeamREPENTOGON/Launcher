@@ -50,4 +50,11 @@ namespace curl {
 			return _downloadAsStringResultToLogStringBuffer;
 		}
 	}
+
+	void SetupProxyForCurl(CURL* curl) {
+		auto proxyString = curl::detail::GetCurlProxyString();
+		if (proxyString.has_value()) {
+			curl_easy_setopt(curl, CURLOPT_PROXY, proxyString.value().c_str());
+		}
+	}
 }

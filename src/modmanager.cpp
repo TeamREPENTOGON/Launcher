@@ -332,6 +332,9 @@ std::string GetThumbnailURL(const std::string& itemId) {
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &html);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+        curl::SetupProxyForCurl(curl);
+
         CURLcode res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
     }
@@ -377,6 +380,8 @@ bool DownloadThumbFromID(const std::string& itemId, const std::string& filePath)
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, nullptr); // Default write function
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    curl::SetupProxyForCurl(curl);
 
     CURLcode res = curl_easy_perform(curl);
     if (res == CURLE_OK) {
