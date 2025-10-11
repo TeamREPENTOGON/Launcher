@@ -911,6 +911,18 @@ namespace Launcher {
 		const IsaacLaunchability launchability = GetIsaacLaunchability();
 		if (launchability != ISAAC_LAUNCH_OK && _configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
 			_logWindow.LogWarn("Disabling REPENTOGON start option: %s", GetIsaacLaunchabilityErrorMessage(launchability));
+			if ((!attemptedpatchfix) && (((launchability == ISAAC_LAUNCH_REPENTOGON_INCOMPATIBLE) || (launchability == ISAAC_LAUNCH_REPENTOGON_INVALID)) && (_installation->GetIsaacInstallation().GetMainInstallation().IsCompatibleWithRepentogon()))) { // if the rgon exe is fucked but it seems fixable....try to fix it?
+				attemptedpatchfix = true;
+				_logWindow.LogWarn("Attempting to fix by forcing a rgon update/copy/patch!");
+				if (std::filesystem::exists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe.bak")) {
+					std::filesystem::remove(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe.bak");
+				}
+				if (std::filesystem::exists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe")) {
+					std::filesystem::rename(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe", _installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe.bak");
+					std::filesystem::remove(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe");
+				}
+				ForceRepentogonUpdate(_unstableRepentogon->GetValue());
+			}
 		}
 		UpdateLaunchButtonEnabledState();
 	}

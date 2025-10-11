@@ -211,6 +211,7 @@ namespace Launcher {
 		LauncherConfiguration* _configuration;
 		/* Log string used in CheckUpdates to indicate which tool is being checked. */
 		std::string _currentUpdate;
+		bool attemptedpatchfix = false;
 
 		wxDECLARE_EVENT_TABLE();
 	};

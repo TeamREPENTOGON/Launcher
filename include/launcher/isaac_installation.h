@@ -36,6 +36,7 @@ private:
     bool _isCompatibleWithRepentogon = false;
     bool _isValid = false;
     bool _needsPatch = false;
+    int _vanillaexeispatchable = -1; //-1 not checked, 0 not pachable, 1 pachable
 
     mutable ILoggableGUI* _gui = nullptr;
 
@@ -44,7 +45,7 @@ private:
     static std::string StripVersion(std::string const& version);
 
     // Returns true if a patch is available to convert this version into a supported one.
-    bool PatchIsAvailable() const;
+    bool PatchIsAvailable();
 
 public:
     inline void SetGUI(ILoggableGUI* gui) {

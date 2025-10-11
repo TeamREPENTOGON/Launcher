@@ -314,43 +314,55 @@ std::optional<std::string> InstallationData::ComputeVersion(std::string const& p
 	return GetVersionStringFromMemory(path);
 }
 
-bool InstallationData::PatchIsAvailable() const {
+bool InstallationData::PatchIsAvailable() {
 	namespace fs = std::filesystem;
+	if (_vanillaexeispatchable > 0) {
+		return _vanillaexeispatchable == 1; //so it doesnt do the whole check and we can call this a shitton of times without worrying, the vanilla exe shouldnt change while the launcher is open anyway, since the launcher doesnt update it and...if it does, just fucking restart the launcher, dude
+	}
+	std::string vanillaexehash;
+	HashResult result = Sha256::Sha256F(this->GetExePath().c_str(), vanillaexehash);
 
-	fs::path fullPath = fs::current_path() / "patch/version.txt";
-	std::string s = fullPath.string();
-	if (fs::exists(fullPath)) {
-		ScopedFile file(fopen(s.c_str(), "r"));
-		if (!file) {
-			Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: failed to open patch file %s\n", s.c_str());
-			return false;
-		}
+	if (result == HASH_OK) {
+		fs::path fullPath = fs::current_path() / "patch/exehash.txt";
+		std::string s = fullPath.string();
+		if (fs::exists(fullPath)) {
+			ScopedFile file(fopen(s.c_str(), "r"));
+			if (!file) {
+				Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: failed to open patch file %s\n", s.c_str());
+				return false;
+			}
 
-		long begin = ftell(file);
-		fseek(file, 0, SEEK_END);
+			long begin = ftell(file);
+			fseek(file, 0, SEEK_END);
 
-		if (ferror(file)) {
-			Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: failed to fseek\n");
-			return false;
-		}
+			if (ferror(file)) {
+				Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: failed to fseek\n");
+				return false;
+			}
 
-		long end = ftell(file);
-		rewind(file);
+			long end = ftell(file);
+			rewind(file);
 
-		std::unique_ptr<char[]> content = std::make_unique<char[]>(end - begin + 1);
-		if (!content) {
-			Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: unable to allocate memory\n");
-			return false;
-		}
+			std::unique_ptr<char[]> content = std::make_unique<char[]>(end - begin + 1);
+			if (!content) {
+				Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: unable to allocate memory\n");
+				return false;
+			}
 
-		fread(content.get(), end - begin, 1, file);
-		content.get()[end - begin] = '\0';
+			fread(content.get(), end - begin, 1, file);
+			content.get()[end - begin] = '\0';
 
-		if (!strcmp(GetVersion(), content.get())) {
-			return true;
+			std::string currexehash = content.get();
+			std::transform(currexehash.begin(), currexehash.end(), currexehash.begin(),
+				[](unsigned char c) { return std::tolower(c); });
+
+			if (vanillaexehash == currexehash) {
+				_vanillaexeispatchable = 1;
+				return true;
+			}
 		}
 	}
-
+	_vanillaexeispatchable = 0;
 	return false;
 }
 

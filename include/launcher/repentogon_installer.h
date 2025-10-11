@@ -130,7 +130,8 @@ namespace Launcher {
 		enum CheckRepentogonUpdatesResult {
 			CHECK_REPENTOGON_UPDATES_UTD,
 			CHECK_REPENTOGON_UPDATES_NEW,
-			CHECK_REPENTOGON_UPDATES_ERR
+			CHECK_REPENTOGON_UPDATES_ERR,
+			CHECK_REPENTOGON_UPDATES_GITLAB_SKIP
 		};
 
 		/* Install a specific release of Repentogon. */

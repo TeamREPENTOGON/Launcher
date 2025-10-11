@@ -31,6 +31,13 @@ void RepentogonInstallerFrame::Initialize() {
 	wxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 	wxTextCtrl* logWindow = new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxDefaultSize,
 		wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH);
+	logWindow->Bind(wxEVT_TEXT, [this](wxCommandEvent& event) {
+		wxTextCtrl* ctrl = static_cast<wxTextCtrl*>(event.GetEventObject());
+			if (((ctrl->GetNumberOfLines() > 2) || (ctrl->GetForegroundColour() == *wxRED)) && (!this->IsShown())) { //this is so the window doesnt just popup to tell me that there were no updates, which is pretty jarrying
+				this->Show();
+				this->SetFocus();
+			}
+		});
 	SetSize(640, 480);
 	SetBackgroundColour(wxColour(240, 240, 240));
 	SetSizeHints(640, 480, 640, 480);

@@ -10,6 +10,7 @@
 #include "shared/logger.h"
 #include "shared/sha256.h"
 #include "shared/zip.h"
+#include <shared/gitlab_versionchecker.h>
 
 namespace fs = std::filesystem;
 
@@ -104,35 +105,40 @@ namespace Launcher {
 			_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_MARKER;
 			return false;
 		}
+		if (!_installation->CheckRepentogonInstallation()) {
+			if (isaacData.IsCompatibleWithRepentogon()) {
+				PushNotification(false, "Copying Isaac files, please wait...");
 
-		if (isaacData.IsCompatibleWithRepentogon()) {
-			PushNotification(false, "Copying Isaac files, please wait...");
-
-			if (!standalone_rgon::CopyFiles(_installation->GetIsaacInstallation()
-				.GetMainInstallation().GetFolderPath(),
-				outputDir)) {
-				Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to copy Isaac files\n");
-				_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_COPY;
-				return false;
-			}
-
-			if (!standalone_rgon::CreateSteamAppIDFile(outputDir)) {
-				Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create steam_appid.txt\n");
-				_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID;
-				return false;
-			}
-
-			if (isaacData.NeedsPatch()) {
-				PushNotification(false, "Patching Isaac files, please wait...");
-				if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "patch").string())) {
-					Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to patch Isaac files\n");
-					_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH;
+				if (!standalone_rgon::CopyFiles(_installation->GetIsaacInstallation()
+					.GetMainInstallation().GetFolderPath(),
+					outputDir)) {
+					Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to copy Isaac files\n");
+					_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_COPY;
 					return false;
+				}
 
+				if (!standalone_rgon::CreateSteamAppIDFile(outputDir)) {
+					Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create steam_appid.txt\n");
+					_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID;
+					return false;
+				}
+
+				if (isaacData.NeedsPatch()) {
+					PushNotification(false, "Patching Isaac files, please wait...");
+					if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "patch").string())) {
+						Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to patch Isaac files\n");
+						_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH;
+						return false;
+
+					}
 				}
 			}
-		} else {
-			Logger::Warn("RepentogonInstaller::InstallRepentogonThread: Skipped copy/patch routine since the vanilla installation is not compatible\n");
+			else {
+				Logger::Warn("RepentogonInstaller::InstallRepentogonThread: Skipped copy/patch routine since the vanilla installation is not compatible\n");
+			}
+		}
+		else {
+			Logger::Warn("RepentogonInstaller::InstallRepentogonThread: Skipped copy/patch routine since there's a pre-existent valid instalation.\n");
 		}
 
 		PushNotification(false, "Sucessfully installed Repentogon\n");
@@ -193,6 +199,10 @@ namespace Launcher {
 			return DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES;
 		}
 
+		if (checkUpdates == CHECK_REPENTOGON_UPDATES_GITLAB_SKIP) {
+			return DOWNLOAD_INSTALL_REPENTOGON_OK;
+		}
+
 		return InstallRepentogonThread(document) ? DOWNLOAD_INSTALL_REPENTOGON_OK : DOWNLOAD_INSTALL_REPENTOGON_ERR;
 	}
 
@@ -203,9 +213,21 @@ namespace Launcher {
 			this, std::ref(document), allowPreReleases, force), &_monitor);
 	}
 
+
 	RepentogonInstaller::CheckRepentogonUpdatesResult
 		RepentogonInstaller::CheckRepentogonUpdatesThread(rapidjson::Document& document,
 			bool allowPreReleases, bool force) {
+		//Gitlab Filter
+		if (!force) {
+			std::string versionfilename = "version";
+			if (allowPreReleases) {
+				versionfilename = "versionnightly";
+			}
+			if (RemoteGitLabVersionMatches(versionfilename, _installation->GetRepentogonInstallation().GetRepentogonVersion())) {
+				return CHECK_REPENTOGON_UPDATES_GITLAB_SKIP;
+			}
+		}
+		//Gitlab Filter END
 		Github::VersionCheckResult result = CheckRepentogonUpdatesThread_Updater(document,
 			allowPreReleases);
 

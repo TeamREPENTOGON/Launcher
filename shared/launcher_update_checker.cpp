@@ -7,6 +7,7 @@
 #include "shared/github.h"
 #include "shared/launcher_update_checker.h"
 #include "shared/logger.h"
+#include <shared/gitlab_versionchecker.h>
 
 namespace Shared {
 	static bool FetchReleases(curl::DownloadStringResult* curlResult,
@@ -46,6 +47,16 @@ namespace Shared {
 
 	bool LauncherUpdateChecker::IsSelfUpdateAvailable(bool allowDrafts, bool force,
 		std::string& version, std::string& url, curl::DownloadStringResult* fetchReleasesResult) {
+
+		//GitLab Barrier
+		if (!force && !ShouldDoTimeBasedGitLabSkip()) {
+			if (RemoteGitLabVersionMatches("versionlauncher", Launcher::version)) {
+				*fetchReleasesResult = curl::DownloadStringResult::DOWNLOAD_STRING_OK; //I would call this up a level so I dont have to do this hacky, but here is more convenient because I have some things already pre-chewed
+				return false;
+			}
+		}
+		//GitLab Barrier END
+
 		bool downloadResult = FetchReleases(fetchReleasesResult, _releasesInfo);
 
 		if (!downloadResult) {

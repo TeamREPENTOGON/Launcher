@@ -190,7 +190,7 @@ bool Launcher::App::OnInit() {
 			sCLI->ForceRepentogonUpdate(), __configuration.UnstableUpdates());
 		installerFrame->SetMainFrame(_mainFrame);
 		installerFrame->InstallRepentogon();
-		installerFrame->Show();
+		installerFrame->Hide(); //It is now handled on the internal logic of the frame when its shown
 	} else {
 		_mainFrame->Init();
 	}
