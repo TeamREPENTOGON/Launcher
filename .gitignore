@@ -59,3 +59,10 @@ deps/bzip2/bzip2.dir/Debug/bzip2.vcxproj.FileListAbsolute.txt
 deps/bsdiff/bspatch.dir/Debug/bspatchlib.obj
 deps/bsdiff/bspatch.dir/Debug/bsdifflib.obj
 deps/bsdiff/bspatch.dir/Debug/bsdiff.obj
+/shared.dir/Release
+*.obj
+/Release
+/REPENTOGONLauncher.dir/Release
+/deps/bzip2/Release
+/deps/bsdiff/Release
+shared.vcxproj.user
