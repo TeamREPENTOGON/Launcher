@@ -311,18 +311,24 @@ namespace diff_patcher {
                 std::string name = v.GetString();
                 fs::path original = rootFolderToPatch / name;
                 fs::path temporary = original;
+                std::string originalStr = original.string();
+                std::string patchStr = patch.string();
+                std::string tempStr = temporary.string();
                 temporary += ".patched";
 
-                Logger::Info("PatchFolder: Patching `%s` using patch file `%s`\n", original.string().c_str(), patch.string().c_str());
+                Logger::Info("PatchFolder: Patching `%s` using patch file `%s`\n", originalStr.c_str(), patch.string().c_str());
 
                 try {
                     std::string s = temporary.string();
-                    bspatch_stream(original.string().c_str(), patch.string().c_str(),
+                    bspatch_stream(originalStr.c_str(), patchStr.c_str(),
                         s.c_str());
 
                     if (const char* substring = strstr(s.c_str(), "isaac-ng.exe")) {
                         if (!strcmp(substring, "isaac-ng.exe.patched")) {
-                            PatchIsaacMain(s.c_str());
+                            std::string path = temporary.string();
+                            std::vector<char> buffer(path.begin(), path.end());
+                            buffer.push_back('\0');
+                            PatchIsaacMain(buffer.data());
                         }
                     }
                 } catch (std::exception& e) {
