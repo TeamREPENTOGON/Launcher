@@ -29,6 +29,20 @@ void RepentogonInstallation::ClearInstallation() {
 	memset(_dllStates, LOAD_DLL_STATE_NONE, sizeof(_dllStates));
 }
 
+bool RepentogonInstallation::CheckHalfAssedPatch(std::string const& installationPath) {
+	std::string basepath = installationPath;
+	std::string patchme = basepath + "patchme.daddy";
+
+	//legacy files that may be fucked up
+	std::string afterbirthpa = basepath + "resources\\packed\\afterbirthp.a.patched";
+	std::string enumslua = basepath + "resources\\scripts\\enums.lua.patched";
+	std::string jsonlua = basepath + "resources\\scripts\\json.lua.patched";
+	std::string mainlua = basepath + "resources\\scripts\\main.lua.patched";
+	//end of legacy files that may be fucked up
+
+	return Filesystem::Exists(patchme.c_str()) || Filesystem::Exists(afterbirthpa.c_str()) || Filesystem::Exists(enumslua.c_str()) || Filesystem::Exists(jsonlua.c_str()) || Filesystem::Exists(mainlua.c_str());
+}
+
 bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	std::string repentogonFolder = installationFolder;
 	repentogonFolder += "/";
@@ -53,6 +67,9 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	}
 
 	_installationState = REPENTOGON_INSTALLATION_STATUS_BROKEN;
+	if (CheckHalfAssedPatch(repentogonFolder)) {
+		return false;
+	}
 
 	const char** mandatoryFile = mandatoryFileNames;
 	bool ok = true;

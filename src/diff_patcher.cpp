@@ -265,6 +265,7 @@ namespace diff_patcher {
         }
 
         bool ok = true;
+        std::ofstream(rootFolderToPatch / "patchme.daddy"); //file to check if patching finished or not
         if (doc.HasMember("delete")) {
             std::error_code err;
             for (auto const& v : doc["delete"].GetArray()) {
@@ -345,6 +346,7 @@ namespace diff_patcher {
                 }
             }
         }
+        fs::remove(rootFolderToPatch / "patchme.daddy"); //file to check if patching finished or not
 
         return ok ? PATCH_OK : PATCH_FAIL;
     }
