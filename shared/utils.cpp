@@ -1,3 +1,4 @@
+#include "shared/status_codes.h"
 #include "shared/utils.h"
 
 namespace utils {
@@ -22,174 +23,174 @@ namespace utils {
 		case 0:
 			break;
 
-		case STATUS_GUARD_PAGE_VIOLATION:
+		case GUARD_PAGE_VIOLATION:
 			str = "guard page violation";
 			break;
 
-		case STATUS_DATATYPE_MISALIGNMENT:
+		case DATATYPE_MISALIGNMENT:
 			str = "data type misalignment";
 			break;
 
-		case STATUS_BREAKPOINT:
+		case BREAKPOINT:
 			str = "breakpoint";
 			break;
 
-		case STATUS_SINGLE_STEP:
+		case SINGLE_STEP:
 			str = "single step";
 			break;
 
-		case STATUS_LONGJUMP:
+		case LONGJUMP:
 			str = "longjump";
 			break;
 
-		case STATUS_UNWIND_CONSOLIDATE:
+		case UNWIND_CONSOLIDATE:
 			str = "unwind consolidate";
 			break;
 
-		case STATUS_ACCESS_VIOLATION:
+		case ACCESS_VIOLATION:
 			str = "access violation";
 			break;
 
-		case STATUS_IN_PAGE_ERROR:
+		case IN_PAGE_ERROR:
 			str = "in page error";
 			break;
 
-		case STATUS_INVALID_HANDLE:
+		case INVALID_HANDLE:
 			str = "invalid handle";
 			break;
 
-		case STATUS_INVALID_PARAMETER:
+		case INVALID_PARAMETER:
 			str = "invalid parameter";
 			break;
 
-		case STATUS_NO_MEMORY:
+		case NO_MEMORY:
 			str = "no memory";
 			break;
 
-		case STATUS_ILLEGAL_INSTRUCTION:
+		case ILLEGAL_INSTRUCTION:
 			str = "illegal instruction";
 			break;
 
-		case STATUS_NONCONTINUABLE_EXCEPTION:
+		case NONCONTINUABLE_EXCEPTION:
 			str = "non continuable exception";
 			break;
 
-		case STATUS_INVALID_DISPOSITION:
+		case INVALID_DISPOSITION:
 			str = "invalid disposition";
 			break;
 
-		case STATUS_ARRAY_BOUNDS_EXCEEDED:
+		case ARRAY_BOUNDS_EXCEEDED:
 			str = "array bounds exceeded";
 			break;
 
-		case STATUS_FLOAT_DENORMAL_OPERAND:
+		case FLOAT_DENORMAL_OPERAND:
 			str = "float denormal operand";
 			break;
 
-		case STATUS_FLOAT_DIVIDE_BY_ZERO:
+		case FLOAT_DIVIDE_BY_ZERO:
 			str = "float divide by zero";
 			break;
 
-		case STATUS_FLOAT_INEXACT_RESULT:
+		case FLOAT_INEXACT_RESULT:
 			str = "float inexact result";
 			break;
 
-		case STATUS_FLOAT_INVALID_OPERATION:
+		case FLOAT_INVALID_OPERATION:
 			str = "float invalid operation";
 			break;
 
-		case STATUS_FLOAT_OVERFLOW:
+		case FLOAT_OVERFLOW:
 			str = "float overflow";
 			break;
 
-		case STATUS_FLOAT_STACK_CHECK:
+		case FLOAT_STACK_CHECK:
 			str = "float stack check";
 			break;
 
-		case STATUS_FLOAT_UNDERFLOW:
+		case FLOAT_UNDERFLOW:
 			str = "float underflow";
 			break;
 
-		case STATUS_INTEGER_DIVIDE_BY_ZERO:
+		case INTEGER_DIVIDE_BY_ZERO:
 			str = "integer divide by zero";
 			break;
 
-		case STATUS_INTEGER_OVERFLOW:
+		case INTEGER_OVERFLOW:
 			str = "integer overflow";
 			break;
 
-		case STATUS_PRIVILEGED_INSTRUCTION:
+		case PRIVILEGED_INSTRUCTION:
 			str = "privileged instruction";
 			break;
 
-		case STATUS_STACK_OVERFLOW:
+		case STACK_OVERFLOW:
 			str = "stack overflow";
 			break;
 
-		case STATUS_DLL_NOT_FOUND:
+		case DLL_NOT_FOUND:
 			str = "dll not found";
 			break;
 
-		case STATUS_ORDINAL_NOT_FOUND:
+		case ORDINAL_NOT_FOUND:
 			str = "ordinal not found";
 			break;
 
-		case STATUS_ENTRYPOINT_NOT_FOUND:
+		case ENTRYPOINT_NOT_FOUND:
 			str = "entrypoint not found";
 			break;
 
-		case STATUS_CONTROL_C_EXIT:
+		case CONTROL_C_EXIT:
 			break;
 
-		case STATUS_DLL_INIT_FAILED:
+		case DLL_INIT_FAILED:
 			str = "dll init failed";
 			break;
 
-		case STATUS_CONTROL_STACK_VIOLATION:
+		case CONTROL_STACK_VIOLATION:
 			str = "control stack violation";
 			break;
 
-		case STATUS_FLOAT_MULTIPLE_FAULTS:
+		case FLOAT_MULTIPLE_FAULTS:
 			str = "float multiple faults";
 			break;
 
-		case STATUS_FLOAT_MULTIPLE_TRAPS:
+		case FLOAT_MULTIPLE_TRAPS:
 			str = "float multiple traps";
 			break;
 
-		case STATUS_REG_NAT_CONSUMPTION:
+		case REG_NAT_CONSUMPTION:
 			str = "reg nat consumption (seriously how the fuck did you trigger this ?)";
 			break;
 
-		case STATUS_HEAP_CORRUPTION:
+		case HEAP_CORRUPTION:
 			str = "heap corruption";
 			break;
 
-		case STATUS_STACK_BUFFER_OVERRUN:
+		case STACK_BUFFER_OVERRUN:
 			str = "stack buffer overrun";
 			break;
 
-		case STATUS_INVALID_CRUNTIME_PARAMETER:
+		case INVALID_CRUNTIME_PARAMETER:
 			str = "invalid cruntime parameter";
 			break;
 
-		case STATUS_ASSERTION_FAILURE:
+		case ASSERTION_FAILURE:
 			str = "assertion failure";
 			break;
 
-		case STATUS_ENCLAVE_VIOLATION:
+		case ENCLAVE_VIOLATION:
 			str = "enclave violation";
 			break;
 
-		case STATUS_INTERRUPTED:
+		case INTERRUPTED:
 			str = "interrupted";
 			break;
 
-		case STATUS_THREAD_NOT_RUNNING:
+		case THREAD_NOT_RUNNING:
 			str = "thread not running";
 			break;
 
-		case STATUS_ALREADY_REGISTERED:
+		case ALREADY_REGISTERED:
 			str = "already registered";
 			break;
 
