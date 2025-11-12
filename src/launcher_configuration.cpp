@@ -107,11 +107,14 @@ bool LauncherConfiguration::InitializeConfigurationPath(
 			BOOL result = Externals::pGetUserProfileDirectoryA(token, homeDirectory, &homeLen);
 
 			if (!result) {
-				Logger::Error("Installation::GetIsaacSaveFolder: unable to find user profile directory: %d\n", GetLastError());
+				result = GetEnvironmentVariableA("USERPROFILE", homeDirectory, 4096);
+				if (result < 0) {
+					Logger::Error("Installation::GetIsaacSaveFolder: unable to find user profile directory: %d\n", GetLastError());
 
-				if (outResult)
-					*outResult = LAUNCHER_CONFIGURATION_INIT_GET_USER_DIRECTORY;
-				return false;
+					if (outResult)
+						*outResult = LAUNCHER_CONFIGURATION_INIT_GET_USER_DIRECTORY;
+					return false;
+				}
 			}
 		}
 
