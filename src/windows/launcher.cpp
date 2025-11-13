@@ -271,8 +271,25 @@ namespace Launcher {
 		wxCheckBox* console = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_CONSOLE, "Enable console window");
 		console->SetValue(false);
 
-		wxCheckBox* unstable = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, "Upgrade to unstable versions");
-		unstable->SetValue(false);
+		_unstableRepentogon = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, "Upgrade to unstable versions");
+		_unstableRepentogon->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
+			if (_unstableRepentogon->IsChecked()) {
+				_unstableRepentogon->SetValue(false);
+				int res = wxMessageBox(
+					"Unstable REPENTOGON versions are work-in-progress updates.\n"
+					"Bugs and crashes will be more likely. This is not reccomended for most users.\n\n"
+					"If you are a mod developer, DO NOT publish mods that depend on unstable versions!\n"
+					"If you are not a mod developer... you probably shouldn't use these anyway.\n\n"
+					"Enable unstable updates?",
+					"WARNING: Unstable REPENTOGON Versions",
+					wxYES_NO | wxNO_DEFAULT | wxICON_WARNING,
+					this
+				);
+				_unstableRepentogon->SetValue(res == wxYES);
+			}
+			event.Skip();
+		});
+		_unstableRepentogon->SetValue(false);
 
 		_advancedOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
 		wxSizerFlags advancedOptionsFlags = wxSizerFlags().Right();
@@ -280,11 +297,10 @@ namespace Launcher {
 
 		_updates = updates;
 		_console = console;
-		_unstableRepentogon = unstable;
 
 		repentogonBoxSizer->Add(console, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, 5);
-		repentogonBoxSizer->Add(unstable, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
+		repentogonBoxSizer->Add(_unstableRepentogon, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
 		repentogonBoxSizer->Add(_advancedOptionsButton, 0, wxCENTER | wxBOTTOM | wxTOP, 10);
 
 		_repentogonOptions = repentogonBox;
@@ -427,8 +443,8 @@ namespace Launcher {
 			break;
 
 		case WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES:
-			_configuration->SetUnstableUpdates(box->GetValue());
-			if (box->GetValue() != _initialUnstableUpdates) {
+			if (_configuration->UnstableUpdates() != box->GetValue()) {
+				_configuration->SetUnstableUpdates(box->GetValue());
 				OnRepentogonUnstableStateSwitched();
 			}
 			break;
@@ -451,24 +467,17 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::OnRepentogonUnstableStateSwitched() {
-		if (_canPromptOnUnstableSwitch) {
-			int result = wxMessageBox("You have switched the Repentogon stability option. "
-				"Do you want to immediately install the corresponding release ?\n"
-				"\n"
-				"If you answer \"No\", the launcher will not prompt you again on repeat switches. "
-				"You can use the \"Advanced Options\" to forcibly trigger the installation later.",
-				"Repentogon stability option changed",
-				wxYES_NO, this);
+		const bool unstableUpdatesEnabled = _unstableRepentogon->GetValue();
 
-			if (result == wxYES || result == wxOK) {
-				ForceRepentogonUpdate(_unstableRepentogon->GetValue());
-			} else {
-				_canPromptOnUnstableSwitch = false;
-			}
-		} else {
-			_logWindow.LogWarn("You previously chose to not install Repentogon after "
-				"switching the unstable Repentogon option. If you want to force an "
-				"update, use the \"Advanced Options\" button below.\n");
+		const wxString message = wxString::Format("Unstable REPENTOGON updates are now %s.\n\n"
+			"Would you like to download and install the latest %s version now?\n\n"
+			"(Note: You can force a REPENTOGON update at any time from the \"Advanced Options\" menu.)",
+			unstableUpdatesEnabled ? "ENABLED" : "DISABLED",
+			unstableUpdatesEnabled ? "unstable" : "stable");
+		const int result = wxMessageBox(message, "REPENTOGON Stability Option Changed", wxYES_NO, this);
+
+		if (result == wxYES || result == wxOK) {
+			ForceRepentogonUpdate(unstableUpdatesEnabled);
 		}
 	}
 
@@ -864,7 +873,6 @@ namespace Launcher {
 
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
 		_unstableRepentogon->Enable(!_configuration->UnstableUpdatesHasOverride());
-		_initialUnstableUpdates = _unstableRepentogon->GetValue();
 
 		_luaHeapSize->SetValue(_configuration->LuaHeapSize());
 		_luaHeapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
@@ -961,9 +969,6 @@ namespace Launcher {
 		} else {
 			_logWindow.Log("State of the Repentogon installation:\n");
 			Launcher::DisplayRepentogonFilesVersion(_installation, 1, true, _logWindow.Get());
-
-			_initialUnstableUpdates = _unstableRepentogon->GetValue();
-			_canPromptOnUnstableSwitch = true;
 		}
 	}
 

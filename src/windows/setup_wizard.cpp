@@ -250,6 +250,8 @@ void LauncherWizard::ConfigureRepentogonSetupPage() {
 
     _repentogonSetup._unstableUpdates->SetValue(_configuration->UnstableUpdates());
     _repentogonSetup._unstableUpdates->Enable(!_configuration->UnstableUpdatesHasOverride());
+
+    UpdateRepentogonSetupWarningText();
 }
 
 void LauncherWizard::AddRepentogonInstallationPage() {
@@ -487,19 +489,23 @@ bool LauncherWizard::CheckRepentogonCompatibilityOnPageChange() {
     */
 }
 
-void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
-    RepentogonInstallation const& repentogon = _installation->GetRepentogonInstallation();
-    if (repentogon.IsValid()) {
-        _dirtyUnstableUpdates = !_dirtyUnstableUpdates;
-        if (_dirtyUnstableUpdates) {
-            _repentogonSetup._updateWarning->SetLabel("This change in options "
-                "may require an update to your existing Repentogon installation");
-        } else {
-            _repentogonSetup._updateWarning->SetLabel("");
-        }
+void LauncherWizard::UpdateRepentogonSetupWarningText() {
+    wxString warningText = "";
+    if (_configuration->UnstableUpdatesIgnoreOverride()) {
+        warningText += "Warning: Unstable updates are work-in-progress, and not reccomended for most users. Bugs and crashes are more likely to occur.\n"
+            "If you are a mod developer, DO NOT publish mods that depend on unstable versions!\n"
+            "If you are not a mod developer... you probably shouldn't use these anyway.\n\n";
     }
+    if (_installation->GetRepentogonInstallation().IsValid() && _dirtyUnstableUpdates) {
+        warningText += "This change in options may require an update to your existing Repentogon installation.\n\n";
+    }
+    _repentogonSetup._updateWarning->SetLabel(warningText);
+}
 
+void LauncherWizard::OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event) {
     _configuration->SetUnstableUpdates(((wxCheckBox*)event.GetEventObject())->GetValue());
+    _dirtyUnstableUpdates = !_dirtyUnstableUpdates;
+    UpdateRepentogonSetupWarningText();
 }
 
 void LauncherWizard::OnAutomaticUpdatesCheckBoxClicked(wxCommandEvent& event) {

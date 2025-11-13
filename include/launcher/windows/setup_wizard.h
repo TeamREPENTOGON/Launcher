@@ -30,6 +30,7 @@ public:
 
     void OnPageChanged(wxWizardEvent& event);
     void BeforePageChanged(wxWizardEvent& event);
+    void UpdateRepentogonSetupWarningText();
     void OnIsaacExecutableSelected(wxCommandEvent& event);
     void OnUnstableUpdatesCheckBoxClicked(wxCommandEvent& event);
     void OnAutomaticUpdatesCheckBoxClicked(wxCommandEvent& event);

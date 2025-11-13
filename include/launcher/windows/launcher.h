@@ -202,8 +202,6 @@ namespace Launcher {
 		wxButton* _launchButton;
 		wxButton* _advancedOptionsButton;
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
-		bool _initialUnstableUpdates = false;
-		bool _canPromptOnUnstableSwitch = true;
 		char* _exePath = nullptr;
 
 		wxTextCtrlLog _logWindow;
