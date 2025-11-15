@@ -305,13 +305,11 @@ namespace Launcher {
 		_updates = updates;
 		_console = console;
 
-		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxTOP | wxRIGHT | wxBOTTOM, 5);
+		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
 		repentogonBoxSizer->Add(_unstableRepentogon, 0, wxLEFT | wxBOTTOM, 5);
-		repentogonBoxSizer->Add(console, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
+		repentogonBoxSizer->Add(console, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
-		wxBoxSizer* wrapper = new wxBoxSizer(wxVERTICAL);
-		wrapper->Add(_advancedOptionsButton, 0, wxBOTTOM | wxTOP,2);
-		repentogonBoxSizer->Add(wrapper, 0,wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 7);
+		repentogonBoxSizer->Add(_advancedOptionsButton, 0,wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 11);
 
 		_repentogonOptions = repentogonBox;
 		_LeftSideSizer->Add(repentogonBoxSizer, 0, wxRIGHT, 10);
