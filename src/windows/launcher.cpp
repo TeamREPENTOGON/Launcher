@@ -208,7 +208,7 @@ namespace Launcher {
 
 		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 5);
 
-		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxTOP | wxLEFT | wxRIGHT, 5);
+		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxTOP | wxLEFT | wxRIGHT, 3);
 
 		_LeftSideSizer->Add(launchModeBoxSizer, 1, wxEXPAND | wxRIGHT, 10);
 		_verticalSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
@@ -308,13 +308,13 @@ namespace Launcher {
 		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxTOP | wxRIGHT | wxBOTTOM, 5);
 		repentogonBoxSizer->Add(_unstableRepentogon, 0, wxLEFT | wxBOTTOM, 5);
 		repentogonBoxSizer->Add(console, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
-		repentogonBoxSizer->Add(_advancedOptionsButton, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 7);
+
+		wxBoxSizer* wrapper = new wxBoxSizer(wxVERTICAL);
+		wrapper->Add(_advancedOptionsButton, 0, wxBOTTOM | wxTOP,2);
+		repentogonBoxSizer->Add(wrapper, 0,wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 7);
 
 		_repentogonOptions = repentogonBox;
-		wxBoxSizer* wrapper = new wxBoxSizer(wxVERTICAL);
-		wrapper->Add(repentogonBoxSizer, 0, wxTOP, 0);
-
-		_LeftSideSizer->Add(wrapper, 0, wxRIGHT, 10);
+		_LeftSideSizer->Add(repentogonBoxSizer, 0, wxRIGHT, 10);
 	}
 
 	void LauncherMainWindow::AddVanillaOptions() {
