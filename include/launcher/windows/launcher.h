@@ -35,16 +35,19 @@ namespace Launcher {
 		WINDOW_BUTTON_SELECT_ISAAC,
 		WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER,
 		WINDOW_BUTTON_ADVANCED_OPTIONS,
+		WINDOW_BUTTON_ADVANCED_MOD_OPTIONS,
 		WINDOW_BUTTON_MODMAN_BUTTON,
 		WINDOW_BUTTON_CHECKLOGS_BUTTON,
 		WINDOW_BUTTON_CHANGEOPTIONS_BUTTON
 	};
 
 	class AdvancedOptionsWindow;
+	class AdvancedModOptionsWindow;
 
 	class LauncherMainWindow : public wxFrame {
 	public:
 		friend class AdvancedOptionsWindow;
+		friend class AdvancedModOptionsWindow;
 		friend class CheckLogsWindow;
 
 		enum AdvancedOptionsEvents {
@@ -52,7 +55,8 @@ namespace Launcher {
 			ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE,
 			ADVANCED_EVENT_FORCE_REPENTOGON_UNSTABLE_UPDATE,
 			ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE,
-			ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE
+			ADVANCED_EVENT_FORCE_LAUNCHER_UNSTABLE_UPDATE,
+			ADVANCED_EVENT_REINSTALL
 		};
 		
 		enum CheckLogsEvents {
@@ -125,9 +129,9 @@ namespace Launcher {
 			const char* emptyText);
 		void OnLevelSelect(wxCommandEvent& event);
 		void OnLaunchModeSelect(wxCommandEvent& event);
-		void OnLuaHeapSizeCharacterWritten(wxCommandEvent& event);
 		void OnOptionSelected(wxCommandEvent& event);
 		void OnAdvancedOptionsClick(wxCommandEvent& event);
+		void OnAdvancedModOptionsClick(wxCommandEvent& event);
 		void OnCheckLogsClick(wxCommandEvent& event);
 
 		void OnRepentogonUnstableStateSwitched();
@@ -201,6 +205,7 @@ namespace Launcher {
 		wxTextCtrl* _repentogonFileText;
 		wxButton* _launchButton;
 		wxButton* _advancedOptionsButton;
+		wxButton* _advancedModOptionsButton;
 		AdvancedOptionsEvents _advancedEvent = ADVANCED_EVENT_NONE;
 		char* _exePath = nullptr;
 

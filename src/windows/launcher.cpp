@@ -61,16 +61,17 @@ EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::LauncherMainWindow
 EVT_TEXT(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::LauncherMainWindow::OnLaunchModeSelect)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
-EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::LauncherMainWindow::OnOptionSelected)
+//EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_HIDE_WINDOW, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_STEALTH_MODE, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
-EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::LauncherMainWindow::OnLuaHeapSizeCharacterWritten)
+//EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::LauncherMainWindow::OnLuaHeapSizeCharacterWritten)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::LauncherMainWindow::Launch)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::LauncherMainWindow::OnIsaacSelectClick)
 // EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::LauncherMainWindow::OnSelectRepentogonFolderClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_CHECKLOGS_BUTTON, Launcher::LauncherMainWindow::OnCheckLogsClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_OPTIONS, Launcher::LauncherMainWindow::OnAdvancedOptionsClick)
+EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_MOD_OPTIONS, Launcher::LauncherMainWindow::OnAdvancedModOptionsClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_MODMAN_BUTTON, Launcher::LauncherMainWindow::OnModManagerButtonPressed)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_CHANGEOPTIONS_BUTTON, Launcher::LauncherMainWindow::OnChangeOptions)
 wxEND_EVENT_TABLE()
@@ -153,7 +154,7 @@ namespace Launcher {
 		SetSizerAndFit(_verticalSizer);
 
 		SetBackgroundColour(wxColour(237, 237, 237));
-
+		CenterOnScreen();
 	}
 
 	LauncherMainWindow::~LauncherMainWindow() {
@@ -177,9 +178,9 @@ namespace Launcher {
 		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Expand().Border( wxRIGHT));
 		_configurationSizer->Add(repentogonExeSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
-		// _stealthMode = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_STEALTH_MODE, "Stealth Mode");
-		// _stealthMode->SetToolTip("When starting the launcher, skip the main window and automatically launch Isaac, then close the launcher afterwards.\n\nThe launcher will appear if an error occurs.");
-		// _configurationSizer->Add(_stealthMode, 0, wxLEFT | wxRIGHT | wxTOP, 5);
+		 _stealthMode = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_STEALTH_MODE, "Stealth Mode (Always ON in BigPicture mode and Steam Deck)");
+		 _stealthMode->SetToolTip("When starting the launcher, skip the main window and automatically launch Isaac, then close the launcher afterwards.\n\nThe launcher will appear if an error occurs.");
+		 _configurationSizer->Add(_stealthMode, 0, wxLEFT | wxRIGHT | wxTOP, 5);
 
 		/*
 		_hideWindow = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_HIDE_WINDOW,
@@ -189,7 +190,7 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::AddLaunchOptions() {
-		wxStaticBox* launchModeBox = new wxStaticBox(_optionsBox, -1, "Launch Options",wxDefaultPosition,wxSize(-1,-1),wxEXPAND);
+		wxStaticBox* launchModeBox = new wxStaticBox(_optionsBox, -1, "Launch Options");
 		wxStaticBoxSizer* launchModeBoxSizer = new wxStaticBoxSizer(launchModeBox, wxVERTICAL );
 
 		wxSizer* box = new wxBoxSizer(wxHORIZONTAL);
@@ -210,14 +211,14 @@ namespace Launcher {
 		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxTOP | wxLEFT | wxRIGHT, 5);
 
 		_LeftSideSizer->Add(launchModeBoxSizer, 1, wxEXPAND | wxRIGHT, 10);
-		_verticalSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
+		_verticalSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
 
 	}
 
 	void LauncherMainWindow::AddModdingOptions() {
 		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "Modding Options");
 		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxVERTICAL);
-
+		/*
 		_luaDebug = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe)");
 		_luaDebug->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
 			if (_luaDebug->IsChecked()) {
@@ -242,12 +243,18 @@ namespace Launcher {
 		heapSizeBox->Add(heapSizeText);
 		heapSizeBox->Add(heapSizeCtrl);
 		repentogonBoxSizer->Add(heapSizeBox, 0, wxLEFT | wxRIGHT | wxTOP, 5);
-
-		wxButton* checklogs = new wxButton(repentogonBox, WINDOW_BUTTON_CHECKLOGS_BUTTON, "Check Game Logs", wxDefaultPosition);
-		repentogonBoxSizer->Add(checklogs, 1, wxEXPAND | wxALL | wxTOP, 5);
+		*/
 
 		wxButton* modman = new wxButton(repentogonBox, WINDOW_BUTTON_MODMAN_BUTTON, "Open Mod Manager", wxDefaultPosition);
-		repentogonBoxSizer->Add(modman, 1, wxEXPAND | wxALL, 5);
+		repentogonBoxSizer->Add(modman, 1, wxEXPAND | wxALL | wxTOP, 5);
+
+		wxButton* checklogs = new wxButton(repentogonBox, WINDOW_BUTTON_CHECKLOGS_BUTTON, "Check Game Logs", wxDefaultPosition);
+		repentogonBoxSizer->Add(checklogs, 1, wxEXPAND | wxALL, 5);
+
+		_advancedModOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_MOD_OPTIONS, "Advanced Mod Options", wxDefaultPosition);
+		repentogonBoxSizer->Add(_advancedModOptionsButton, 1, wxEXPAND | wxALL, 5);
+
+
 		_RightSideSizer->Add(repentogonBoxSizer, 1, wxEXPAND | wxALL, 0);
 	}
 
@@ -268,7 +275,7 @@ namespace Launcher {
 		wxCheckBox* updates = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UPDATES, "Automatically check for updates");
 		updates->SetValue(true);
 
-		wxCheckBox* console = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_CONSOLE, "Enable console window");
+		wxCheckBox* console = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_CONSOLE, "Enable dev console window");
 		console->SetValue(false);
 
 		_unstableRepentogon = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, "Upgrade to unstable versions");
@@ -287,8 +294,8 @@ namespace Launcher {
 				);
 				_unstableRepentogon->SetValue(res == wxYES);
 			}
-			event.Skip();
-		});
+		event.Skip();
+			});
 		_unstableRepentogon->SetValue(false);
 
 		_advancedOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
@@ -298,13 +305,16 @@ namespace Launcher {
 		_updates = updates;
 		_console = console;
 
-		repentogonBoxSizer->Add(console, 0, wxLEFT | wxRIGHT | wxTOP, 5);
-		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, 5);
-		repentogonBoxSizer->Add(_unstableRepentogon, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
-		repentogonBoxSizer->Add(_advancedOptionsButton, 0, wxCENTER | wxBOTTOM | wxTOP, 10);
+		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxTOP | wxRIGHT | wxBOTTOM, 5);
+		repentogonBoxSizer->Add(_unstableRepentogon, 0, wxLEFT | wxBOTTOM, 5);
+		repentogonBoxSizer->Add(console, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
+		repentogonBoxSizer->Add(_advancedOptionsButton, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 7);
 
 		_repentogonOptions = repentogonBox;
-		_LeftSideSizer->Add(repentogonBoxSizer, 0, wxRIGHT , 10);
+		wxBoxSizer* wrapper = new wxBoxSizer(wxVERTICAL);
+		wrapper->Add(repentogonBoxSizer, 0, wxTOP, 0);
+
+		_LeftSideSizer->Add(wrapper, 0, wxRIGHT, 10);
 	}
 
 	void LauncherMainWindow::AddVanillaOptions() {
@@ -412,24 +422,7 @@ namespace Launcher {
 		UpdateLaunchButtonEnabledState();
 	}
 
-	void LauncherMainWindow::OnLuaHeapSizeCharacterWritten(wxCommandEvent& event) {
-		wxTextCtrl* ctrl = dynamic_cast<wxTextCtrl*>(event.GetEventObject());
-
-		std::string luaHeapSize = ctrl->GetValue().c_str().AsChar();
-		std::transform(luaHeapSize.begin(), luaHeapSize.end(), luaHeapSize.begin(), toupper);
-
-		std::cmatch match;
-		if (std::regex_match(luaHeapSize.c_str(), match, LuaHeapSizeRegex)) {
-			_configuration->SetLuaHeapSize(luaHeapSize);
-		} else if (luaHeapSize == "K" || luaHeapSize == "M" || luaHeapSize == "G") {
-			_configuration->SetLuaHeapSize("");
-		} else {
-			wxBell();
-			const long ip = ctrl->GetInsertionPoint() - 1;
-			ctrl->SetValue(_configuration->LuaHeapSize());
-			ctrl->SetInsertionPoint(ip > 0 ? ip : 0);
-		}
-	}
+	
 
 	void LauncherMainWindow::OnOptionSelected(wxCommandEvent& event) {
 		wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
@@ -874,14 +867,14 @@ namespace Launcher {
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
 		_unstableRepentogon->Enable(!_configuration->UnstableUpdatesHasOverride());
 
-		_luaHeapSize->SetValue(_configuration->LuaHeapSize());
-		_luaHeapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
+		//_luaHeapSize->SetValue(_configuration->LuaHeapSize());
+		//_luaHeapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
 
-		_luaDebug->SetValue(_configuration->LuaDebug());
-		_luaDebug->Enable(!_configuration->LuaDebugHasOverride());
+		//_luaDebug->SetValue(_configuration->LuaDebug());
+		//_luaDebug->Enable(!_configuration->LuaDebugHasOverride());
 
-		// _stealthMode->SetValue(_configuration->StealthMode());
-		// _stealthMode->Enable(!_configuration->StealthModeHasOverride());
+		 _stealthMode->SetValue(_configuration->StealthMode());
+		 _stealthMode->Enable(!_configuration->StealthModeHasOverride());
 
 		//_hideWindow->SetValue(_configuration->HideWindow());
 		//_hideWindow->Enable(!_configuration->HideWindowHasOverride());
@@ -1037,7 +1030,15 @@ namespace Launcher {
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE:
 			ForceLauncherUpdate(false);
 			break;
-
+		case ADVANCED_EVENT_REINSTALL:
+			_logWindow.Log("Attempting Repair...");
+			if (fs::remove_all(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon")) {
+				ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
+			}
+			else {
+				_logWindow.Log("Repair Failed!, Could not remove the Repentogon folder!");
+			}
+			break;
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE:
 			ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
 			break;
@@ -1046,6 +1047,13 @@ namespace Launcher {
 			_logWindow.LogError("Unhandled result from ShowModal: %d", result);
 			break;
 		}
+	}
+	
+	void LauncherMainWindow::OnAdvancedModOptionsClick(wxCommandEvent&) {
+		AdvancedModOptionsWindow window(this);
+		int result = window.ShowModal();
+		window.luaheapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
+		window.luaDebug->Enable(!_configuration->LuaDebugHasOverride());
 	}
 
 	void ShowFileInExplorer(const std::string& filePath) { //played around a few alternatives I found online, most suggested executing shell scripts....but those are slow as sin and if the user does anything before they execute, the fileexplorer window may not be on focus anymore....so its not ideal

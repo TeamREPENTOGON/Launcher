@@ -51,25 +51,44 @@ namespace Launcher {
 	}
 
 	void LaunchCountdownWindow::Build() {
-		wxPanel* panel = new wxPanel(this, wxID_ANY, wxDefaultPosition, wxSize(300, 60));
+		wxPanel* panel = new wxPanel(this);
 		panel->SetBackgroundColour(*wxWHITE);
-		wxSizer* panelSizer = new wxBoxSizer(wxVERTICAL);
+
+		wxBoxSizer* panelSizer = new wxBoxSizer(wxVERTICAL);
+
 		_countdownSeconds = 3;
-		_text = new wxStaticText(panel, wxID_ANY, "", wxPoint(10, 10));
+		_text = new wxStaticText(panel, wxID_ANY, "");
 		UpdateText();
-		panelSizer->Add(_text, 0, wxALL, 20);
+
+
+		panelSizer->AddStretchSpacer();
+		panelSizer->Add(_text, 0, wxALIGN_CENTER | wxALL, 10);
+		panelSizer->AddStretchSpacer();
+
 		panel->SetSizer(panelSizer);
 
-		wxPanel* panel2 = new wxPanel(this, wxID_ANY, wxPoint(0, 60), wxSize(300, 35));
-		_cancelButton = new wxButton(panel2, Events::EVENT_CANCEL_BUTTON, "Open Launcher", wxPoint(195, 5));
-		wxSizer* panelSizer2 = new wxBoxSizer(wxHORIZONTAL);
-		panelSizer2->Add(_cancelButton);
+		wxPanel* panel2 = new wxPanel(this);
+
+		wxBoxSizer* panelSizer2 = new wxBoxSizer(wxHORIZONTAL);
+		_cancelButton = new wxButton(panel2, Events::EVENT_CANCEL_BUTTON,
+			"Cancel and Open Launcher");
+		panelSizer2->Add(_cancelButton, 1, wxEXPAND | wxALL, 10);
 		panel2->SetSizer(panelSizer2);
 
-		_timer = new wxTimer(this, Events::EVENT_TIMER);
-		_timer->Start(1000);  // 1 second in milliseconds
-		
-		Fit();
+		wxBoxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
+
+		mainSizer->Add(panel, 1, wxEXPAND);
+		mainSizer->Add(panel2, 0, wxEXPAND);
+
+		this->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) { EndModal(wxID_CANCEL); });
+		_text->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) { EndModal(wxID_CANCEL); });		
+		panel->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) { EndModal(wxID_CANCEL); });
+		panel2->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) { EndModal(wxID_CANCEL); });
+
+		SetSizerAndFit(mainSizer);
 		CenterOnScreen();
+
+		_timer = new wxTimer(this, Events::EVENT_TIMER);
+		_timer->Start(1000); // 1 second
 	}
 }

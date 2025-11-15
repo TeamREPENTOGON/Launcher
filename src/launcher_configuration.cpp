@@ -29,9 +29,9 @@ static ConfigurationTuple<bool> HideWindowConf() {
 	return { Sections::general, Keys::hideWindow, Defaults::hideWindow };
 }
 
-// static ConfigurationTuple<bool> StealthModeConf() {
-// 	return { Sections::general, Keys::stealthMode, Defaults::stealthMode };
-// }
+ static ConfigurationTuple<bool> StealthModeConf() {
+ 	return { Sections::general, Keys::stealthMode, Defaults::stealthMode };
+ }
 
 static ConfigurationTuple<bool> ConsoleConf() {
 	return { Sections::repentogon, Keys::console, Defaults::console };
@@ -239,7 +239,7 @@ void LauncherConfiguration::LoadFromFile(INIReader const& reader) {
 	// Not reading LoadRoom from the config file yet as it is not supported in the UI.
 	// _options.loadRoom = ReadString(reader, LoadRoomConf);
 	_options.hideWindow = ReadBoolean(reader, HideWindowConf);
-	// _options.stealthMode = ReadBoolean(reader, StealthModeConf);
+	 _options.stealthMode = ReadBoolean(reader, StealthModeConf);
 
 	_options.console = ReadBoolean(reader, ConsoleConf);
 	_options.automaticUpdates = ReadBoolean(reader, AutomaticUpdatesConf);
