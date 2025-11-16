@@ -102,15 +102,10 @@ namespace Launcher {
 	private:
 		/* Window building. */
 		void AddLauncherConfigurationOptions();
-		void AddLaunchOptions();
-		void AddRepentogonOptions();
-		void AddVanillaOptions();
-		void AddModdingOptions();
-		void AddOptionsConfigOptions(); //lol
-
-		void AddLauncherConfigurationTextField(const char* intro,
-			const char* buttonText, const char* emptyText, wxColour const& emptyColor,
-			wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId);
+		void AddLaunchOptions(const wxSizerFlags& sizerFlags);
+		void AddRepentogonOptions(const wxSizerFlags& sizerFlags);
+		void AddModdingOptions(const wxSizerFlags& sizerFlags);
+		void AddOptionsConfigOptions(const wxSizerFlags& sizerFlags); //lol
 
 		/* Initialize the IsaacOptions structure. */
 		void InitializeOptions();
@@ -118,7 +113,7 @@ namespace Launcher {
 		/* Initialize GUI components from the IsaacOptions structure. */
 		void InitializeGUIFromOptions();
 		/* Helper to initialize the level selection field from the IsaacOptions structure. */
-		void InitializeLevelSelectFromOptions();
+		// void InitializeLevelSelectFromOptions();
 		void UpdateLaunchButtonEnabledState();
 		void UpdateRepentogonOptionsFromInstallation();
 
@@ -185,19 +180,16 @@ namespace Launcher {
 		void RelaunchIsaac();
 
 		wxStaticBoxSizer* _optionsSizer;
+		wxFlexGridSizer* _optionsGridSizer;
 		wxStaticBoxSizer* _configurationSizer;
 		wxSizer* _verticalSizer;
-		wxSizer* _LeftSideSizer;
-		wxSizer* _RightSideSizer;
 		wxCheckBox* _console;
 		wxCheckBox* _updates;
 		wxCheckBox* _unstableRepentogon;
-		wxCheckBox* _luaDebug;
-		wxCheckBox* _hideWindow;
+		// wxCheckBox* _hideWindow;
 		wxCheckBox* _stealthMode;
-		wxComboBox* _levelSelect;
+		// wxComboBox* _levelSelect;
 		wxComboBox* _launchMode;
-		wxTextCtrl* _luaHeapSize;
 		wxStaticBox* _optionsBox;
 		wxStaticBox* _configurationBox;
 		wxStaticBox* _repentogonOptions;

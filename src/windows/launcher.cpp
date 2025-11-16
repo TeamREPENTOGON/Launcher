@@ -61,14 +61,11 @@ EVT_COMBOBOX(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::LauncherMainWindow
 EVT_TEXT(Launcher::WINDOW_COMBOBOX_LAUNCH_MODE, Launcher::LauncherMainWindow::OnLaunchModeSelect)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_CONSOLE, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
-//EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_HIDE_WINDOW, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_STEALTH_MODE, Launcher::LauncherMainWindow::OnOptionSelected)
 EVT_CHECKBOX(Launcher::WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, Launcher::LauncherMainWindow::OnOptionSelected)
-//EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::LauncherMainWindow::OnLuaHeapSizeCharacterWritten)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_LAUNCH_BUTTON, Launcher::LauncherMainWindow::Launch)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_ISAAC, Launcher::LauncherMainWindow::OnIsaacSelectClick)
-// EVT_BUTTON(Launcher::WINDOW_BUTTON_SELECT_REPENTOGON_FOLDER, Launcher::LauncherMainWindow::OnSelectRepentogonFolderClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_CHECKLOGS_BUTTON, Launcher::LauncherMainWindow::OnCheckLogsClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_OPTIONS, Launcher::LauncherMainWindow::OnAdvancedOptionsClick)
 EVT_BUTTON(Launcher::WINDOW_BUTTON_ADVANCED_MOD_OPTIONS, Launcher::LauncherMainWindow::OnAdvancedModOptionsClick)
@@ -100,56 +97,51 @@ namespace Launcher {
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 
 	static constexpr const char* ComboBoxVanilla = "Vanilla";
-	static constexpr const char* ComboBoxRepentogon = "Repentogon";
+	static constexpr const char* ComboBoxRepentogon = "REPENTOGON";
 
 	static const std::regex LuaHeapSizeRegex("^([0-9]+[KMG]{0,1})?$");
 
 	LauncherMainWindow::LauncherMainWindow(Installation* installation, LauncherConfiguration* configuration) :
-		wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
-		_installation(installation), _configuration(configuration),
-		_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, 125),
-			wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)) {
-		// _optionsGrid = new wxGridBagSizer(0, 20);
+			wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
+			_installation(installation), _configuration(configuration),
+			_logWindow(new wxTextCtrl(this, -1, wxEmptyString, wxDefaultPosition, wxSize(-1, 125),
+				wxTE_READONLY | wxTE_MULTILINE | wxTE_RICH)) {
 		_console = nullptr;
-		_luaHeapSize = nullptr;
 
-		wxStaticBox* optionsBox = new wxStaticBox(this, -1, "Game configuration");
-		wxStaticBoxSizer* optionsSizer = new wxStaticBoxSizer(optionsBox, wxHORIZONTAL);
-
+		// Main window sizer
 		_verticalSizer = new wxBoxSizer(wxVERTICAL);
 
+		// Log window
 		wxTextCtrl* logWindow = _logWindow.Get();
 		logWindow->SetBackgroundColour(*wxWHITE);
-
-		wxStaticBox* configurationBox = new wxStaticBox(this, -1, "Launcher configuration");
-		wxStaticBoxSizer* configurationSizer = new wxStaticBoxSizer(configurationBox, wxVERTICAL);
-
-		wxSizerFlags logFlags = wxSizerFlags().Expand().Proportion(5).Border(wxLEFT | wxRIGHT | wxTOP);
+		const wxSizerFlags logFlags = wxSizerFlags().Expand().Proportion(5).Border(wxALL, 5);
 		_verticalSizer->Add(logWindow, logFlags);
-		logFlags.Proportion(0);
-		_verticalSizer->Add(configurationSizer, logFlags);
-		_verticalSizer->Add(optionsSizer, 0, wxALIGN_CENTER_HORIZONTAL | wxALL, 5);
 
-		_configurationBox = configurationBox;
-		_configurationSizer = configurationSizer;
-		_optionsSizer = optionsSizer;
-		_optionsBox = optionsBox;
+		// Shared sizer flags
+		const wxSizerFlags sharedFlags = wxSizerFlags().Expand().Proportion(0).Border(wxLEFT | wxRIGHT | wxBOTTOM, 5);
 
+		// Launcher configuration
+		_configurationBox = new wxStaticBox(this, -1, "Launcher configuration");
+		_configurationSizer = new wxStaticBoxSizer(_configurationBox, wxVERTICAL);
 		AddLauncherConfigurationOptions();
+		_verticalSizer->Add(_configurationSizer, sharedFlags);
 
+		// Game configuration
+		_optionsBox = new wxStaticBox(this, -1, "Game configuration");
+		_optionsSizer = new wxStaticBoxSizer(_optionsBox, wxVERTICAL);
+		_optionsGridSizer = new wxFlexGridSizer(2, 2, 5);
+		_optionsGridSizer->SetFlexibleDirection(wxBOTH);
+		const wxSizerFlags optionsGridFlags = wxSizerFlags().Expand().Proportion(1).Border(wxALL, 0);
+		AddRepentogonOptions(optionsGridFlags);
+		AddModdingOptions(optionsGridFlags);
+		AddLaunchOptions(optionsGridFlags);
+		AddOptionsConfigOptions(optionsGridFlags);
+		_optionsSizer->Add(_optionsGridSizer, 1, wxALIGN_CENTER_HORIZONTAL | wxALL, 2);
+		_verticalSizer->Add(_optionsSizer, sharedFlags);
 
-		_LeftSideSizer = new wxBoxSizer(wxVERTICAL);
-		AddRepentogonOptions();
-		//AddVanillaOptions();
-		AddLaunchOptions();
-		_optionsSizer->Add(_LeftSideSizer, 0, wxALL, 0);
-
-		_RightSideSizer = new wxBoxSizer(wxVERTICAL);
-
-		AddModdingOptions();
-		AddOptionsConfigOptions();
-
-		_optionsSizer->Add(_RightSideSizer, 0, wxALL, 0);
+		// Launch button
+		_launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game", wxDefaultPosition, wxSize(50, 50));
+		_verticalSizer->Add(_launchButton, sharedFlags);
 
 		SetSizerAndFit(_verticalSizer);
 
@@ -162,25 +154,56 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::AddLauncherConfigurationOptions() {
-		wxBoxSizer* isaacSelectionSizer = new wxBoxSizer(wxHORIZONTAL);
-		AddLauncherConfigurationTextField("Isaac executable",
-			"Choose exe", NoIsaacText,
-			NoIsaacColor, isaacSelectionSizer, &_isaacFileText, WINDOW_BUTTON_SELECT_ISAAC);
+		// Isaac exe row
+		wxBoxSizer* isaacExeSizer = new wxBoxSizer(wxHORIZONTAL);
 
-		_configurationSizer->Add(isaacSelectionSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
+		// Isaac exe label
+		wxStaticText* isaacExeText = new wxStaticText(_configurationBox, wxID_ANY, "Isaac executable", wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+		isaacExeSizer->Add(isaacExeText, 0, wxRIGHT | wxALIGN_CENTER_VERTICAL, 5);
+
+		// Isaac exe path
+		_isaacFileText = new wxTextCtrl(_configurationBox, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY | wxTE_RICH);
+		_isaacFileText->SetBackgroundColour(*wxWHITE);
+		wxTextAttr textAttr = _isaacFileText->GetDefaultStyle();
+		_isaacFileText->SetDefaultStyle(wxTextAttr(NoIsaacColor));
+		_isaacFileText->AppendText(NoIsaacText);
+		_isaacFileText->SetDefaultStyle(textAttr);
+		isaacExeSizer->Add(_isaacFileText, 1, wxALIGN_CENTER_VERTICAL);
+
+		// Choose exe button
+		wxButton* isaacSelectionButton = new wxButton(_configurationBox, WINDOW_BUTTON_SELECT_ISAAC, "Choose exe");
+		isaacExeSizer->Add(isaacSelectionButton, 0, wxLEFT, 2);
+
+		_configurationSizer->Add(isaacExeSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 		// _configurationSizer->Add(new wxStaticLine(), 0, wxTOP | wxBOTTOM, 5);
 
+
+		// REPENTOGON executable row
 		wxBoxSizer* repentogonExeSizer = new wxBoxSizer(wxHORIZONTAL);
-		wxStaticText* repentogonExeText = new wxStaticText(_configurationBox, wxID_ANY, "Repentogon executable",wxDefaultPosition);
-		_repentogonFileText = new wxTextCtrl(_configurationBox, wxID_ANY, "", wxDefaultPosition,
-			wxDefaultSize, wxTE_READONLY);
-		repentogonExeSizer->Add(repentogonExeText, 0, wxRIGHT, 5);
-		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Expand().Border( wxRIGHT));
+
+		// rgon exe label
+		wxStaticText* repentogonExeText = new wxStaticText(_configurationBox, wxID_ANY, "REPENTOGON exe", wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT);
+		repentogonExeSizer->Add(repentogonExeText, 0, wxRIGHT | wxALIGN_CENTER_VERTICAL, 5);
+
+		// rgon exe path
+		_repentogonFileText = new wxTextCtrl(_configurationBox, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY);
+		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Border(wxRIGHT));
+
 		_configurationSizer->Add(repentogonExeSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
+
+		// Align the two path boxes
+		const wxSize isaacExeTextSize = isaacExeText->GetTextExtent(isaacExeText->GetLabelText());
+		const wxSize rgonExeTextSize = repentogonExeText->GetTextExtent(repentogonExeText->GetLabelText());
+		const wxSize minSize(std::max(isaacExeTextSize.x, rgonExeTextSize.x), std::max(isaacExeTextSize.y, rgonExeTextSize.y));
+		isaacExeText->SetMinSize(minSize);
+		repentogonExeText->SetMinSize(minSize);
+
+
+		// Additional Launcher options
 		 _stealthMode = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_STEALTH_MODE, "Stealth Mode (Always ON in BigPicture mode and Steam Deck)");
 		 _stealthMode->SetToolTip("When starting the launcher, skip the main window and automatically launch Isaac, then close the launcher afterwards.\n\nThe launcher will appear if an error occurs.");
-		 _configurationSizer->Add(_stealthMode, 0, wxLEFT | wxRIGHT | wxTOP, 5);
+		 _configurationSizer->Add(_stealthMode, 0, wxLEFT | wxRIGHT | wxTOP | wxBOTTOM, 5);
 
 		/*
 		_hideWindow = new wxCheckBox(_configurationBox, WINDOW_CHECKBOX_HIDE_WINDOW,
@@ -189,15 +212,12 @@ namespace Launcher {
 		*/
 	}
 
-	void LauncherMainWindow::AddLaunchOptions() {
+	void LauncherMainWindow::AddLaunchOptions(const wxSizerFlags& sizerFlags) {
 		wxStaticBox* launchModeBox = new wxStaticBox(_optionsBox, -1, "Launch Options");
 		wxStaticBoxSizer* launchModeBoxSizer = new wxStaticBoxSizer(launchModeBox, wxVERTICAL );
 
 		wxSizer* box = new wxBoxSizer(wxHORIZONTAL);
-		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "), wxEXPAND | wxLEFT | wxRIGHT,5);
-
-		_launchButton = new wxButton(this, WINDOW_BUTTON_LAUNCH_BUTTON, "Launch game", wxDefaultPosition, wxSize(50, 50));
-		//launchModeBoxSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 5);
+		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "), wxEXPAND | wxLEFT | wxRIGHT, 5);
 
 		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE);
 		_launchMode->Append(ComboBoxRepentogon);
@@ -207,76 +227,49 @@ namespace Launcher {
 		box->Add(_launchMode, wxEXPAND | wxRIGHT, 10);
 
 		launchModeBoxSizer->Add(box, 0, wxTOP | wxLEFT | wxRIGHT, 5);
+		//launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxTOP | wxLEFT | wxRIGHT, 3);
 
-		launchModeBoxSizer->Add(new wxStaticLine(launchModeBox), 0, wxTOP | wxLEFT | wxRIGHT, 3);
-
-		_LeftSideSizer->Add(launchModeBoxSizer, 1, wxEXPAND | wxRIGHT, 10);
-		_verticalSizer->Add(_launchButton, 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
-
+		_optionsGridSizer->Add(launchModeBoxSizer, sizerFlags);
 	}
 
-	void LauncherMainWindow::AddModdingOptions() {
-		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "Modding Options");
-		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxVERTICAL);
-		/*
-		_luaDebug = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe)");
-		_luaDebug->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
-			if (_luaDebug->IsChecked()) {
-				_luaDebug->SetValue(false);
-				int res = wxMessageBox(
-					"By enabling this, you give all your auto-updating workshop mods FULL UNRESTRICTED ACCESS TO YOUR COMPUTER!!, they can delete files, encrypt your harddrive, mine bitcoins, send out your login tokens, you name it...\nAre you sure you want to enable it?",
-					"Enable luadebug",
-					wxYES_NO | wxNO_DEFAULT | wxICON_WARNING,
-					this
-				);
-				_luaDebug->SetValue(res == wxYES);
-			}
-		event.Skip();
-			});
+	void LauncherMainWindow::AddModdingOptions(const wxSizerFlags& sizerFlags) {
+		wxStaticBox* modOptionsBox = new wxStaticBox(_optionsBox, -1, "Modding Options");
+		wxStaticBoxSizer* modOptionsSizer = new wxStaticBoxSizer(modOptionsBox, wxVERTICAL);
 
-		repentogonBoxSizer->Add(_luaDebug, 0, wxLEFT | wxRIGHT, 5);
+		const wxSizerFlags buttonSizerFlags = wxSizerFlags().Expand().Proportion(0).Border(wxALL, 3);
 
-		wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
-		wxTextCtrl* heapSizeCtrl = new wxTextCtrl(repentogonBox, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024M");
-		_luaHeapSize = heapSizeCtrl;
-		wxStaticText* heapSizeText = new wxStaticText(repentogonBox, -1, "Lua heap size: ");
-		heapSizeBox->Add(heapSizeText);
-		heapSizeBox->Add(heapSizeCtrl);
-		repentogonBoxSizer->Add(heapSizeBox, 0, wxLEFT | wxRIGHT | wxTOP, 5);
-		*/
+		wxButton* modman = new wxButton(modOptionsBox, WINDOW_BUTTON_MODMAN_BUTTON, "Open Mod Manager", wxDefaultPosition);
+		modOptionsSizer->Add(modman, buttonSizerFlags);
 
-		wxButton* modman = new wxButton(repentogonBox, WINDOW_BUTTON_MODMAN_BUTTON, "Open Mod Manager", wxDefaultPosition);
-		repentogonBoxSizer->Add(modman, 1, wxEXPAND | wxALL | wxTOP, 5);
+		wxButton* checklogs = new wxButton(modOptionsBox, WINDOW_BUTTON_CHECKLOGS_BUTTON, "Check Game Logs", wxDefaultPosition);
+		modOptionsSizer->Add(checklogs, buttonSizerFlags);
 
-		wxButton* checklogs = new wxButton(repentogonBox, WINDOW_BUTTON_CHECKLOGS_BUTTON, "Check Game Logs", wxDefaultPosition);
-		repentogonBoxSizer->Add(checklogs, 1, wxEXPAND | wxALL, 5);
+		_advancedModOptionsButton = new wxButton(modOptionsBox, WINDOW_BUTTON_ADVANCED_MOD_OPTIONS, "Advanced Mod Options", wxDefaultPosition);
+		modOptionsSizer->Add(_advancedModOptionsButton, buttonSizerFlags);
 
-		_advancedModOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_MOD_OPTIONS, "Advanced Mod Options", wxDefaultPosition);
-		repentogonBoxSizer->Add(_advancedModOptionsButton, 1, wxEXPAND | wxALL, 5);
-
-
-		_RightSideSizer->Add(repentogonBoxSizer, 1, wxEXPAND | wxALL, 0);
+		_optionsGridSizer->Add(modOptionsSizer, sizerFlags);
 	}
 
 
-	void LauncherMainWindow::AddOptionsConfigOptions() {
-		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "Game Options");
-		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxHORIZONTAL);
+	void LauncherMainWindow::AddOptionsConfigOptions(const wxSizerFlags& sizerFlags) {
+		wxStaticBox* gameOptionsBox = new wxStaticBox(_optionsBox, -1, "Game Options");
+		wxStaticBoxSizer* gameOptionsSizer = new wxStaticBoxSizer(gameOptionsBox, wxVERTICAL);
 
-		wxButton* modman = new wxButton(repentogonBox, WINDOW_BUTTON_CHANGEOPTIONS_BUTTON, "Change Game Options", wxDefaultPosition);
-		repentogonBoxSizer->Add(modman, 1,  wxALL, 5);
-		_RightSideSizer->Add(repentogonBoxSizer, 0, wxEXPAND | wxRIGHT, 0);
+		wxButton* modman = new wxButton(gameOptionsBox, WINDOW_BUTTON_CHANGEOPTIONS_BUTTON, "Change Game Options", wxDefaultPosition);
+		gameOptionsSizer->Add(modman, 0, wxEXPAND | wxALL, 3);
+
+		_optionsGridSizer->Add(gameOptionsSizer, sizerFlags);
 	}
 
-	void LauncherMainWindow::AddRepentogonOptions() {
+	void LauncherMainWindow::AddRepentogonOptions(const wxSizerFlags& sizerFlags) {
 		wxStaticBox* repentogonBox = new wxStaticBox(_optionsBox, -1, "REPENTOGON Options");
 		wxStaticBoxSizer* repentogonBoxSizer = new wxStaticBoxSizer(repentogonBox, wxVERTICAL);
 
-		wxCheckBox* updates = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UPDATES, "Automatically check for updates");
-		updates->SetValue(true);
+		_updates = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UPDATES, "Automatically check for updates");
+		_updates->SetValue(true);
 
-		wxCheckBox* console = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_CONSOLE, "Enable dev console window");
-		console->SetValue(false);
+		_console = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_CONSOLE, "Enable dev console window");
+		_console->SetValue(false);
 
 		_unstableRepentogon = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, "Upgrade to unstable versions");
 		_unstableRepentogon->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
@@ -294,79 +287,26 @@ namespace Launcher {
 				);
 				_unstableRepentogon->SetValue(res == wxYES);
 			}
-		event.Skip();
-			});
+			event.Skip();
+		});
 		_unstableRepentogon->SetValue(false);
 
 		_advancedOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
-		wxSizerFlags advancedOptionsFlags = wxSizerFlags().Right();
 
+		const wxSizerFlags checkboxFlags = wxSizerFlags().Left().Border(wxLEFT | wxBOTTOM | wxRIGHT, 5);
+		repentogonBoxSizer->Add(_updates, checkboxFlags);
+		repentogonBoxSizer->Add(_unstableRepentogon, checkboxFlags);
+		repentogonBoxSizer->Add(_console, checkboxFlags);
 
-		_updates = updates;
-		_console = console;
-
-		repentogonBoxSizer->Add(updates, 0, wxLEFT | wxRIGHT | wxBOTTOM, 5);
-		repentogonBoxSizer->Add(_unstableRepentogon, 0, wxLEFT | wxBOTTOM, 5);
-		repentogonBoxSizer->Add(console, 0, wxLEFT | wxRIGHT | wxBOTTOM, 8);
-
-		repentogonBoxSizer->Add(_advancedOptionsButton, 0,wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 11);
+		repentogonBoxSizer->Add(_advancedOptionsButton, 0, wxALIGN_CENTER_HORIZONTAL | wxBOTTOM, 0);
 
 		_repentogonOptions = repentogonBox;
-		_LeftSideSizer->Add(repentogonBoxSizer, 0, wxRIGHT, 10);
-	}
-
-	void LauncherMainWindow::AddVanillaOptions() {
-		wxStaticBox* vanillaBox = new wxStaticBox(_optionsBox, -1, "Vanilla Options");
-		wxStaticBoxSizer* vanillaBoxSizer = new wxStaticBoxSizer(vanillaBox, wxVERTICAL);
-
-		wxSizer* levelSelectSizer = new wxBoxSizer(wxHORIZONTAL);
-		levelSelectSizer->Add(new wxStaticText(vanillaBox, -1, "Starting stage: "));
-		_levelSelect = CreateLevelsComboBox(vanillaBox);
-		levelSelectSizer->Add(_levelSelect);
-
-		vanillaBoxSizer->Add(levelSelectSizer, 0, wxTOP | wxLEFT | wxRIGHT, 5);
-		_luaDebug = new wxCheckBox(vanillaBox, WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe)");
-		_luaDebug->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
-			if (_luaDebug->IsChecked()) {
-				_luaDebug->SetValue(false);
-				int res = wxMessageBox(
-					"By enabling this, you give all your auto-updating workshop mods FULL UNRESTRICTED ACCESS TO YOUR COMPUTER!!, they can delete files, encrypt your harddrive, mine bitcoins, send out your login tokens, you name it...\nAre you sure you want to enable it?",
-					"Enable luadebug",
-					wxYES_NO | wxNO_DEFAULT | wxICON_WARNING,
-					this
-				);
-				_luaDebug->SetValue(res == wxYES);
-			}
-			event.Skip();
-		});
-
-		vanillaBoxSizer->Add(_luaDebug, 0, wxLEFT | wxRIGHT, 5);
-		vanillaBoxSizer->Add(new wxStaticLine(vanillaBox), 0, wxTOP | wxBOTTOM, 5);
-
-		wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
-		wxTextCtrl* heapSizeCtrl = new wxTextCtrl(vanillaBox, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024M");
-		_luaHeapSize = heapSizeCtrl;
-		wxStaticText* heapSizeText = new wxStaticText(vanillaBox, -1, "Lua heap size: ");
-		heapSizeBox->Add(heapSizeText);
-		heapSizeBox->Add(heapSizeCtrl);
-		vanillaBoxSizer->Add(heapSizeBox, 0, wxLEFT | wxRIGHT, 5);
-		vanillaBoxSizer->Add(new wxStaticLine(vanillaBox), 0, wxBOTTOM, 5);
-
-		_optionsSizer->Add(vanillaBoxSizer, 0, wxTOP | wxLEFT | wxRIGHT | wxBOTTOM, 10);
+		_optionsGridSizer->Add(repentogonBoxSizer, sizerFlags);
 	}
 
 	void LauncherMainWindow::OnIsaacSelectClick(wxCommandEvent&) {
 		SelectIsaacExecutablePath();
 	}
-
-	/* void LauncherMainWindow::OnSelectRepentogonFolderClick(wxCommandEvent& event) {
-		wxDirDialog dialog(this, "Please select the folder in which to install Repentogon", wxEmptyString,
-			0, wxDefaultPosition, wxDefaultSize, "Select Repentogon installation folder");
-		dialog.ShowModal();
-
-		std::string path = dialog.GetPath().ToStdString();
-		OnFileSelected(path, NoRepentogonInstallationFolderColor, _repentogonInstallFolderText, NoRepentogonInstallationFolderText);
-	} */
 
 	void LauncherMainWindow::OnModManagerButtonPressed(wxCommandEvent&) {
 		ModManagerFrame* modWindow = new ModManagerFrame(this,_installation);
@@ -438,10 +378,6 @@ namespace Launcher {
 				_configuration->SetUnstableUpdates(box->GetValue());
 				OnRepentogonUnstableStateSwitched();
 			}
-			break;
-
-		case WINDOW_CHECKBOX_VANILLA_LUADEBUG:
-			_configuration->SetLuaDebug(box->GetValue());
 			break;
 
 		case WINDOW_CHECKBOX_HIDE_WINDOW:
@@ -535,13 +471,13 @@ namespace Launcher {
 		}
 
 		_logWindow.Log("Launching the game with the following options:");
-		_logWindow.Log("\tRepentogon:");
+		_logWindow.Log("\REPENTOGON:");
 		bool launchingVanilla = _configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA;
 		if (launchingVanilla) {
-			_logWindow.Log("\t\tRepentogon is disabled");
+			_logWindow.Log("\t\REPENTOGON is disabled");
 		} else {
-			_logWindow.Log("\t\tRepentogon is enabled");
-			_logWindow.Log("\t\tEnable Repentogon console window: %s", _configuration->RepentogonConsole() ? "yes" : "no");
+			_logWindow.Log("\t\REPENTOGON is enabled");
+			_logWindow.Log("\t\tEnable REPENTOGON console window: %s", _configuration->RepentogonConsole() ? "yes" : "no");
 		}
 		_logWindow.Log("\tVanilla:");
 		if (_configuration->Stage() > 0) {
@@ -670,8 +606,8 @@ namespace Launcher {
 			_repentogonFileText->SetValue(repData.GetExePath());
 		} else {
 			_repentogonFileText->SetForegroundColour(*wxRED);
-			_repentogonFileText->SetValue("No valid Repentogon installation found");
-			_logWindow.LogWarn("No valid Repentogon installation found");
+			_repentogonFileText->SetValue("No valid REPENTOGON installation found");
+			_logWindow.LogWarn("No valid REPENTOGON installation found");
 		}
 
 		UpdateRepentogonOptionsFromInstallation();
@@ -865,12 +801,6 @@ namespace Launcher {
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
 		_unstableRepentogon->Enable(!_configuration->UnstableUpdatesHasOverride());
 
-		//_luaHeapSize->SetValue(_configuration->LuaHeapSize());
-		//_luaHeapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
-
-		//_luaDebug->SetValue(_configuration->LuaDebug());
-		//_luaDebug->Enable(!_configuration->LuaDebugHasOverride());
-
 		 _stealthMode->SetValue(_configuration->StealthMode());
 		 _stealthMode->Enable(!_configuration->StealthModeHasOverride());
 
@@ -887,6 +817,7 @@ namespace Launcher {
 		_launchMode->Enable(!_configuration->IsaacLaunchModeHasOverride());
 	}
 
+	/*
 	void LauncherMainWindow::InitializeLevelSelectFromOptions() {
 		int levelStage = _configuration->Stage();
 		int stageType = _configuration->StageType();
@@ -899,6 +830,7 @@ namespace Launcher {
 		}
 		_levelSelect->Enable(!_configuration->StageHasOverride());
 	}
+	*/
 
 	void LauncherMainWindow::UpdateLaunchButtonEnabledState() {
 		if (_launchButton) {
@@ -927,7 +859,7 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::ForceRepentogonUpdate(bool allowPreReleases) {
-		_logWindow.Log("Forcibly updating Repentogon to the latest version");
+		_logWindow.Log("Forcibly updating REPENTOGON to the latest version");
 
 		EnableInterface(false);
 		std::shared_ptr<RepentogonInstallerFrame> updater(
@@ -950,15 +882,15 @@ namespace Launcher {
 
 		if (result == RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_ERR ||
 			result == RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_ERR_CHECK_UPDATES) {
-			_logWindow.LogError("Unable to force Repentogon update\n");
+			_logWindow.LogError("Unable to force REPENTOGON update\n");
 			return;
 		}
 
 		if (!_installation->CheckRepentogonInstallation()) {
-			_logWindow.LogError("Installation of Repentogon post update is not valid\n");
+			_logWindow.LogError("Installation of REPENTOGON post update is not valid\n");
 			Launcher::DebugDumpBrokenRepentogonInstallation(_installation, _logWindow.Get());
 		} else {
-			_logWindow.Log("State of the Repentogon installation:\n");
+			_logWindow.Log("State of the REPENTOGON installation:\n");
 			Launcher::DisplayRepentogonFilesVersion(_installation, 1, true, _logWindow.Get());
 		}
 	}
@@ -977,40 +909,11 @@ namespace Launcher {
 		return dialog.GetPath().ToStdString();
 	}
 
-	void LauncherMainWindow::AddLauncherConfigurationTextField(const char* intro,
-		const char* buttonText, const char* emptyText, wxColour const& emptyColor,
-		wxBoxSizer* sizer, wxTextCtrl** result, Launcher::Windows windowId) {
-
-		wxStaticText* txt = new wxStaticText(_configurationBox, -1, intro, wxDefaultPosition);
-		int width, height;
-		txt->GetTextExtent("Repentogon executable", &width, &height);
-		txt->SetMinSize(wxSize(width, height));
-		sizer->Add(txt, 0, wxRIGHT, 5);
-
-		wxButton* isaacSelectionButton = new wxButton(_configurationBox, windowId, buttonText);
-		wxTextCtrl* textCtrl = new wxTextCtrl(_configurationBox, -1, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY | wxTE_RICH);
-		textCtrl->SetBackgroundColour(*wxWHITE);
-
-		wxTextAttr textAttr = textCtrl->GetDefaultStyle();
-		textCtrl->SetDefaultStyle(wxTextAttr(emptyColor));
-		textCtrl->AppendText(emptyText);
-		textCtrl->SetDefaultStyle(textAttr);
-
-		wxSizerFlags flags = wxSizerFlags().Expand().Proportion(1);
-		sizer->Add(textCtrl, flags);
-
-		sizer->Add(isaacSelectionButton, 0, wxRIGHT, 5);
-
-		if (result) {
-			*result = textCtrl;
-		}
-	}
-
 	bool LauncherMainWindow::PromptLegacyUninstall() {
 		std::ostringstream s;
-		s << "An unsupported build of Repentogon is currently installed and must be removed in order to upgrade to the latest Repentgon version.\n"
+		s << "An unsupported build of REPENTOGON is currently installed and must be removed in order to upgrade to the latest Repentgon version.\n"
 			"Proceed with its uninstallation?";
-		wxMessageDialog modal(this, s.str(), "Uninstall legacy Repentogon installation?", wxYES_NO);
+		wxMessageDialog modal(this, s.str(), "Uninstall legacy REPENTOGON installation?", wxYES_NO);
 		int result = modal.ShowModal();
 		return result == wxID_YES || result == wxID_OK;
 	}
