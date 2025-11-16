@@ -187,7 +187,7 @@ namespace Launcher {
 
 		// rgon exe path
 		_repentogonFileText = new wxTextCtrl(_configurationBox, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY);
-		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Border(wxRIGHT));
+		repentogonExeSizer->Add(_repentogonFileText, wxSizerFlags().Proportion(1).Border(wxRIGHT, 2));
 
 		_configurationSizer->Add(repentogonExeSizer, 0, wxEXPAND | wxTOP | wxLEFT | wxRIGHT, 5);
 
