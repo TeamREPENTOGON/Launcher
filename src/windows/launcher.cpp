@@ -101,6 +101,7 @@ namespace Launcher {
 
 	static const std::regex LuaHeapSizeRegex("^([0-9]+[KMG]{0,1})?$");
 
+
 	LauncherMainWindow::LauncherMainWindow(Installation* installation, LauncherConfiguration* configuration) :
 			wxFrame(nullptr, wxID_ANY, "REPENTOGON Launcher"),
 			_installation(installation), _configuration(configuration),
