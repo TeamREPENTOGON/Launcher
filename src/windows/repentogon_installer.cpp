@@ -8,6 +8,7 @@
 #include "launcher/windows/repentogon_installer.h"
 #include "launcher/log_helpers.h"
 #include "shared/logger.h"
+#include <filesystem>
 
 wxBEGIN_EVENT_TABLE(RepentogonInstallerFrame, wxFrame)
 EVT_CLOSE(RepentogonInstallerFrame::OnClose)
@@ -72,6 +73,7 @@ void RepentogonInstallerFrame::OnClose(wxCloseEvent& event) {
 
 void RepentogonInstallerFrame::InstallRepentogon() {
 	std::unique_lock<std::mutex> lck(_installerMutex);
+	_wasinstalled = std::filesystem::exists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon");
 	_helper = std::make_unique<RepentogonInstallerHelper>(this, _installation,
 		_allowUnstable, _forceUpdate, _logWindow);
 	_helper->Install(std::bind_front(&RepentogonInstallerFrame::OnRepentogonInstalled, this));
@@ -88,6 +90,17 @@ void RepentogonInstallerFrame::OnRepentogonInstalled(bool completed,
 
 	if (_mainFrame) {
 		_mainFrame->CallAfter(&Launcher::LauncherMainWindow::Init);
+	}
+
+	if (!_wasinstalled && (result == Launcher::RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_OK))
+	{
+		_wasinstalled = true;
+		int res = wxMessageBox(
+			"REPENTOGON has successfully installed!\nTake in mind that it runs on an older version of REP+, which means it may miss some features. But remember you can still launch in Vanilla mode on the latest version if needed, both versions exist simultanously! ",
+			"Sucessfully installed REPENTOGON",
+			wxOK | wxOK_DEFAULT | wxICON_INFORMATION,
+			this
+		);
 	}
 
 	if (!sCLI->RepentogonInstallerWait() && !_synchronous) {

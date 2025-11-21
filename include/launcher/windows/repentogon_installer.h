@@ -60,6 +60,7 @@ private:
 	bool _forceUpdate = false;
 	bool _allowUnstable = false;
 	bool _synchronous = false;
+	bool _wasinstalled = true;
 
 	std::mutex _installerMutex;
 	std::unique_ptr<RepentogonInstallerHelper> _helper;
