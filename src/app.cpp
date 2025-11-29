@@ -123,7 +123,7 @@ bool Launcher::App::OnInit() {
 
 	// Force unstable updates to true for the beta.
 	// This can be removed once a stable REPENTOGON release exists that uses the launcher.
-	__configuration.SetUnstableUpdatesOverride(true);
+	//__configuration.SetUnstableUpdatesOverride(true);
 
 	_mainFrame->Show(!__configuration.AutoLaunch());
 
