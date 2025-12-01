@@ -220,7 +220,7 @@ namespace Launcher {
 		wxSizer* box = new wxBoxSizer(wxHORIZONTAL);
 		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "), wxEXPAND | wxLEFT | wxRIGHT, 5);
 
-		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE);
+		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxCB_READONLY);
 		_launchMode->Append(ComboBoxRepentogon);
 		_launchMode->Append(ComboBoxVanilla);
 		_launchMode->SetValue(ComboBoxRepentogon);
