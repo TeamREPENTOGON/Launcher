@@ -137,6 +137,10 @@ bool Launcher::App::OnInit() {
 		providedPath = __configuration.IsaacExecutablePath();
 	}
 
+	if (providedPath) {
+		Installation::CheckLegalIsaacPath(*providedPath);
+	}
+
 	bool isStandalone = false;
 	auto [isaacPath, repentogonOk] = __installation->Initialize(providedPath, &isStandalone);
 

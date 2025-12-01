@@ -45,6 +45,8 @@ namespace Launcher {
 
 		int SetIsaacExecutable(std::string const& file, bool* standalone);
 
+		static void CheckLegalIsaacPath(const std::string& isaacExePath);
+
 	private:
 		ILoggableGUI* _gui = nullptr;
 		RepentogonInstallation _repentogonInstallation;

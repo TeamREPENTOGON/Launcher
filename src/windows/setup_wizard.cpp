@@ -400,6 +400,8 @@ void LauncherWizard::OnIsaacExecutableSelected(std::string const& path) {
         return;
     }
 
+    Launcher::Installation::CheckLegalIsaacPath(path);
+
     if (standalone) {
         if (wxMessageBox("The executable you selected is a Repentogon-patched specific executable.\n "
             "Proceeding with this executable is not advised. Continue with it ?",
