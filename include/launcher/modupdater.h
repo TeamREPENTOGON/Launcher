@@ -136,7 +136,12 @@ private:
                 auto* nodeName = root->first_node("directory");
                 auto* nodeVersion = root->first_node("version");
                 outName = nodeName ? nodeName->value() : "";
-                outVersion = nodeVersion ? nodeVersion->value() : "";
+                if ((nodeVersion == nullptr) ||(nodeVersion == 0)) { //fuck you minecraft explosions mod, you degenerate fuck!
+                    outVersion = "";
+                }
+                else {
+                    outVersion = nodeVersion ? nodeVersion->value() : "";
+                }
                 return true;
             }
         }
@@ -224,11 +229,13 @@ private:
     void MainProc() {
         if (!SteamAPI_Init()) {
             PostProgressEvent(0, "Warning: SteamAPI_Init() failed or already initialized. Proceeding...");
+            PostProgressEvent(0, "FINISH: update process finished.");
             return;
         }
         if (!SteamAPI_IsSteamRunning()) {
             PostProgressEvent(0,"Steam is not running. Start Steam and try again.");
             PostProgressEvent(0,"DONE: Steam not running");
+            PostProgressEvent(0, "FINISH: update process finished.");
             return;
         }
         int overallPct = 0;
@@ -237,6 +244,7 @@ private:
         if (num == 0) {
             PostProgressEvent(overallPct,"No subscribed workshop items found.");
             PostProgressEvent(overallPct,"DONE: nothing to update");
+            PostProgressEvent(overallPct, "FINISH: update process finished.");
             return;
         }
         std::vector<PublishedFileId_t> subscribed(num);
@@ -244,6 +252,7 @@ private:
         if (returned == 0) {
             PostProgressEvent(overallPct,"Failed to retrieve subscribed items from Steam.");
             PostProgressEvent(overallPct,"DONE: failed to get subscriptions");
+            PostProgressEvent(overallPct, "FINISH: update process finished.");
             return;
         }
         subscribed.resize(returned);

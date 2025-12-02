@@ -265,7 +265,7 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 
 	DWORD waitTime = sCLI->IsaacWaitTime();
 	if (waitTime == 0) {
-		waitTime = 60000;
+		waitTime = 600000;
 	} else if (waitTime == -1) {
 		waitTime = INFINITE;
 	}
