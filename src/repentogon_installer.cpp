@@ -142,6 +142,8 @@ namespace Launcher {
 		}
 
 		PushNotification(false, "Sucessfully installed Repentogon\n");
+
+
 		Logger::Info("RepentogonInstaller::InstallRepentogonThread: successfully installed Repentogon\n");
 
 		_installationState.phase = REPENTOGON_INSTALLATION_PHASE_DONE;

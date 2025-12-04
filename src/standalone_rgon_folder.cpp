@@ -30,7 +30,7 @@ namespace standalone_rgon {
         "curl-ca-bundle.crt",
         "libcurl.dll",
         "Lua5.3.3f.dll",
-        "Lua5.3.3r.dll",
+        //"Lua5.3.3r.dll",
         "msvcp110.dll",
         "msvcr110.dll",
         "OpenAL32.dll",
@@ -1344,6 +1344,15 @@ namespace standalone_rgon {
                 "while copying files from %s to %s\n",
                 failcount, srcFolder.c_str(), dstFolder.c_str());
         }
+
+        //Rgon exe fuck tracking BEGIN
+        std::ofstream f(dstFolder + "/DONT RUN THE EXE DIRECTLY.txt", std::ios::trunc);
+        if (!f) {
+            return false;
+        }
+        f << "1"; //change this when a new fuck method exists....yes, I know I said I would only use it in the other line but.....I lied, its hardcoded because Im lazy, not because its only ever used once.
+        //Rgon exe fuck tracking END
+
 
         return failcount == 0;
     }

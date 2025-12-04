@@ -4,6 +4,9 @@
 #include "shared/logger.h"
 #include "shared/module.h"
 
+#include <iostream>
+#include <fstream>
+
 /* Array of all the names of files that must be found for the installation
  * to be considered a valid Repentogon installation.
  */
@@ -43,6 +46,23 @@ bool RepentogonInstallation::CheckHalfAssedPatch(std::string const& installation
 	return Filesystem::Exists(patchme.c_str()) || Filesystem::Exists(afterbirthpa.c_str()) || Filesystem::Exists(enumslua.c_str()) || Filesystem::Exists(jsonlua.c_str()) || Filesystem::Exists(mainlua.c_str());
 }
 
+
+
+bool RepentogonInstallation::CheckExeFuckMethod(std::string const& installationPath) {
+	std::ifstream f(installationPath + "DONT RUN THE EXE DIRECTLY.txt");
+	std::string content;
+
+	if (!f) {
+		return true;
+	}
+
+	std::getline(f, content);
+	if (content != "1") { //change this when we change the fuck method later, for now its 1, since its only eevr going top be used here, I just hardcoded it
+		return true;
+	}
+	return false;
+}
+
 bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	std::string repentogonFolder = installationFolder;
 	repentogonFolder += "/";
@@ -70,6 +90,19 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	if (CheckHalfAssedPatch(repentogonFolder)) {
 		return false;
 	}
+
+	if (CheckExeFuckMethod(repentogonFolder)) {
+		std::string luadllstr = repentogonFolder + "/Lua5.3.3r.dll"; //to fuck old versions, heh
+		std::string isaacexestr = repentogonFolder + "/isaac-ng.exe"; //to unfuck the exe
+		if (Filesystem::Exists(luadllstr.c_str())) {
+			Filesystem::RemoveFile(luadllstr.c_str());
+		}
+		if (Filesystem::Exists(isaacexestr.c_str())) {
+			Filesystem::RemoveFile(isaacexestr.c_str());
+		}
+		return false;
+	}
+
 
 	const char** mandatoryFile = mandatoryFileNames;
 	bool ok = true;

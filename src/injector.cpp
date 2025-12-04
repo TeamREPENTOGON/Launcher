@@ -80,7 +80,7 @@ DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* 
 	const char* currentDirectory = parent.c_str();
 
 	Logger::Info("Creating process with path %s, lpCurrentDirectory = %s\n", path, currentDirectory);
-
+	SetEnvironmentVariableA("LAUNCHED_BY_RGONLAUNCHER", "1");
 	DWORD result = CreateProcessA(path, (LPSTR)cli.c_str(), NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, filepath.parent_path().string().c_str(), &startupInfo, processInfo);
 	if (result == 0) {
 		Logger::Error("Failed to create process: %d\n", GetLastError());
@@ -210,12 +210,13 @@ static bool SanitizeRepentogonStartup(const char* path) {
 int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const* configuration,
 	HANDLE* outProcess, void** page, size_t* functionOffset, size_t* paramOffset,
 	PROCESS_INFORMATION* processInfo) {
+	/*
 	if (!isLegacy) {
 		if (!SanitizeRepentogonStartup(path)) {
 			return -1;
 		}
 	}
-
+	*/
 	Logger::Info("Starting injector\n");
 	DWORD processId = CreateIsaac(path, isLegacy, configuration, processInfo);
 	if (processId == 0) {

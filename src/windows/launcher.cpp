@@ -545,6 +545,14 @@ namespace Launcher {
 			if (exitCode != 0xFFFFFFFF) {
 				_logWindow.LogWarn("Game exited with error code %#lx (%s)\n", exitCode, desc.c_str());
 			}
+			if (exitCode == 0xc0000135) { //missing dll, the lua5.3.3r will be missing in older versions of rgon with potentially fucked exes by the old launcher practices
+				int res = wxMessageBox(
+					"This kind of error may indicate that you are missing an important RGON update!, make sure you are up to date! \n You can force an update in the Advanced Options screen.",
+					"Broken Repentogon Instalation. Outdated?",
+					wxOK | wxOK_DEFAULT | wxICON_ERROR,
+					this
+				);
+			}
 		} else {
 			_logWindow.LogInfo("Game sucessfully exited\n");
 		}

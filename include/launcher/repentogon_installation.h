@@ -79,6 +79,7 @@ public:
 
     bool Validate(std::string const& installationPath);
 	bool CheckHalfAssedPatch(std::string const& installationPath);
+	bool CheckExeFuckMethod(std::string const& installationPath);
 
 	inline RepentogonInstallationStatus GetState() const {
 		return _installationState;

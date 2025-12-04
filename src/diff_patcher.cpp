@@ -322,7 +322,7 @@ namespace diff_patcher {
                     std::string s = temporary.string();
                     bspatch_stream(originalStr.c_str(), patchStr.c_str(),
                         s.c_str());
-
+                    /* //No longer needed, keeping it just in case
                     if (const char* substring = strstr(s.c_str(), "isaac-ng.exe")) {
                         if (!strcmp(substring, "isaac-ng.exe.patched")) {
                             std::string path = temporary.string();
@@ -331,6 +331,7 @@ namespace diff_patcher {
                             PatchIsaacMain(buffer.data());
                         }
                     }
+                    */
                 } catch (std::exception& e) {
                     Logger::Error("PatchFolder: unable to apply patch for %s (%s)\n", name.c_str(),
                         e.what());
