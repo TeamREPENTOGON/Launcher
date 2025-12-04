@@ -57,7 +57,7 @@ namespace curl::detail {
 		result.code = curl_easy_perform(curl);
 		if (result.code != CURLE_OK) {
 			Logger::Error("DownloadAsString: %s: error while performing HTTP request: "
-				"cURL error: %s", url, curl_easy_strerror(result.code));
+				"cURL error: %s\n", url, curl_easy_strerror(result.code));
 			result.result = DOWNLOAD_STRING_BAD_REQUEST;
 			return result;
 		}
