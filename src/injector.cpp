@@ -314,6 +314,9 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 			if (!TerminateProcess(process, 0xFFFFFFFF)) {
 				gui->LogError("Unable to kill Isaac process: %d\n", GetLastError());
 			}
+			CloseHandle(processInfo.hThread);
+			CloseHandle(processInfo.hProcess);
+			CloseHandle(process);
 			return 0xFFFFFFFF;
 		}
 	}
@@ -323,6 +326,9 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 		Logger::Error("Failed to resume isaac-ng.exe main thread: %d\n", GetLastError());
 		gui->LogError("Game was unable to leave its suspended state, aborting launch\n");
 		TerminateProcess(process, 0xFFFFFFFF);
+		CloseHandle(processInfo.hThread);
+		CloseHandle(processInfo.hProcess);
+		CloseHandle(process);
 		return 0xFFFFFFFF;
 	} else {
 		Logger::Info("Resumed main thread of isaac-ng.exe, previous supend count was %d\n", result);
@@ -342,6 +348,7 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 
 	CloseHandle(processInfo.hProcess);
 	CloseHandle(processInfo.hThread);
+	CloseHandle(process);
 
 	return exitCode;
 }
