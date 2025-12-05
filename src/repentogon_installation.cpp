@@ -94,9 +94,9 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	if (CheckExeFuckMethod(repentogonFolder)) {
 		std::string luadllstr = repentogonFolder + "/Lua5.3.3r.dll"; //to fuck old versions, heh
 		std::string isaacexestr = repentogonFolder + "/isaac-ng.exe"; //to unfuck the exe
-		if (Filesystem::Exists(luadllstr.c_str())) {
-			Filesystem::RemoveFile(luadllstr.c_str());
-		}
+		//if (Filesystem::Exists(luadllstr.c_str())) {
+			//Filesystem::RemoveFile(luadllstr.c_str());
+		//}
 		if (Filesystem::Exists(isaacexestr.c_str())) {
 			Filesystem::RemoveFile(isaacexestr.c_str());
 		}
