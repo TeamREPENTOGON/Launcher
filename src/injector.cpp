@@ -223,7 +223,7 @@ int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const*
 		return -1;
 	}
 
-	HANDLE process = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
+	HANDLE process = OpenProcess(PROCESS_CREATE_THREAD | PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ,
 		FALSE, processInfo->dwProcessId);
 	if (!process) {
 		Logger::Error("Failed to open process: %d\n", GetLastError());
@@ -272,10 +272,13 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	}
 
 	DWORD result = WaitForSingleObject(remoteThread, waitTime);
+	DWORD threadCode = 0;
 	switch (result) {
-	case WAIT_OBJECT_0:
-		Logger::Info("RemoteThread completed\n");
+	case WAIT_OBJECT_0: {
+		GetExitCodeThread(remoteThread, &threadCode);
+		Logger::Info("RemoteThread completed with exit code %d\n", threadCode);
 		break;
+	}
 
 	case WAIT_ABANDONED:
 		Logger::Warn("This shouldn't happened: RemoteThread returned WAIT_ABANDONNED\n");
@@ -290,7 +293,7 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 		return -1;
 	}
 
-	return 0;
+	return threadCode;
 }
 
 DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
@@ -308,6 +311,12 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 	if (configuration->IsaacLaunchMode() == LAUNCH_MODE_REPENTOGON) {
 		if (CreateAndWait(process, remotePage, functionOffset, paramOffset)) {
 			gui->LogError("Error encountered while injecting Repentogon, check log files\n");
+			if (!TerminateProcess(process, 0xFFFFFFFF)) {
+				gui->LogError("Unable to kill Isaac process: %d\n", GetLastError());
+			}
+			CloseHandle(processInfo.hThread);
+			CloseHandle(processInfo.hProcess);
+			CloseHandle(process);
 			return 0xFFFFFFFF;
 		}
 	}
@@ -316,6 +325,10 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 	if (result == -1) {
 		Logger::Error("Failed to resume isaac-ng.exe main thread: %d\n", GetLastError());
 		gui->LogError("Game was unable to leave its suspended state, aborting launch\n");
+		TerminateProcess(process, 0xFFFFFFFF);
+		CloseHandle(processInfo.hThread);
+		CloseHandle(processInfo.hProcess);
+		CloseHandle(process);
 		return 0xFFFFFFFF;
 	} else {
 		Logger::Info("Resumed main thread of isaac-ng.exe, previous supend count was %d\n", result);
@@ -335,6 +348,7 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 
 	CloseHandle(processInfo.hProcess);
 	CloseHandle(processInfo.hThread);
+	CloseHandle(process);
 
 	return exitCode;
 }
