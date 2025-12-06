@@ -28,11 +28,11 @@ namespace Launcher {
 	// 	}
 	// }
 
-	void LaunchCountdownWindow::OnCancelButtonClick(wxCommandEvent& event) {
+	void LaunchCountdownWindow::OnCancelButtonClick(wxCommandEvent&) {
 		EndModal(wxID_CANCEL);
 	}
 
-	void LaunchCountdownWindow::OnProgressTimer(wxTimerEvent& event) {
+	void LaunchCountdownWindow::OnProgressTimer(wxTimerEvent&) {
 		if (--_countdownSeconds <= 0) {
 			EndModal(wxID_OK);
 		} else {
@@ -40,7 +40,7 @@ namespace Launcher {
 		}
 	}
 
-	void LaunchCountdownWindow::OnUpdate(wxUpdateUIEvent& event) {
+	void LaunchCountdownWindow::OnUpdate(wxUpdateUIEvent&) {
 		SetFocus();
 	}
 
@@ -80,10 +80,10 @@ namespace Launcher {
 		mainSizer->Add(panel, 1, wxEXPAND);
 		mainSizer->Add(panel2, 0, wxEXPAND);
 
-		this->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) { EndModal(wxID_CANCEL); });
-		_text->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) { EndModal(wxID_CANCEL); });		
-		panel->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) { EndModal(wxID_CANCEL); });
-		panel2->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent& event) { EndModal(wxID_CANCEL); });
+		this->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent&) { EndModal(wxID_CANCEL); });
+		_text->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent&) { EndModal(wxID_CANCEL); });
+		panel->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent&) { EndModal(wxID_CANCEL); });
+		panel2->Bind(wxEVT_LEFT_DOWN, [this](wxMouseEvent&) { EndModal(wxID_CANCEL); });
 
 		SetSizerAndFit(mainSizer);
 		CenterOnScreen();

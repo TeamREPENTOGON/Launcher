@@ -382,7 +382,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) 
 	if (!urlGiven) {
 		// An appropriate update is available. Prompt the user about it.
 		const std::string updatePrompt = (std::ostringstream() << "An update is available for the launcher.\n" <<
-			"It will update from version " << Launcher::version << " to version " << version << ".\n\n" <<
+			"It will update from version " << Launcher::LAUNCHER_VERSION << " to version " << version << ".\n\n" <<
 			"Do you want to update now?").str();
 
 		int updatePromptResult = MessageBoxA(NULL, updatePrompt.c_str(), UpdaterProcessName, MB_ICONINFORMATION | MB_YESNO);

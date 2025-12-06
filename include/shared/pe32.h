@@ -7,7 +7,7 @@
 
 #include "shared/unique_free_ptr.h"
 
-#pragma pack(1)
+#pragma pack(push, 1)
 struct COFFHeader {
 	uint16_t Machine;
 	uint16_t NumberOfSections;
@@ -17,10 +17,11 @@ struct COFFHeader {
 	uint16_t SizeOfOptionalHeader;
 	uint16_t Characteristics;
 };
+#pragma pack(pop)
 
 static_assert(sizeof(COFFHeader) == 20);
 
-#pragma pack(1)
+#pragma pack(push, 1)
 struct SectionHeader {
 	char Name[8];
 	uint32_t VirtualSize;
@@ -33,6 +34,7 @@ struct SectionHeader {
 	uint16_t NumberOfLineNumbers;
 	uint32_t Characteristics;
 };
+#pragma pack(pop)
 
 static_assert(sizeof(SectionHeader) == 40);
 

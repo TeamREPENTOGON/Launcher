@@ -95,8 +95,10 @@ void RepentogonInstallerFrame::OnRepentogonInstalled(bool completed,
 	if (!_wasinstalled && (result == Launcher::RepentogonInstaller::DOWNLOAD_INSTALL_REPENTOGON_OK))
 	{
 		_wasinstalled = true;
-		int res = wxMessageBox(
-			"REPENTOGON has successfully installed!\nTake in mind that it runs on an older version of REP+, which means it may miss some features. But remember you can still launch in Vanilla mode on the latest version if needed, both versions exist simultanously! ",
+		wxMessageBox(
+			"REPENTOGON has been successfully installed!\n"
+			"Take in mind that it runs on an older version of REP+, which means it may miss some features.\n"
+			"Remember you can still launch in Vanilla mode on the latest version if needed, both versions exist simultaneously!",
 			"Sucessfully installed REPENTOGON",
 			wxOK | wxOK_DEFAULT | wxICON_INFORMATION,
 			this

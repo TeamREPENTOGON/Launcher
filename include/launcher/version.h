@@ -1,5 +1,5 @@
 #pragma once
 
 namespace Launcher {
-	extern const char* version;
+	extern const char* LAUNCHER_VERSION;
 }

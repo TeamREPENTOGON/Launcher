@@ -227,7 +227,7 @@ namespace diff_patcher {
             }
 
             return true;
-        } catch (std::runtime_error const& e) {
+        } catch (std::runtime_error const&) {
             Logger::Error("diff_patcher::PatchIsaacMain: error while processing %s as a PE executable\n", file);
             return false;
         }

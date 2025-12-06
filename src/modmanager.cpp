@@ -64,7 +64,7 @@ void ModManagerFrame::OnHover(wxMouseEvent& event) {
     int y = event.GetY();
 
     long pos;
-    if (extraInfoCtrl->HitTest(wxPoint(x, y), &pos) == wxRICHTEXT_HITTEST_NONE) {
+    if (extraInfoCtrl->HitTest(wxPoint(x, y), &pos) == wxTE_HT_BELOW) {
         if (!lastTip.IsEmpty()) {
             extraInfoCtrl->UnsetToolTip();
             lastTip.clear();
@@ -335,7 +335,7 @@ std::string GetThumbnailURL(const std::string& itemId) {
 
         curl::SetupProxyForCurl(curl);
 
-        CURLcode res = curl_easy_perform(curl);
+        curl_easy_perform(curl);
         curl_easy_cleanup(curl);
     }
 
@@ -408,7 +408,7 @@ bool LoadImageQuietly(const std::string& path, wxImage& img) {
     wxLogNull noLog;
 
     fflush(stderr);
-    int originalStderrFd = dup(fileno(stderr));
+    int originalStderrFd = _dup(_fileno(stderr));
     if (originalStderrFd == -1) {
         return img.LoadFile(path, wxBITMAP_TYPE_ANY) && img.IsOk();
     }
@@ -418,20 +418,19 @@ bool LoadImageQuietly(const std::string& path, wxImage& img) {
     FILE* nullFile = freopen("/dev/null", "w", stderr);
 #endif
     if (!nullFile) {
-        dup2(originalStderrFd, fileno(stderr));
-        close(originalStderrFd);
+        _dup2(originalStderrFd, _fileno(stderr));
+        _close(originalStderrFd);
         return img.LoadFile(path, wxBITMAP_TYPE_ANY) && img.IsOk();
     }
     bool loaded = img.LoadFile(path, wxBITMAP_TYPE_ANY) && img.IsOk();
     fflush(stderr);
-    dup2(originalStderrFd, fileno(stderr));
-    close(originalStderrFd);
+    _dup2(originalStderrFd, _fileno(stderr));
+    _close(originalStderrFd);
 
     return loaded;
 }
 
 bool HasChildNodesFromXML(fs::path xml, const std::string& daddy, const std::string& child = "") {
-    int count = 0;
     try {
     if (fs::exists(xml)) {
         rapidxml::file<> xmlFile(xml.string().c_str());
@@ -515,7 +514,7 @@ void ModManagerFrame::LoadModExtraData() {
             selectedMod.extradata.Pills        = selectedMod.extradata.Pills      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems","pill");
         }
         selectedMod.extradata.lua = fs::exists(fs::path(_modspath / selectedMod.folderName / "main.lua"));
-        
+
         checks = 0;
         if (fs::exists(fs::path(_modspath / selectedMod.folderName / "resources-dlc3"))) {
             checks++;
@@ -531,7 +530,7 @@ void ModManagerFrame::LoadModExtraData() {
             selectedMod.extradata.resourceChallenges   = selectedMod.extradata.resourceChallenges || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "challenges.xml"));
             selectedMod.extradata.resourceCards        = selectedMod.extradata.resourceCards      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
             selectedMod.extradata.resourcePills        = selectedMod.extradata.resourcePills      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
-            selectedMod.extradata.anm2                 = selectedMod.extradata.anm2               || HasAnm2File(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx")); 
+            selectedMod.extradata.anm2                 = selectedMod.extradata.anm2               || HasAnm2File(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"));
             selectedMod.extradata.sprites              = selectedMod.extradata.sprites            || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"), ".png");
             selectedMod.extradata.resourceMinor        = selectedMod.extradata.resourceMinor      || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i]), ".xml");
 
@@ -557,7 +556,7 @@ void ModManagerFrame::LoadModExtraData() {
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
     else if (selectedMod.extradata.resourceMinor){
-        style.SetBackgroundColour(wxColor("Grey")); 
+        style.SetBackgroundColour(wxColor("Grey"));
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->BeginURL("Not too bad on this case, but could still be bad for compat");
         extraInfoCtrl->WriteText(wxString::FromUTF8("<XML REPLACEMENTS>"));
@@ -600,7 +599,7 @@ void ModManagerFrame::LoadModExtraData() {
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
 
-    if (selectedMod.extradata.Items > 0) { 
+    if (selectedMod.extradata.Items) {
         style.SetBackgroundColour(wxColor(82, 235, 5)); //barf green
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Items>"));
@@ -608,7 +607,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    if (selectedMod.extradata.Trinkets > 0) {
+    if (selectedMod.extradata.Trinkets) {
         style.SetBackgroundColour(wxColor(255, 207, 2)); //GOLD
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->WriteText(wxString::FromUTF8("<Trinkets>"));
@@ -657,7 +656,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    
+
     if (selectedMod.extradata.cutscenes) {
         style.SetBackgroundColour(wxColor(136, 42, 245)); //the man who slaughers or some shit, I didnt play fnaf!
         extraInfoCtrl->BeginStyle(style);
@@ -856,7 +855,7 @@ void ModManagerFrame::OnSelectMod(ModInfo mod) {
                                         wxQueueEvent(this, evt);
                                     }
                                 }
-                                
+
                         }
                         }
                         catch (...) {} //dont give a shit, this is not critical at all

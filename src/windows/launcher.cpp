@@ -314,7 +314,7 @@ namespace Launcher {
 		modWindow->Show();
 	}
 
-	void LauncherMainWindow::OnChangeOptions(wxCommandEvent& event) {
+	void LauncherMainWindow::OnChangeOptions(wxCommandEvent&) {
 		GameOptions opts;
 		opts.Load(fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/options.ini");
 
@@ -361,7 +361,7 @@ namespace Launcher {
 		UpdateLaunchButtonEnabledState();
 	}
 
-	
+
 
 	void LauncherMainWindow::OnOptionSelected(wxCommandEvent& event) {
 		wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
@@ -472,12 +472,12 @@ namespace Launcher {
 		}
 
 		_logWindow.Log("Launching the game with the following options:");
-		_logWindow.Log("\REPENTOGON:");
+		_logWindow.Log("\tREPENTOGON:");
 		bool launchingVanilla = _configuration->IsaacLaunchMode() == LAUNCH_MODE_VANILLA;
 		if (launchingVanilla) {
-			_logWindow.Log("\t\REPENTOGON is disabled");
+			_logWindow.Log("\t\tREPENTOGON is disabled");
 		} else {
-			_logWindow.Log("\t\REPENTOGON is enabled");
+			_logWindow.Log("\t\tREPENTOGON is enabled");
 			_logWindow.Log("\t\tEnable REPENTOGON console window: %s", _configuration->RepentogonConsole() ? "yes" : "no");
 		}
 		_logWindow.Log("\tVanilla:");
@@ -546,8 +546,9 @@ namespace Launcher {
 				_logWindow.LogWarn("Game exited with error code %#lx (%s)\n", exitCode, desc.c_str());
 			}
 			if (exitCode == 0xc0000135) { //missing dll, the lua5.3.3r will be missing in older versions of rgon with potentially fucked exes by the old launcher practices
-				int res = wxMessageBox(
-					"This kind of error may indicate that you are missing an important RGON update!, make sure you are up to date! \n You can force an update in the Advanced Options screen.",
+				wxMessageBox(
+					"This kind of error may indicate that you are missing an important RGON update! Make sure you are up to date!\n"
+					"You can force an update in the Advanced Options screen.",
 					"Broken Repentogon Instalation. Outdated?",
 					wxOK | wxOK_DEFAULT | wxICON_ERROR,
 					this
@@ -693,7 +694,7 @@ namespace Launcher {
 			"Unstable launcher version", wxCENTER | wxICON_WARNING);
 		LogWarn("Running an unstable version of the launcher");
 #endif */
-		_logWindow.Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::version);
+		_logWindow.Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::LAUNCHER_VERSION);
 		std::string currentDir = Filesystem::GetCurrentDirectory_();
 		_logWindow.Log("Current directory is: %s", currentDir.c_str());
 		_logWindow.Log("Using configuration file %s\n", LauncherConfiguration::GetConfigurationPath());
@@ -958,10 +959,10 @@ namespace Launcher {
 			break;
 		}
 	}
-	
+
 	void LauncherMainWindow::OnAdvancedModOptionsClick(wxCommandEvent&) {
 		AdvancedModOptionsWindow window(this);
-		int result = window.ShowModal();
+		window.ShowModal();
 		window.luaheapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
 		window.luaDebug->Enable(!_configuration->LuaDebugHasOverride());
 	}

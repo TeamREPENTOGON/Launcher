@@ -196,7 +196,7 @@ namespace Updater {
 		LauncherUpdateData updateData;
 		bool downloadResult = DownloadUpdate(&updateData);
 
-		_gui->Log("Update scheduled from version %s to version %s\n", Launcher::version, _updater.GetReleaseInfo()["name"].GetString());
+		_gui->Log("Update scheduled from version %s to version %s\n", Launcher::LAUNCHER_VERSION, _updater.GetReleaseInfo()["name"].GetString());
 
 		if (!PostDownloadChecks(downloadResult, &updateData)) {
 			_gui->LogError("Error while downloading release\n");

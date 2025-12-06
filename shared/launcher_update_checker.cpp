@@ -50,7 +50,7 @@ namespace Shared {
 
 		//GitLab Barrier
 		if (!force && !ShouldDoTimeBasedGitLabSkip()) {
-			if (RemoteGitLabVersionMatches("versionlauncher", Launcher::version)) {
+			if (RemoteGitLabVersionMatches("versionlauncher", Launcher::LAUNCHER_VERSION)) {
 				*fetchReleasesResult = curl::DownloadStringResult::DOWNLOAD_STRING_OK; //I would call this up a level so I dont have to do this hacky, but here is more convenient because I have some things already pre-chewed
 				return false;
 			}
@@ -64,7 +64,7 @@ namespace Shared {
 		}
 
 		_hasRelease = true;
-		return SelectTargetRelease(_releasesInfo, allowDrafts, force, version, url) && strcmp(::Launcher::version, version.c_str());
+		return SelectTargetRelease(_releasesInfo, allowDrafts, force, version, url) && strcmp(::Launcher::LAUNCHER_VERSION, version.c_str());
 	}
 
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,

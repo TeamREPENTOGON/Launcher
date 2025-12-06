@@ -31,7 +31,7 @@ namespace Launcher {
 
 			std::ostringstream stream;
 			stream << "A new version of the launcher is available (" <<
-				Launcher::version << " -> " << version << ").\n" <<
+				Launcher::LAUNCHER_VERSION << " -> " << version << ").\n" <<
 				"Do you want to update the launcher ?";
 			int msgResult = wxMessageBox(stream.str(), "New launcher release available",
 				wxYES_NO, &dialog);

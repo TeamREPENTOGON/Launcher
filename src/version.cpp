@@ -4,8 +4,8 @@ namespace Launcher {
 
 #ifndef CMAKE_LAUNCHER_VERSION
 #pragma message("CMAKE_LAUNCHER_VERSION undefined")
-	const char* version = "dev";
+	const char* LAUNCHER_VERSION = "dev";
 #else
-	const char* version = CMAKE_LAUNCHER_VERSION;
+	const char* LAUNCHER_VERSION = CMAKE_LAUNCHER_VERSION;
 #endif
 }
