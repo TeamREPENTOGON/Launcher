@@ -15,4 +15,8 @@ namespace standalone_rgon {
         std::filesystem::path& result, bool strict);
 
     bool IsStandaloneFolder(const std::string& path);
+    bool CreateFuckMethodFile(std::string const& base, uint32_t method);
+
+    extern uint32_t REPENTOGON_FUCK_METHOD;
+    extern std::string REPENTOGON_FUCK_METHOD_FILE;
 }

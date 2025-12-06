@@ -21,6 +21,9 @@
 #include <wx/stattext.h>
 
 namespace standalone_rgon {
+    uint32_t REPENTOGON_FUCK_METHOD = 2;
+    std::string REPENTOGON_FUCK_METHOD_FILE = "DONT RUN THE EXE DIRECTLY.txt";
+
     /* Mostly grabbed from https://steamdb.info/depot/3353471 then filled in
      * what came from a previous depot manually, if new files are added in new
      * versions, we will need to add them here, if shit is removed, its fine...
@@ -1271,6 +1274,21 @@ namespace standalone_rgon {
 
     namespace fs = std::filesystem; //so I dont go insane
 
+    bool CreateFuckMethodFile(std::string const& base, uint32_t method) {
+        std::ostringstream stream;
+        stream << base << "/" << REPENTOGON_FUCK_METHOD_FILE;
+
+        std::ofstream f(stream.str(), std::ios::trunc);
+        if (!f) {
+            return false;
+        }
+
+        f << method;
+        f.close();
+
+        return true;
+    }
+
     bool CreateSteamAppIDFile(const std::string& targetPath) {
         std::ofstream outFile(targetPath + "/steam_appid.txt");
         if (!outFile.good()) {
@@ -1344,15 +1362,6 @@ namespace standalone_rgon {
                 "while copying files from %s to %s\n",
                 failcount, srcFolder.c_str(), dstFolder.c_str());
         }
-
-        //Rgon exe fuck tracking BEGIN
-        std::ofstream f(dstFolder + "/DONT RUN THE EXE DIRECTLY.txt", std::ios::trunc);
-        if (!f) {
-            return false;
-        }
-        f << "1"; //change this when a new fuck method exists....yes, I know I said I would only use it in the other line but.....I lied, its hardcoded because Im lazy, not because its only ever used once.
-        //Rgon exe fuck tracking END
-
 
         return failcount == 0;
     }

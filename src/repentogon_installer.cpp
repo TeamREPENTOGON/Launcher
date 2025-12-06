@@ -117,6 +117,11 @@ namespace Launcher {
 					return false;
 				}
 
+				if (!standalone_rgon::CreateFuckMethodFile(outputDir, standalone_rgon::REPENTOGON_FUCK_METHOD)) {
+					Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create Repentogon fuck method file\n");
+					_installationState.result = REPENTOGON_INSTALLATION_RESULT_FUCK_METHOD;
+				}
+
 				if (!standalone_rgon::CreateSteamAppIDFile(outputDir)) {
 					Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to create steam_appid.txt\n");
 					_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID;
@@ -693,7 +698,7 @@ namespace Launcher {
 
 				return Github::ValidateReleaseInfo(*descriptor, response, nullptr);
 			}
-			
+
 			auto releases = asJson.GetArray();
 			if (releases.Empty()) {
 				Logger::Error("Trying to download a new Repentogon release, but none available\n");
@@ -703,8 +708,8 @@ namespace Launcher {
 			if (!releases[0].HasMember("url") || !releases[0]["url"].IsString()) {
 				Logger::Error("Trying to download a new Repentogon release, but you ran out of requests! (try again next hour!)\n");
 				return Github::RELEASE_INFO_JSON_ERROR;
-			} 
-			
+			}
+
 			curl::DownloadMonitor monitor;
 			request.url = releases[0]["url"].GetString();
 			std::shared_ptr<curl::AsynchronousDownloadStringDescriptor> releasesDesc =

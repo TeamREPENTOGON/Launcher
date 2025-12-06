@@ -1,4 +1,5 @@
 #include "launcher/repentogon_installation.h"
+#include "launcher/standalone_rgon_folder.h"
 #include "shared/scoped_module.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
@@ -46,18 +47,19 @@ bool RepentogonInstallation::CheckHalfAssedPatch(std::string const& installation
 	return Filesystem::Exists(patchme.c_str()) || Filesystem::Exists(afterbirthpa.c_str()) || Filesystem::Exists(enumslua.c_str()) || Filesystem::Exists(jsonlua.c_str()) || Filesystem::Exists(mainlua.c_str());
 }
 
-
-
 bool RepentogonInstallation::CheckExeFuckMethod(std::string const& installationPath) {
-	std::ifstream f(installationPath + "DONT RUN THE EXE DIRECTLY.txt");
-	std::string content;
+	std::ostringstream stream;
+	stream << installationPath << "/" << standalone_rgon::REPENTOGON_FUCK_METHOD_FILE;
+	std::ifstream f(stream.str());
 
 	if (!f) {
 		return true;
 	}
 
-	std::getline(f, content);
-	if (content != "1") { //change this when we change the fuck method later, for now its 1, since its only eevr going top be used here, I just hardcoded it
+	uint32_t method;
+	f >> method;
+
+	if (method != standalone_rgon::REPENTOGON_FUCK_METHOD) {
 		return true;
 	}
 	return false;

@@ -51,6 +51,8 @@ namespace Launcher {
 		REPENTOGON_INSTALLATION_RESULT_NO_MARKER,
 		/* Update failed: failed to copy Isaac files. */
 		REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_COPY,
+		/* Update failed: unable to create fuck method file. */
+		REPENTOGON_INSTALLATION_RESULT_FUCK_METHOD,
 		/* Update failed: failed to create steam_appid.txt. */
 		REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID,
 		/* Update failed: failed to patch Isaac files. */
