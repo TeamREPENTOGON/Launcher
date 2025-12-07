@@ -2,6 +2,10 @@
 #include <Windows.h>
 #include <io.h>
 
+#include <cassert>
+
+#include <map>
+#include <set>
 #include <stdexcept>
 
 #include "shared/pe32.h"
@@ -9,6 +13,7 @@
 
 PE32::PE32(const char* filename) : _filename(filename) {
     Validate(filename);
+	Map();
 }
 
 PE32::~PE32() {
@@ -147,9 +152,90 @@ void PE32::Validate(const char* filename) {
 	if (size < minSize)
 		throw std::runtime_error("PE32: provided executable too short (malformed optional header)");
 
+	_optionalHeader = (OptionalHeader*)(content + *peOffsetAddr + sizeof(uint32_t) + sizeof(COFFHeader));
 	_sections = (SectionHeader*)(content + minSize);
 
 	minSize += _coffHeader->NumberOfSections * sizeof(SectionHeader);
 	if (size < minSize)
 		throw std::runtime_error("PE32: provided executable too short (malformed section table)");
+}
+
+struct SectionHeaderComparator {
+	bool operator()(SectionHeader* lhs, SectionHeader* rhs) const {
+		return lhs->VirtualAddress < rhs->VirtualAddress;
+	}
+};
+
+void PE32::Map() {
+	/* Compute the size of the headers on the disk.
+	 * Also compute the necessary padding.
+	 */
+	uint32_t lowOffset = 0xFFFFFFFF;
+	uint32_t lowVA = 0xFFFFFFFF;
+	for (int i = 0; i < _coffHeader->NumberOfSections; ++i) {
+		lowOffset = std::min(lowOffset, _sections[i].PointerToRawData);
+		lowVA = std::min(lowVA, _sections[i].VirtualAddress);
+	}
+
+	std::set<SectionHeader*, SectionHeaderComparator> sections;
+	std::map<SectionHeader*, uint32_t> trueSize;
+	/* Total size of the executable in memory, including padding for sections. */
+	uint32_t size = lowVA;
+	for (int i = 0; i < _coffHeader->NumberOfSections; ++i) {
+		sections.insert(_sections + i);
+		uint32_t sectionSize = _sections[i].VirtualSize;
+		uint32_t alignment = _optionalHeader->SectionAlignment;
+		if (sectionSize % alignment) {
+			sectionSize = ((sectionSize + alignment - 1) / alignment) * alignment;
+		}
+		trueSize.insert(std::make_pair(_sections + i, sectionSize));
+		size += sectionSize;
+	}
+
+	char* raw = _content.get();
+	char* data = (char*)calloc(1, size);
+	if (!data) {
+		return;
+	}
+
+	char* orig = data;
+	_memoryContent.reset(data);
+
+	if ((lowOffset - 1) > size) {
+		_memoryContent.release();
+		assert(false && "lowOffset overrides size");
+		return;
+	}
+
+	memcpy(data, raw, lowOffset - 1);
+	data += lowVA;
+
+	if ((data - orig) > size) {
+		_memoryContent.release();
+		assert(false && "lowVA overrides size");
+		return;
+	}
+
+	for (SectionHeader* section : sections) {
+		memcpy(data, raw + section->PointerToRawData, section->SizeOfRawData);
+		data += trueSize[section];
+
+		if ((data - orig) > size) {
+			_memoryContent.release();
+			assert(false && "section size overrides total size");
+			return;
+		}
+	}
+}
+
+const char* PE32::RVA(uint32_t rva, const char* base) {
+	if (!_memoryContent) {
+		return base;
+	}
+
+	if (!base) {
+		base = _memoryContent.get();
+	}
+
+	return base + rva;
 }
