@@ -1,5 +1,10 @@
+#include <WinSock2.h>
+#include <Windows.h>
+#include <io.h>
+
 #include "launcher/repentogon_installation.h"
 #include "launcher/standalone_rgon_folder.h"
+#include "shared/pe32.h"
 #include "shared/scoped_module.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
@@ -53,16 +58,105 @@ bool RepentogonInstallation::CheckExeFuckMethod(std::string const& installationP
 	std::ifstream f(stream.str());
 
 	if (!f) {
-		return true;
+		return false;
 	}
 
 	uint32_t method;
 	f >> method;
 
 	if (method != standalone_rgon::REPENTOGON_FUCK_METHOD) {
-		return true;
+		return false;
 	}
+
+	return ValidateFuckMethod(installationPath);
+}
+
+bool RepentogonInstallation::ValidateFuckMethod(std::string const& installationFolder) {
+	std::filesystem::path p(installationFolder);
+	p /= "Lua5.3.3r.dll";
+
+	std::string asString = p.string();
+	const char* path = asString.c_str();
+	if (!std::filesystem::exists(p)) {
+		Logger::Error("RepentogonInstallation::ValidateFuckMethod: %s does not exist\n", path);
+		return false;
+	}
+
+	PE32 pe(path);
+	ExportDirectoryTable* edt = (ExportDirectoryTable*)pe.RVA(pe.GetOptionalHeader()->ExportTable.VirtualAddress);
+	uint32_t* namesPtr = (uint32_t*)pe.RVA(edt->NamePointerRVA);
+	for (uint32_t i = 0; i < edt->NumberOfNamePointers; ++i) {
+		const char* name = pe.RVA(namesPtr[i]);
+		if (!strcmp(name, "LUA_REPENTOGON")) {
+			return true;
+		}
+	}
+
 	return false;
+}
+
+void RepentogonInstallation::InvalidateRepentogonExecutable(std::string const& executable) {
+	Logger::Info("Invalidating Repentogon executable %s\n", executable.c_str());
+	std::filesystem::path p(executable);
+	if (!std::filesystem::exists(p)) {
+		Logger::Error("Unable to invalidate executable: does not exist\n");
+		return;
+	}
+
+	std::string asString = p.string();
+	const char* path = asString.c_str();
+	FILE* file = fopen(path, "rb");
+	if (!file) {
+		Logger::Error("Unable to invalidate executable: unable to open\n");
+		return;
+	}
+
+	DWORD highOrder = 0;
+	HANDLE exeHandle = (HANDLE)_get_osfhandle(_fileno(file));
+	DWORD size = GetFileSize(exeHandle, &highOrder);
+
+	if (highOrder != 0 || size < PE32::PE_SIGNATURE_OFFSET + 4) {
+		Logger::Error("Unable to invalidate executable: invalid size\n");
+		fclose(file);
+		return;
+	}
+
+	char* content = (char*)calloc(1, size);
+	if (!content) {
+		Logger::Error("Unable to invalidate executable: no memory\n");
+		fclose(file);
+		return;
+	}
+
+	fread(content, size, 1, file);
+	fclose(file);
+
+	uint32_t offset = *(uint32_t*)(content + PE32::PE_SIGNATURE_OFFSET);
+	if ((offset + 2) > size) {
+		Logger::Error("Unable to invalidate executable: malformed headers\n");
+		free(content);
+		return;
+	}
+
+	char* pe = content + offset;
+	if (pe[0] != 'P' || pe[1] != 'E') {
+		Logger::Error("Unable to invalidate executable: invalid PE signature\n");
+		free(content);
+		return;
+	}
+
+	pe[0] = pe[1] = 0;
+	file = fopen(path, "wb");
+	if (!file) {
+		Logger::Warn("Unable to invalidate executable: cannot open to write, removing instead\n");
+		std::filesystem::remove(p);
+		free(content);
+		return;
+	}
+
+	fwrite(content, size, 1, file);
+	fclose(file);
+	free(content);
 }
 
 bool RepentogonInstallation::Validate(std::string const& installationFolder) {
@@ -93,18 +187,11 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 		return false;
 	}
 
-	if (CheckExeFuckMethod(repentogonFolder)) {
-		std::string luadllstr = repentogonFolder + "/Lua5.3.3r.dll"; //to fuck old versions, heh
-		std::string isaacexestr = repentogonFolder + "/isaac-ng.exe"; //to unfuck the exe
-		//if (Filesystem::Exists(luadllstr.c_str())) {
-			//Filesystem::RemoveFile(luadllstr.c_str());
-		//}
-		if (Filesystem::Exists(isaacexestr.c_str())) {
-			Filesystem::RemoveFile(isaacexestr.c_str());
-		}
+	if (!CheckExeFuckMethod(repentogonFolder)) {
+		_gui->LogError("The Repentogon installation is not protected against non launcher runs\n");
+		InvalidateRepentogonExecutable(repentogonFolder + "isaac-ng.exe");
 		return false;
 	}
-
 
 	const char** mandatoryFile = mandatoryFileNames;
 	bool ok = true;

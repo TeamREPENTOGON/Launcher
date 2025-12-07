@@ -62,8 +62,6 @@ namespace Launcher {
 		return result;
 	}
 
-	
-
 	bool Installation::CheckRepentogonInstallation() {
 		if (!_isaacInstallation.GetMainInstallation().IsValid()) {
 			_repentogonInstallation.Invalidate();

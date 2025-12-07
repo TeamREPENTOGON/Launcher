@@ -131,6 +131,9 @@ public:
 private:
 	void Invalidate();
 
+	bool ValidateFuckMethod(std::string const& installationFolder);
+	void InvalidateRepentogonExecutable(std::string const& path);
+
 	/* Load a library that has an entry in the _dllStates array.
      *
 	 * Returns the result of loading the library. If the load is successful,
