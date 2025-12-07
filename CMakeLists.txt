@@ -82,6 +82,11 @@ target_include_directories (REPENTOGONLauncher PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/chained_futures/include"
 )
 target_compile_definitions (REPENTOGONLauncher PRIVATE NOMINMAX UNICODE INI_SHARED_LIB "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
+
+if (CMAKE_LAUNCHER_FORCE_UNSTABLE)
+  target_compile_definitions (REPENTOGONLauncher PRIVATE LAUNCHER_FORCE_UNSTABLE)
+endif()
+
 target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch steamapi Winhttp)
 add_custom_command(
     TARGET REPENTOGONLauncher POST_BUILD

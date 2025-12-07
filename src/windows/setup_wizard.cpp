@@ -194,6 +194,11 @@ void LauncherWizard::AddRepentogonSetupPage() {
         LAUNCHER_WIZARD_CONTROL_UNSTABLE_UPDATES_CHECKBOX,
         "Unstable releases (not recommended)");
 
+#ifdef LAUNCHER_FORCE_UNSTABLE
+    unstableUpdates->SetValue(true);
+    unstableUpdates->Disable();
+#endif
+
     wxSizer* automaticUpdatesSizer = new wxBoxSizer(wxHORIZONTAL);
     automaticUpdatesSizer->Add(automaticUpdates);
     wxStaticBitmap* automaticUpdatesBitmap = new wxStaticBitmap(page, wxID_ANY, _questionMarkBitmap);
@@ -248,8 +253,10 @@ void LauncherWizard::ConfigureRepentogonSetupPage() {
     _repentogonSetup._autoUpdates->SetValue(_configuration->AutomaticUpdates());
     _repentogonSetup._autoUpdates->Enable(!_configuration->AutomaticUpdatesHasOverride());
 
+#ifndef LAUNCHER_FORCE_UNSTABLE
     _repentogonSetup._unstableUpdates->SetValue(_configuration->UnstableUpdates());
     _repentogonSetup._unstableUpdates->Enable(!_configuration->UnstableUpdatesHasOverride());
+#endif
 
     UpdateRepentogonSetupWarningText();
 }

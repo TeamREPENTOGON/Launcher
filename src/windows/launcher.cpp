@@ -273,6 +273,11 @@ namespace Launcher {
 		_console->SetValue(false);
 
 		_unstableRepentogon = new wxCheckBox(repentogonBox, WINDOW_CHECKBOX_REPENTOGON_UNSTABLE_UPDATES, "Upgrade to unstable versions");
+
+#ifdef LAUNCHER_FORCE_UNSTABLE
+		_unstableRepentogon->SetValue(true);
+		_unstableRepentogon->Disable();
+#else
 		_unstableRepentogon->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
 			if (_unstableRepentogon->IsChecked()) {
 				_unstableRepentogon->SetValue(false);
@@ -291,6 +296,7 @@ namespace Launcher {
 			event.Skip();
 		});
 		_unstableRepentogon->SetValue(false);
+#endif
 
 		_advancedOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
 
@@ -622,7 +628,10 @@ namespace Launcher {
 
 		UpdateRepentogonOptionsFromInstallation();
 		_updates->SetValue(_configuration->AutomaticUpdates());
+
+#ifndef LAUNCHER_FORCE_UNSTABLE
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
+#endif
 	}
 
 	bool LauncherMainWindow::SanityCheckLauncherUpdate() {
@@ -808,8 +817,10 @@ namespace Launcher {
 		_updates->SetValue(_configuration->AutomaticUpdates());
 		_updates->Enable(!_configuration->AutomaticUpdatesHasOverride());
 
+#ifndef LAUNCHER_FORCE_UNSTABLE
 		_unstableRepentogon->SetValue(_configuration->UnstableUpdates());
 		_unstableRepentogon->Enable(!_configuration->UnstableUpdatesHasOverride());
+#endif
 
 		 _stealthMode->SetValue(_configuration->StealthMode());
 		 _stealthMode->Enable(!_configuration->StealthModeHasOverride());
