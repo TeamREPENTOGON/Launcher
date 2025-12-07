@@ -343,7 +343,7 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 	if (!ok) {
 		Logger::Error("Unable to retrieve exit code\n");
 	} else {
-		Logger::Info("isaac-ng.exe exited with exit code %d\n", exitCode);
+		Logger::Info("isaac-ng.exe exited with exit code %x\n", exitCode);
 	}
 
 	CloseHandle(processInfo.hProcess);
