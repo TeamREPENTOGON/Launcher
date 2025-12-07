@@ -276,7 +276,7 @@ int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_
 	switch (result) {
 	case WAIT_OBJECT_0: {
 		GetExitCodeThread(remoteThread, &threadCode);
-		Logger::Info("RemoteThread completed with exit code %d\n", threadCode);
+		Logger::Info("RemoteThread completed with exit code %#x\n", threadCode);
 		break;
 	}
 
@@ -343,7 +343,7 @@ DWORD Launcher::Launch(ILoggableGUI* gui, const char* path, bool isLegacy,
 	if (!ok) {
 		Logger::Error("Unable to retrieve exit code\n");
 	} else {
-		Logger::Info("isaac-ng.exe exited with exit code %x\n", exitCode);
+		Logger::Info("isaac-ng.exe exited with exit code %#x\n", exitCode);
 	}
 
 	CloseHandle(processInfo.hProcess);
