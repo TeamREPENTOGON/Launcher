@@ -35,6 +35,8 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     parser.AddLongOption(Options::isaacWaitTime, "Max wait time (in milliseconds) after creating the Repentogon remote thread",
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongSwitch(Options::strictThreadCancel, "Crash the launcher if a cancelled thread does not enter its cancellable state");
+    parser.AddLongSwitch(Options::skipUniqueCheck, "Skip the uniqueness check at the start of the launcher. "
+        "Only use this if the check itself fails for abnormal reasons.");
 
     parser.AddLongSwitch(Options::steam, "Perform a Steam launch, bypassing as much of the "
         "startup logic as possible");
@@ -85,6 +87,7 @@ int CLIParser::Parse(int argc, wxChar** argv) {
         _repentogonInstallerRefreshRate = refreshRate;
     }
 
+    _skipUnique = parser.Found(Options::skipUniqueCheck);
     _skipSelfUpdate = parser.Found(Options::skipSelfUpdate);
     _stealthMode = parser.Found(Options::stealthMode);
     _basementRenovator = parser.Found(Options::basementRenovator);

@@ -23,5 +23,8 @@ namespace Launcher {
 		LauncherMainWindow* CreateMainWindow();
 
 		LauncherMainWindow* _mainFrame;
+		HANDLE _lockFile;
+
+		void CheckLauncherUniqueness();
 	};
 }

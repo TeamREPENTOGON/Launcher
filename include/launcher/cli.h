@@ -126,6 +126,10 @@ public:
         return _strictThreadCancel;
     }
 
+    inline bool SkipUnique() const {
+        return _skipUnique;
+    }
+
 private:
     CLIParser();
 
@@ -147,6 +151,7 @@ private:
         static constexpr const char* trapIsaacLaunch = "trap-isaac-launch";
         static constexpr const char* isaacWaitTime = "isaac-wait-time";
         static constexpr const char* strictThreadCancel = "strict-thread-cancel";
+        static constexpr const char* skipUniqueCheck = "skip-unique";
 
         // Start from Steam options
         static constexpr const char* steam = "steam";
@@ -174,6 +179,7 @@ private:
     bool _stealthMode = false;
     bool _basementRenovator = false;
     bool _strictThreadCancel = false;
+    bool _skipUnique = false;
     unsigned long _repentogonInstallerRefreshRate = Options::_repentogonInstallerDefaultRefreshRate;
     unsigned long _curlLimit = 0;
     unsigned long _curlTimeout = 0;

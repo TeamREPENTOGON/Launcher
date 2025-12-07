@@ -1,3 +1,9 @@
+#include <WinSock2.h>
+#include <Windows.h>
+#include <ShlObj_core.h>
+
+#include <filesystem>
+
 #include "chained_future/chained_future.h"
 
 #include "shared/externals.h"
@@ -7,12 +13,12 @@
 #include "launcher/launcher_self_update.h"
 #include "launcher/windows/launcher.h"
 #include "launcher/windows/setup_wizard.h"
+#include "shared/filesystem.h"
 #include "shared/github_executor.h"
 #include "shared/logger.h"
 #include "shared/loggable_gui.h"
 #include "launcher/windows/repentogon_installer.h"
-#include <filesystem>
-#include <launcher/modupdater.h>
+#include "launcher/modupdater.h"
 
 static LauncherConfiguration __configuration;
 static Launcher::Installation* __installation;
@@ -56,20 +62,65 @@ void SetWorkingDirToExe() {//stupid shit to make menu shortcuts work
 	SetCurrentDirectoryA(exeDir.string().c_str());
 }
 
+void Launcher::App::CheckLauncherUniqueness() {
+	wchar_t* path = NULL;
+	HRESULT result = SHGetKnownFolderPath(FOLDERID_LocalAppData, KF_FLAG_DEFAULT, NULL, &path);
+	if (result != S_OK) {
+		CoTaskMemFree(path);
+		MessageBoxA(NULL, "Unable to get the path to Local AppData, cannot ensure Launcher uniqueness.\n"
+			"Rerun with --skip-unique to skip this check (at your own risk).",
+			"Fatal error", MB_ICONERROR);
+		ExitProcess(-1);
+	}
+
+	size_t baseLen = wcslen(path);
+	size_t len = baseLen + wcslen(L"\\repentogon_launcher.lock") + 1;
+
+	wchar_t* fullPath = (wchar_t*)calloc(len, sizeof(wchar_t));
+	wcscpy(fullPath, path);
+	wcscat(fullPath, L"\\repentogon_launcher.lock");
+
+	HANDLE file = CreateFileW(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+		OPEN_ALWAYS, FILE_ATTRIBUTE_HIDDEN, NULL);
+	CoTaskMemFree(path);
+	free(fullPath);
+
+	if (file == INVALID_HANDLE_VALUE) {
+		DWORD last = GetLastError();
+		if (last == ERROR_SHARING_VIOLATION) {
+			MessageBoxA(NULL, "Another instance of the launcher is already running. Aborting.",
+				"Fatal error", MB_ICONERROR);
+		} else {
+			MessageBoxA(NULL, "Unable to create the lock file to prevent multiple "
+				"instances of the launcher from running.\n"
+				"Rerun with --skip-unique to skip this check (at your own risk).",
+				"Fatal error", MB_ICONERROR);
+		}
+
+		ExitProcess(-1);
+	}
+
+	_lockFile = file;
+}
+
 bool Launcher::App::OnInit() {
 	SetWorkingDirToExe();
 	Logger::Init("launcher.log", "w");
 	Externals::Init();
 
-	sGithubExecutor->Start();
 	if (sCLI->Parse(argc, argv) > 0) {
 		Logger::Error("Syntax error while parsing command line\n");
 	}
 
+	if (!sCLI->SkipUnique()) {
+		CheckLauncherUniqueness();
+	}
+
+	sGithubExecutor->Start();
 	__installation = new Installation(&__nopLogGUI, &__configuration);
 	_mainFrame = CreateMainWindow();
 	_mainFrame->EnableInterface(false);
-	
+
 	wxIcon icon;
 	icon.CopyFromBitmap(wxBitmap(wxICON(IDI_ICON1)));
 	_mainFrame->SetIcon(icon);
@@ -204,6 +255,7 @@ bool Launcher::App::OnInit() {
 }
 
 int Launcher::App::OnExit() {
+	CloseHandle(_lockFile);
 	delete __installation;
 	Externals::End();
 	return 0;
