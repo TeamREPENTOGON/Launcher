@@ -55,6 +55,7 @@ target_include_directories (shared PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
 target_compile_options (shared PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
+target_compile_definitions (shared PRIVATE NOMINMAX)
 target_link_libraries (shared libcurl zip)
 
 target_link_libraries (bspatch bzip2)
@@ -80,7 +81,7 @@ target_include_directories (REPENTOGONLauncher PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include"
     "${CMAKE_SOURCE_DIR}/deps/chained_futures/include"
 )
-target_compile_definitions (REPENTOGONLauncher PRIVATE UNICODE INI_SHARED_LIB "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
+target_compile_definitions (REPENTOGONLauncher PRIVATE NOMINMAX UNICODE INI_SHARED_LIB "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
 target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch steamapi Winhttp)
 add_custom_command(
     TARGET REPENTOGONLauncher POST_BUILD
@@ -105,7 +106,7 @@ target_include_directories (REPENTOGONLauncherUpdater PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
-target_compile_definitions (REPENTOGONLauncherUpdater PRIVATE "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
+target_compile_definitions (REPENTOGONLauncherUpdater PRIVATE NOMINMAX "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
 target_compile_options (REPENTOGONLauncherUpdater PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
 
 # add_custom_command (TARGET REPENTOGONLauncherUpdater POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:REPENTOGONLauncherUpdater> "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
