@@ -22,7 +22,7 @@ EVT_TEXT(Launcher::WINDOW_TEXT_VANILLA_LUAHEAPSIZE, Launcher::AdvancedModOptions
 wxEND_EVENT_TABLE()
 
 namespace Launcher {
-	AdvancedOptionsWindow::AdvancedOptionsWindow(LauncherMainWindow* mainFrame) : _mainFrame(mainFrame), wxDialog(mainFrame, -1, "Advanced options") {
+	AdvancedOptionsWindow::AdvancedOptionsWindow(LauncherMainWindow* mainFrame) : _mainFrame(mainFrame), wxDialog(mainFrame, -1, "Update/Repair Instalation") {
 		Build();
 	}
 

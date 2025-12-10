@@ -298,7 +298,7 @@ namespace Launcher {
 		_unstableRepentogon->SetValue(false);
 #endif
 
-		_advancedOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_OPTIONS, "Advanced options...");
+		_advancedOptionsButton = new wxButton(repentogonBox, WINDOW_BUTTON_ADVANCED_OPTIONS, "Update/Repair Installation");
 
 		const wxSizerFlags checkboxFlags = wxSizerFlags().Left().Border(wxLEFT | wxBOTTOM | wxRIGHT, 5);
 		repentogonBoxSizer->Add(_updates, checkboxFlags);
