@@ -501,7 +501,7 @@ bool LauncherWizard::CheckRepentogonCompatibilityOnPageChange() {
 void LauncherWizard::UpdateRepentogonSetupWarningText() {
     wxString warningText = "";
     if (_configuration->UnstableUpdatesIgnoreOverride()) {
-        warningText += "Warning: Unstable updates are work-in-progress, and not reccomended for most users. Bugs and crashes are more likely to occur.\n"
+        warningText += "Warning: Unstable updates are work-in-progress, and not recommended for most users. Bugs and crashes are more likely to occur.\n"
             "If you are a mod developer, DO NOT publish mods that depend on unstable versions!\n"
             "If you are not a mod developer... you probably shouldn't use these anyway.\n\n";
     }

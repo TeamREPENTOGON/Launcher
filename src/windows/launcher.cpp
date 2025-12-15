@@ -283,7 +283,7 @@ namespace Launcher {
 				_unstableRepentogon->SetValue(false);
 				int res = wxMessageBox(
 					"Unstable REPENTOGON versions are work-in-progress updates.\n"
-					"Bugs and crashes will be more likely. This is not reccomended for most users.\n\n"
+					"Bugs and crashes will be more likely. This is not recommended for most users.\n\n"
 					"If you are a mod developer, DO NOT publish mods that depend on unstable versions!\n"
 					"If you are not a mod developer... you probably shouldn't use these anyway.\n\n"
 					"Enable unstable updates?",
