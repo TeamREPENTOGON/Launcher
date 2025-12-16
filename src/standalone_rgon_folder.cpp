@@ -21,7 +21,7 @@
 #include <wx/stattext.h>
 
 namespace standalone_rgon {
-    uint32_t REPENTOGON_FUCK_METHOD = 2;
+    uint32_t REPENTOGON_FUCK_METHOD = 1;
     std::string REPENTOGON_FUCK_METHOD_FILE = "DONT RUN THE EXE DIRECTLY.txt";
 
     /* Mostly grabbed from https://steamdb.info/depot/3353471 then filled in
