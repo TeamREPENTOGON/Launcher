@@ -112,17 +112,17 @@ std::optional<std::string> LocateSteamIsaacExecutable() {
 	}
 
 	// Get the installation path of Steam itself.
-	std::optional<std::string> steamInstallPath = Steam::GetSteamInstallationPath();
+	const char* steamInstallPath = Steam::GetSteamInstallationPath();
 	if (!steamInstallPath) {
 		Logger::Info("LocateSteamIsaacExecutable: No Steam installation path found.\n");
 		return std::nullopt;
 	}
-	Logger::Info("LocateSteamIsaacExecutable: Found Steam installation @ %s\n", steamInstallPath->c_str());
+	Logger::Info("LocateSteamIsaacExecutable: Found Steam installation @ %s\n", steamInstallPath);
 
 	constexpr char isaacRelativePath[] = "\\steamapps\\common\\The Binding of Isaac Rebirth\\isaac-ng.exe";
 
 	// Check for an isaac-ng.exe under the Steam installation directory.
-	const std::string steamInstallIsaacPath = *steamInstallPath + isaacRelativePath;
+	const std::string steamInstallIsaacPath = std::string(steamInstallPath) + isaacRelativePath;
 
 	if (Filesystem::Exists(steamInstallIsaacPath.c_str())) {
 		Logger::Info("LocateSteamIsaacExecutable: isaac-ng.exe found @ %s\n", steamInstallIsaacPath.c_str());
