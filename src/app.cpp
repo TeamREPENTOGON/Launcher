@@ -19,6 +19,7 @@
 #include "shared/loggable_gui.h"
 #include "launcher/windows/repentogon_installer.h"
 #include "launcher/modupdater.h"
+#include "launcher/version.h"
 
 static LauncherConfiguration __configuration;
 static Launcher::Installation* __installation;
@@ -107,6 +108,8 @@ bool Launcher::App::OnInit() {
 	SetWorkingDirToExe();
 	Logger::Init("launcher.log", "w");
 	Externals::Init();
+
+	Logger::Info("Launcher started, version %s\n", LAUNCHER_VERSION);
 
 	if (sCLI->Parse(argc, argv) > 0) {
 		Logger::Error("Syntax error while parsing command line\n");
