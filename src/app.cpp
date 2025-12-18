@@ -129,7 +129,7 @@ bool Launcher::App::OnInit() {
 	_mainFrame->SetIcon(icon);
 
 	if (!sCLI->SkipSelfUpdate()) {
-		HandleSelfUpdate(_mainFrame, false, false);
+		// HandleSelfUpdate(_mainFrame, false, false);
 	}
 
 	LauncherConfigurationInitialize initializationResult;

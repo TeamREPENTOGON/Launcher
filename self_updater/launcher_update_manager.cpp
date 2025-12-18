@@ -208,6 +208,8 @@ namespace Updater {
 			updateData._zipFilename = strurl + "/Launcher/REPENTOGONLauncher.zip";
 		}
 
+		updateData._zipFilename = "./testupdate.zip";
+
 		if (!ExtractArchive(&updateData)) {
 			_gui->LogError("Error while extracting the releases's archive\n");
 			return false;

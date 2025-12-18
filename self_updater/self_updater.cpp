@@ -4,6 +4,7 @@
 #include <Commctrl.h>
 #include <thread>
 #include <memory>
+#include <fstream>
 
 #include "comm/messages.h"
 #include "shared/github_executor.h"
@@ -26,14 +27,14 @@ const char* Updater::ReleaseURL = "--url";
 const char* Updater::UpgradeVersion = "--version";
 
 namespace Updater {
-	static const char* LauncherExePath = "./REPENTOGONLauncher.exe";
+	static const char* LauncherExePath = "./bin/REPENTOGONLauncherApp.exe";
 	static const char* UpdaterProcessName = "REPENTOGON Launcher Updater";
 
 	// During update installation, the existing updater exe is renamed to make room for the new one.
 	// We can't delete our own exe (since it is obviously running) but renaming it is allowed.
 	// The old renamed exe will be deleted the next time the updater runs.
-	static const char* UpdaterExeFilename = "REPENTOGONLauncherUpdater.exe";
-	static const char* RenamedUpdaterExeFilename = "REPENTOGONLauncherUpdater.exe.bak";
+	static const char* UpdaterExeFilename = "REPENTOGONLauncher.exe";
+	static const char* RenamedUpdaterExeFilename = "REPENTOGONLauncher.exe.bak";
 
 	const std::unordered_map<UpdaterState, const char*> UpdaterStateProgressBarLabels = {
 		{ UPDATER_CHECKING_FOR_UPDATE, "REPENTOGON Launcher Updater: Checking for update..." },
@@ -283,6 +284,20 @@ void Updater::StartLauncher() {
 }
 
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) {
+	if (std::filesystem::exists("bin/unfinished.it") || !std::filesystem::exists(LauncherExePath)) {
+		Logger::Error("Detected broken update/installation!\n");
+		std::filesystem::remove_all("bin");
+		if (std::filesystem::exists("bin.old")) {
+			std::filesystem::rename("bin.old", "bin");
+			Logger::Info("Successfully restored previous installation!\n");
+		} else {
+			Logger::Info("No prior installation exists to restore!\n");
+		}
+	}
+	//if (std::filesystem::exists("bin.old")) {
+	//	std::filesystem::remove_all("bin.old");
+	//}
+
 	// Open a handle for the active launcher process, if provided by the launcher itself.
 	HANDLE launcherHandle = TryOpenLauncherProcessHandle(argc, argv);
 	// Validate that no other instance of the updater is running.
@@ -343,7 +358,9 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) 
 		version = versionGiven;
 	}
 
-	if (!urlGiven) {
+	const bool forceUpdate = urlGiven || !std::filesystem::exists(LauncherExePath);
+
+	if (!forceUpdate) {
 		lu::SelfUpdateCheckResult checkResult = updateManager.CheckSelfUpdateAvailability(allowUnstable, version, url);
 
 		switch (checkResult) {
@@ -376,9 +393,9 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) 
 		return UPDATE_ERROR;
 	}
 
-	SetCurrentUpdaterState(UPDATER_PROMPTING_USER);
+	if (!forceUpdate) {
+		SetCurrentUpdaterState(UPDATER_PROMPTING_USER);
 
-	if (!urlGiven) {
 		// An appropriate update is available. Prompt the user about it.
 		const std::string updatePrompt = (std::ostringstream() << "An update is available for the launcher.\n" <<
 			"It will update from version " << Launcher::LAUNCHER_VERSION << " to version " << version << ".\n\n" <<
@@ -415,6 +432,8 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) 
 		return UPDATE_ERROR;
 	}
 
+	Logger::Info("Downloaded from %s\n", url.c_str());
+
 	SetCurrentUpdaterState(UPDATER_INSTALLING_UPDATE);
 
 	// Check if the launcher exe is still locked. If so, prompt the user about it.
@@ -422,6 +441,16 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) 
 	if (!VerifyLauncherNotRunning()) {
 		return UPDATE_ERROR;
 	}
+
+	if (std::filesystem::exists("bin.old")) {
+		Logger::Info("Deleting backup of previous version...\n");
+		std::filesystem::remove_all("bin.old");
+	}
+	Logger::Info("Backing up current version...\n");
+	std::filesystem::rename("bin", "bin.old");
+	Logger::Info("Initializing directory for new version...\n");
+	std::filesystem::create_directories("bin");
+	std::ofstream("bin/unfinished.it");
 
 	// The updater cannot directly overwrite its own currently-running exe with the new one from the update.
 	// To get around this, we do the following:
@@ -449,6 +478,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) 
 		return UPDATE_ERROR;
 	}
 
+	std::filesystem::remove("bin/unfinished.it");
 	Logger::Info("Update successful!\n");
 	return UPDATE_SUCCESSFUL;
 }
@@ -477,7 +507,6 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 		break;
 
 	case Updater::UPDATE_SUCCESSFUL:
-		Updater::StartLauncher();
 		res = 0;
 		break;
 
@@ -492,5 +521,7 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 	}
 
 	sGithubExecutor->Stop();
+
+	Updater::StartLauncher();
 	return res;
 }
