@@ -123,30 +123,21 @@ bool Unpacker::MemoryUnpack(const char* name, std::vector<Unpacker::FileContent>
 
 bool Unpacker::MemoryToDisk(std::vector<FileContent> const& files) {
 	wchar_t description[] = L"Unpacker memory to disk unpacking";
-	HANDLE transaction = CreateTransaction(NULL, NULL, 0, 0, 0, 0, description);
-	if (transaction == INVALID_HANDLE_VALUE) {
-		Logger::Error("Unpacker::MemoryToDisk: unable to create transaction (%d)\n", GetLastError());
-		return false;
-	}
-
-	Updater::Utils::ScopedHandle scopedHandle(transaction);
 
 	for (FileContent const& content : files) {
 		if (content.isFolder) {
-			if (Filesystem::Exists(content.name, transaction) && !Filesystem::DeleteFolder(content.name, transaction)) {
+			if (Filesystem::Exists(content.name) && !Filesystem::DeleteFolder(content.name)) {
 				Logger::Error("Unpacker::MemoryToDisk: unable to delete folder %s\n", content.name);
-			} else if (!CreateDirectoryTransactedA(NULL, content.name, NULL, transaction)) {
+			} else if (!CreateDirectoryA(content.name, NULL)) {
 				Logger::Error("Unpacker::MemoryToDisk: unable to create folder %s (%d)\n", content.name, GetLastError());
 			}
 			continue;
 		}
 
-		HANDLE file = CreateFileTransactedA(content.name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-			FILE_ATTRIBUTE_NORMAL, NULL, transaction, 0, NULL);
+		HANDLE file = CreateFileA(content.name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
 		if (file == INVALID_HANDLE_VALUE) {
 			Logger::Error("Unpacker::MemoryToDisk: error while creating file %s (%d)\n", content.name, GetLastError());
-			RollbackTransaction(transaction);
 			return false;
 		}
 
@@ -155,7 +146,6 @@ bool Unpacker::MemoryToDisk(std::vector<FileContent> const& files) {
 			if (!WriteFile(file, content.buffer, content.buffLen, &bytesWritten, NULL)) {
 				Logger::Error("Unpacker::MemoryToDisk: error while writing file %s (%d)\n", content.name, GetLastError());
 				CloseHandle(file);
-				RollbackTransaction(transaction);
 				return false;
 			}
 
@@ -163,17 +153,11 @@ bool Unpacker::MemoryToDisk(std::vector<FileContent> const& files) {
 				Logger::Error("Unpacker::MemoryToDisk: incorrect amount of bytes written for file %s (expected %d, got %d)\n",
 					content.name, content.buffLen, bytesWritten);
 				CloseHandle(file);
-				RollbackTransaction(transaction);
 				return false;
 			}
 		}
 
 		CloseHandle(file);
-	}
-
-	if (!CommitTransaction(transaction)) {
-		Logger::Error("Unpacker::MemoryToDisk: error while commiting transaction\n");
-		return false;
 	}
 
 	return true;
