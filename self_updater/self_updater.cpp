@@ -27,7 +27,7 @@ const char* Updater::ReleaseURL = "--url";
 const char* Updater::UpgradeVersion = "--version";
 
 namespace Updater {
-	static const char* LauncherExePath = "./bin/REPENTOGONLauncherApp.exe";
+	static const char* LauncherExePath = "./launcher-data/REPENTOGONLauncherApp.exe";
 	static const char* UpdaterProcessName = "REPENTOGON Launcher Updater";
 
 	// During update installation, the existing updater exe is renamed to make room for the new one.
@@ -35,6 +35,10 @@ namespace Updater {
 	// The old renamed exe will be deleted the next time the updater runs.
 	static const char* UpdaterExeFilename = "REPENTOGONLauncher.exe";
 	static const char* RenamedUpdaterExeFilename = "REPENTOGONLauncher.exe.bak";
+
+	static const char* LauncherDataFolder = "launcher-data";
+	static const char* LauncherDataBackupFolder = "launcher-data.old";
+	static const char* UnfinishedUpdateMarker = "launcher-data/unfinished.it";
 
 	const std::unordered_map<UpdaterState, const char*> UpdaterStateProgressBarLabels = {
 		{ UPDATER_CHECKING_FOR_UPDATE, "REPENTOGON Launcher Updater: Checking for update..." },
@@ -44,6 +48,10 @@ namespace Updater {
 	};
 
 	std::atomic<UpdaterState> _currentState = UPDATER_STARTUP;
+
+	void CreateEmptyFile(const char* path) {
+		std::ofstream stream(path);
+	}
 }
 
 Updater::UpdaterState Updater::GetCurrentUpdaterState() {
@@ -283,20 +291,17 @@ void Updater::StartLauncher() {
 	}
 }
 
-Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) {
-	if (std::filesystem::exists("bin/unfinished.it") || !std::filesystem::exists(LauncherExePath)) {
+Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
+	if (std::filesystem::exists(UnfinishedUpdateMarker) || !std::filesystem::exists(LauncherExePath)) {
 		Logger::Error("Detected broken update/installation!\n");
-		std::filesystem::remove_all("bin");
-		if (std::filesystem::exists("bin.old")) {
-			std::filesystem::rename("bin.old", "bin");
+		std::filesystem::remove_all(LauncherDataFolder);
+		if (std::filesystem::exists(LauncherDataBackupFolder)) {
+			std::filesystem::rename(LauncherDataBackupFolder, LauncherDataFolder);
 			Logger::Info("Successfully restored previous installation!\n");
 		} else {
 			Logger::Info("No prior installation exists to restore!\n");
 		}
 	}
-	//if (std::filesystem::exists("bin.old")) {
-	//	std::filesystem::remove_all("bin.old");
-	//}
 
 	// Open a handle for the active launcher process, if provided by the launcher itself.
 	HANDLE launcherHandle = TryOpenLauncherProcessHandle(argc, argv);
@@ -442,15 +447,15 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) 
 		return UPDATE_ERROR;
 	}
 
-	if (std::filesystem::exists("bin.old")) {
+	if (std::filesystem::exists(LauncherDataBackupFolder)) {
 		Logger::Info("Deleting backup of previous version...\n");
-		std::filesystem::remove_all("bin.old");
+		std::filesystem::remove_all(LauncherDataBackupFolder);
 	}
 	Logger::Info("Backing up current version...\n");
-	std::filesystem::rename("bin", "bin.old");
+	std::filesystem::rename(LauncherDataFolder, LauncherDataBackupFolder);
 	Logger::Info("Initializing directory for new version...\n");
-	std::filesystem::create_directories("bin");
-	std::ofstream("bin/unfinished.it");
+	std::filesystem::create_directories(LauncherDataFolder);
+	CreateEmptyFile(UnfinishedUpdateMarker);
 
 	// The updater cannot directly overwrite its own currently-running exe with the new one from the update.
 	// To get around this, we do the following:
@@ -478,7 +483,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) 
 		return UPDATE_ERROR;
 	}
 
-	std::filesystem::remove("bin/unfinished.it");
+	std::filesystem::remove(UnfinishedUpdateMarker);
 	Logger::Info("Update successful!\n");
 	return UPDATE_SUCCESSFUL;
 }
