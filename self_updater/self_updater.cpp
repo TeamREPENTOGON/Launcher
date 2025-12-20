@@ -115,7 +115,7 @@ HANDLE Updater::TryOpenLauncherProcessHandle(int argc, char** argv) {
 	return launcherHandle;
 }
 
-bool Updater::TryDeleteOldRenamedUpdaterExe() {
+bool Updater::TryDeleteOldRenamedUpdaterExe(HWND mainWindow) {
 	int attempts = 0;
 	while (std::filesystem::exists(RenamedUpdaterExeFilename) && !DeleteFileA(RenamedUpdaterExeFilename)) {
 		attempts++;
@@ -127,7 +127,7 @@ bool Updater::TryDeleteOldRenamedUpdaterExe() {
 			continue;
 		}
 		SetCurrentUpdaterState(UPDATER_PROMPTING_USER);
-		int response = MessageBoxA(NULL, "Failed to delete REPENTOGONLauncherUpdater.exe.bak file from prior update.\n"
+		int response = MessageBoxA(mainWindow, "Failed to delete REPENTOGONLauncherUpdater.exe.bak file from prior update.\n"
 			"The update was most likely successful, but please report this as a bug.\n"
 			"Select \"cancel\" to allow the Launcher to start.\n", UpdaterProcessName, MB_ICONINFORMATION | MB_RETRYCANCEL);
 		if (response == IDRETRY || response == IDOK || response == IDTRYAGAIN) {
@@ -141,7 +141,7 @@ bool Updater::TryDeleteOldRenamedUpdaterExe() {
 	return true;
 }
 
-bool Updater::VerifyLauncherNotRunning() {
+bool Updater::VerifyLauncherNotRunning(HWND mainWindow) {
 	Utils::ScopedHandle fh(INVALID_HANDLE_VALUE);
 
 	int attempts = 0;
@@ -155,10 +155,7 @@ bool Updater::VerifyLauncherNotRunning() {
 			continue;
 		}
 
-		/* Cannot have a parent window here as we may be in the process of
-		 * destroying the launcher.
-		 */
-		int response = MessageBoxA(NULL, "Cannot update the REPENTOGON Launcher, as it is currently running.\nPlease close it and try again.\n", UpdaterProcessName, MB_ICONINFORMATION | MB_RETRYCANCEL);
+		int response = MessageBoxA(mainWindow, "Cannot update the REPENTOGON Launcher, as it is currently running.\nPlease close it and try again.\n", UpdaterProcessName, MB_ICONINFORMATION | MB_RETRYCANCEL);
 		if (response == IDRETRY || response == IDOK || response == IDTRYAGAIN) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(500));
 			continue;
@@ -170,7 +167,7 @@ bool Updater::VerifyLauncherNotRunning() {
 	return true;
 }
 
-std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow() {
+std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(HWND mainWindow) {
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 
 	WNDCLASSEX windowClass = {};
@@ -190,7 +187,7 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow() {
 	}
 
 	// Create main window
-	auto window = std::make_unique<UniqueWindow>(nullptr, windowClass.lpszClassName,
+	auto window = std::make_unique<UniqueWindow>(mainWindow, windowClass.lpszClassName,
 		Updater::UpdaterProcessName, WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU, 0,
 		0, 450, 95, windowClass.hInstance);
 	HWND windowHandle = window->GetHandle();
@@ -230,7 +227,7 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow() {
 	return window;
 }
 
-void Updater::ProgressBarThread() {
+void Updater::ProgressBarThread(HWND mainWindow) {
 	std::unique_ptr<Updater::UniqueWindow> progressBarWindow = nullptr;
 
 	UpdaterState state = UPDATER_STARTUP;
@@ -252,7 +249,7 @@ void Updater::ProgressBarThread() {
 
 			if (UpdaterStateProgressBarLabels.find(state) != UpdaterStateProgressBarLabels.end()) {
 				if (!progressBarWindow) {
-					progressBarWindow = Updater::CreateProgressBarWindow();
+					progressBarWindow = Updater::CreateProgressBarWindow(mainWindow);
 					if (!progressBarWindow) {
 						Logger::Error("Failed to create progress bar window\n");
 						break;
@@ -271,7 +268,7 @@ void Updater::ProgressBarThread() {
 	Logger::Error("Progress bar thread ended.\n");
 }
 
-void Updater::StartLauncher() {
+bool Updater::StartLauncher() {
 	Updater::SetCurrentUpdaterState(Updater::UPDATER_STARTING_LAUNCHER);
 	Logger::Info("Starting launcher...\n");
 
@@ -282,13 +279,7 @@ void Updater::StartLauncher() {
 	memset(&info, 0, sizeof(info));
 
 	char cli[] = { 0 };
-	BOOL created = CreateProcessA(LauncherExePath, cli, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
-	if (!created) {
-		Logger::Error("Failed to start launcher.\n");
-		ExitProcess(1);
-	} else {
-		ExitProcess(0);
-	}
+	return CreateProcessA(LauncherExePath, cli, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
 }
 
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
@@ -315,13 +306,13 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 		if (!isForced) {
 			if (lockResult == Utils::LOCK_UPDATER_ERR_INTERNAL) {
-				MessageBoxA(NULL, "Unable to check if another instance of the updater is already running\n"
+				MessageBoxA(mainWindow, "Unable to check if another instance of the updater is already running\n"
 					"Check the log file (you may need to launch Isaac normaly at least once; otherwise rerun with --force)\n",
 					UpdaterProcessName, MB_ICONERROR);
 				Logger::Error("Error while attempting to lock the updater\n");
 			}
 			else {
-				MessageBoxA(NULL, "Another instance of the updater is already running, "
+				MessageBoxA(mainWindow, "Another instance of the updater is already running, "
 					"terminate it first then restart the updater\n"
 					"(If no other instance of the updater is running, rerun with --force)\n", UpdaterProcessName, MB_ICONERROR);
 				Logger::Error("Launcher updater is already running, terminate other instances first\n");
@@ -375,7 +366,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 		case lu::SELF_UPDATE_CHECK_ERR_GENERIC:
 			SetCurrentUpdaterState(UPDATER_FAILED);
-			MessageBoxA(NULL, "An error was encountered while checking for the availability of updates. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
+			MessageBoxA(mainWindow, "An error was encountered while checking for the availability of updates. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
 			Logger::Error("Error while checking for updates.\n");
 			return UPDATE_ERROR;
 
@@ -385,7 +376,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 		default:
 			SetCurrentUpdaterState(UPDATER_FAILED);
-			MessageBoxA(NULL, "An unknown error was encountered while checking for the availability of updates. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
+			MessageBoxA(mainWindow, "An unknown error was encountered while checking for the availability of updates. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
 			Logger::Error("Recieved unexpected error code %d while checking for availability of self updates. Please report this as a bug.\n", checkResult);
 			return UPDATE_ERROR;
 		}
@@ -394,7 +385,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	// Check for a renamed updater exe from a previous update and try to delete it if found.
 	// Since we have the lockfile to prevent multiple instances of the updater running at the same time,
 	// we shouldn't ever fail to delete it, but you never know...
-	if (!TryDeleteOldRenamedUpdaterExe()) {
+	if (!TryDeleteOldRenamedUpdaterExe(mainWindow)) {
 		return UPDATE_ERROR;
 	}
 
@@ -406,7 +397,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 			"It will update from version " << Launcher::LAUNCHER_VERSION << " to version " << version << ".\n\n" <<
 			"Do you want to update now?").str();
 
-		int updatePromptResult = MessageBoxA(NULL, updatePrompt.c_str(), UpdaterProcessName, MB_ICONINFORMATION | MB_YESNO);
+		int updatePromptResult = MessageBoxA(mainWindow, updatePrompt.c_str(), UpdaterProcessName, MB_ICONINFORMATION | MB_YESNO);
 		if (updatePromptResult != IDOK && updatePromptResult != IDYES) {
 			Logger::Info("Launcher updated rejected by user\n");
 			return UPDATE_SKIPPED;
@@ -432,7 +423,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	if (!updateManager.DownloadAndExtractUpdate(url.c_str())) {
 		SetCurrentUpdaterState(UPDATER_FAILED);
-		MessageBoxA(NULL, "Failed to download the update for the launcher. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
+		MessageBoxA(mainWindow, "Failed to download the update for the launcher. Check the log file for more details.\n", UpdaterProcessName, MB_ICONERROR);
 		Logger::Error("Error trying to download update from URL: %s\n", url.c_str());
 		return UPDATE_ERROR;
 	}
@@ -443,7 +434,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	// Check if the launcher exe is still locked. If so, prompt the user about it.
 	// The exe file can remain locked very briefly after terminating the launcher, so we check this after the download.
-	if (!VerifyLauncherNotRunning()) {
+	if (!VerifyLauncherNotRunning(mainWindow)) {
 		return UPDATE_ERROR;
 	}
 
@@ -470,14 +461,14 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	if (!Unpacker::ExtractArchive(Comm::UnpackedArchiveName)) {
 		SetCurrentUpdaterState(UPDATER_FAILED);
-		MessageBoxA(NULL, "Unable to unpack the update, check log file\n", UpdaterProcessName, MB_ICONERROR);
+		MessageBoxA(mainWindow, "Unable to unpack the update, check log file\n", UpdaterProcessName, MB_ICONERROR);
 		Logger::Error("Error while extracting archive\n");
 		return UPDATE_ERROR;
 	}
 
 	if (!DeleteFileA(Comm::UnpackedArchiveName)) {
 		SetCurrentUpdaterState(UPDATER_FAILED);
-		MessageBoxA(NULL, "Unable to delete the archive containing the update.\n"
+		MessageBoxA(mainWindow, "Unable to delete the archive containing the update.\n"
 			"Delete the archive (launcher_update.bin) then you can start the launcher\n", UpdaterProcessName, MB_ICONERROR);
 		Logger::Error("Error while deleting archive (%d)\n", GetLastError());
 		return UPDATE_ERROR;
@@ -497,11 +488,14 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 
 	sGithubExecutor->Start();
 
+	// Create a dummy window to use as a parent for popups.
+	Updater::UniqueWindow mainWindow(NULL, "STATIC", NULL, WS_POPUP, 0, 0, 0, 0, GetModuleHandle(NULL));
+
 	// Start up a progress bar window on a separate thread so that we can show some not-frozen UI to the user.
-	std::thread progressBarThread(Updater::ProgressBarThread);
+	std::thread progressBarThread(Updater::ProgressBarThread, mainWindow.GetHandle());
 	progressBarThread.detach();
 
-	Updater::UpdateLauncherResult result = Updater::TryUpdateLauncher(argc, argv);
+	Updater::UpdateLauncherResult result = Updater::TryUpdateLauncher(argc, argv, mainWindow.GetHandle());
 
 	int res = -1;
 
@@ -527,6 +521,8 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 
 	sGithubExecutor->Stop();
 
-	Updater::StartLauncher();
+	if (!Updater::StartLauncher()) {
+		return -1;
+	}
 	return res;
 }

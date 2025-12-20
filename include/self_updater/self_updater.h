@@ -66,23 +66,23 @@ namespace Updater {
 	// This function checks for the renamed file from a previous update and tries to delete it if found.
 	// Returns false if the file could not be deleted.
 	// The updater cannot continue in this case.
-	bool TryDeleteOldRenamedUpdaterExe();
+	bool TryDeleteOldRenamedUpdaterExe(HWND mainWindow);
 
 	// Returns false if the launcher exe is locked, most likely meaning it is still running.
 	// The updater cannot continue in this case.
-	bool VerifyLauncherNotRunning();
+	bool VerifyLauncherNotRunning(HWND mainWindow);
 
 	// Initializes the window for the progress bar and returns the handle within a UniqueWindow wrapper.
 	// Returns nullptr if the window could not be created.
-	std::unique_ptr<Updater::UniqueWindow> CreateProgressBarWindow();
+	std::unique_ptr<Updater::UniqueWindow> CreateProgressBarWindow(HWND mainWindow);
 
 	// A progress bar window is created/run on a separate thread so that it doesn't freeze during the update.
 	// The handle of the progress bar window is sent back to the main thread via the promise.
-	void ProgressBarThread();
+	void ProgressBarThread(HWND mainWindow);
 
-	// Starts the launcher exe, then terminates this process.
-	[[noreturn]] void StartLauncher();
+	// Starts the launcher exe.
+	bool StartLauncher();
 
 	// "Main" function that initiates the self-update process.
-	UpdateLauncherResult TryUpdateLauncher(int argc, char** argv);
+	UpdateLauncherResult TryUpdateLauncher(int argc, char** argv, HWND mainWindow);
 }
