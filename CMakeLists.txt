@@ -67,6 +67,8 @@ set (WIN32_RESOURCES ${CMAKE_SOURCE_DIR}/assets/icon.rc)
 file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h")
 add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES} ${WIN32_RESOURCES})
 set_target_properties(REPENTOGONLauncher PROPERTIES OUTPUT_NAME "REPENTOGONLauncherApp")
+set_target_properties(REPENTOGONLauncher PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data)
+set_target_properties(inih PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data)
 target_compile_options (REPENTOGONLauncher PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
 target_include_directories (REPENTOGONLauncher PRIVATE 
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
@@ -91,28 +93,21 @@ endif()
 target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch steamapi Winhttp)
 add_custom_command(
     TARGET REPENTOGONLauncher POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin
-    COMMAND ${CMAKE_COMMAND} -E rename $<TARGET_FILE_DIR:REPENTOGONLauncher>/REPENTOGONLauncherApp.exe $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin/REPENTOGONLauncherApp.exe
-    COMMAND ${CMAKE_COMMAND} -E rename $<TARGET_FILE_DIR:REPENTOGONLauncher>/REPENTOGONLauncherApp.pdb $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin/REPENTOGONLauncherApp.pdb
-    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin COMMAND_EXPAND_LISTS
+    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/deps/steamapi/lib/steam_api.dll"
-        $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin
+        $<TARGET_FILE_DIR:REPENTOGONLauncher>/
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/deps/steamapi/lib/steam_appid.txt"
-        $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin
+        $<TARGET_FILE_DIR:REPENTOGONLauncher>
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/patch"
-        "$<TARGET_FILE_DIR:REPENTOGONLauncher>/bin/patch"
-    COMMAND ${CMAKE_COMMAND} -E remove $<TARGET_FILE_DIR:REPENTOGONLauncher>/inih.dll
-    COMMAND ${CMAKE_COMMAND} -E rename $<TARGET_FILE_DIR:REPENTOGONLauncher>/inih.exp $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin/inih.exp
-    COMMAND ${CMAKE_COMMAND} -E rename $<TARGET_FILE_DIR:REPENTOGONLauncher>/inih.lib $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin/inih.lib
-    COMMAND ${CMAKE_COMMAND} -E rename $<TARGET_FILE_DIR:REPENTOGONLauncher>/inih.pdb $<TARGET_FILE_DIR:REPENTOGONLauncher>/bin/inih.pdb
+        "$<TARGET_FILE_DIR:REPENTOGONLauncher>/patch"
 )
 
 
 file (GLOB_RECURSE UPDATER_FILES "include/self_updater/*.h" self_updater/*.cpp "include/launcher/version.h" src/version.cpp ${SHARED_FILES})
-add_executable (REPENTOGONLauncherUpdater WIN32 ${UPDATER_FILES})
+add_executable (REPENTOGONLauncherUpdater WIN32 ${UPDATER_FILES} ${WIN32_RESOURCES})
 set_target_properties(REPENTOGONLauncherUpdater PROPERTIES OUTPUT_NAME "REPENTOGONLauncher")
 target_link_libraries (REPENTOGONLauncherUpdater libcurl_static zip zlibstatic userenv ktmw32 comctl32 Winhttp)
 target_include_directories (REPENTOGONLauncherUpdater PRIVATE
