@@ -106,7 +106,7 @@ void Launcher::App::CheckLauncherUniqueness() {
 
 bool Launcher::App::OnInit() {
 	SetWorkingDirToExe();
-	Logger::Init("launcher.log", "w");
+	Logger::Init("../launcher.log", "w");
 	Externals::Init();
 
 	Logger::Info("Launcher started, version %s\n", LAUNCHER_VERSION);
