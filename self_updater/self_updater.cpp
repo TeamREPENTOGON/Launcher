@@ -479,7 +479,15 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	return UPDATE_SUCCESSFUL;
 }
 
+void SetWorkingDirToExe() {//stupid shit to make menu shortcuts work
+	char exePath[MAX_PATH];
+	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+	SetCurrentDirectoryA(exeDir.string().c_str());
+}
+
 int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
+	SetWorkingDirToExe();
 	Logger::Init("updater.log", true);
 	Logger::Info("%s started with command-line args: %s\n", Updater::UpdaterProcessName, cli);
 
