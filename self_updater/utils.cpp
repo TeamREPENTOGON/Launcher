@@ -248,6 +248,10 @@ namespace Updater::Utils {
 		return true;
 	}
 
+	bool FileLocked(const char* path) {
+		return FileExists(path) && ScopedHandle(CreateFileA(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE;
+	}
+
 	char* GetUserProfileDir() {
 		char buffer[4096];
 		DWORD len = 4096;

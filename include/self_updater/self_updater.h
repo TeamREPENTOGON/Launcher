@@ -38,6 +38,7 @@ namespace Updater {
 		UPDATER_DOWNLOADING_UPDATE,
 		UPDATER_INSTALLING_UPDATE,
 		UPDATER_STARTING_LAUNCHER,
+		UPDATER_SHUTTING_DOWN,
 		UPDATER_FAILED,
 	};
 
@@ -54,6 +55,9 @@ namespace Updater {
 
 	// Stores a new value into `_currentState`.
 	void SetCurrentUpdaterState(UpdaterState newState);
+
+	// Helper wrapper for MessageBoxA that brings the parent window to the foreground and sets the MessageBox title.
+	int ShowMessageBox(HWND window, const char* text, UINT flags);
 
 	// Returns true if the provided handle seems to correspond to the launcher exe.
 	bool HandleMatchesLauncherExe(HANDLE handle);
@@ -75,11 +79,11 @@ namespace Updater {
 
 	// Initializes the window for the progress bar and returns the handle within a UniqueWindow wrapper.
 	// Returns nullptr if the window could not be created.
-	std::unique_ptr<Updater::UniqueWindow> CreateProgressBarWindow(HWND mainWindow);
+	std::unique_ptr<Updater::UniqueWindow> CreateProgressBarWindow();
 
 	// A progress bar window is created/run on a separate thread so that it doesn't freeze during the update.
 	// The handle of the progress bar window is sent back to the main thread via the promise.
-	void ProgressBarThread(HWND mainWindow);
+	void ProgressBarThread();
 
 	// Constructs the cli to send to the launcher, to allow passthrough of args intended for it.
 	std::string BuildLauncherCli(int argc, char** argv);
