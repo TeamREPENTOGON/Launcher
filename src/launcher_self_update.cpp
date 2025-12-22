@@ -9,7 +9,7 @@
 #include "shared/launcher_update_checker.h"
 
 namespace Launcher {
-	static const char* SelfUpdaterExePath = "./REPENTOGONLauncherUpdater.exe";
+	static const char* SelfUpdaterExePath = "../REPENTOGONLauncher.exe";
 
 	enum SelfUpdateResult {
 		SELF_UPDATE_ERR_GENERIC,
@@ -37,8 +37,7 @@ namespace Launcher {
 				wxYES_NO, &dialog);
 
 			if (msgResult == wxYES || msgResult == wxOK) {
-				SelfUpdateResult updateResult = DoSelfUpdate(version.c_str(),
-					url.c_str());
+				SelfUpdateResult updateResult = DoSelfUpdate(version.c_str(), url.c_str());
 
 				std::ostringstream errMsg;
 				errMsg << "Error while attempting self-update: check the ";
@@ -65,17 +64,19 @@ namespace Launcher {
 		}
 	}
 
-	SelfUpdateResult DoSelfUpdate(const char* version, const char* url) {
-		Logger::Info("Launching self-updater to check for launcher updates...\n");
-
-		char cli[512];
-		int len = snprintf(cli, sizeof(cli), "%s --launcherpid %d --version %s --url %s",
-			SelfUpdaterExePath, GetCurrentProcessId(), version, url);
-		if (len < 0 || len >= sizeof(cli)) {
-			Logger::Error("Failed to start self-updater process: command-line "
-				"arguments exceeded buffer size %d\n", sizeof(cli));
-			return SELF_UPDATE_ERR_GENERIC;
+	std::string BuildUpdaterCli(const char* version, const char* url) {
+		std::ostringstream cli;
+		cli << SelfUpdaterExePath << " --launcherpid " << GetCurrentProcessId() << " --version " << version << " --url " << url;
+		for (int i = 1; i < wxTheApp->argc; ++i) {
+			cli << " " << wxTheApp->argv[i];
 		}
+		return cli.str();
+	}
+
+	SelfUpdateResult DoSelfUpdate(const char* version, const char* url) {
+		std::string cli = BuildUpdaterCli(version, url);
+
+		Logger::Info("Launching self-updater: %s\n", cli.c_str());
 
 		PROCESS_INFORMATION info;
 		memset(&info, 0, sizeof(info));
@@ -83,7 +84,7 @@ namespace Launcher {
 		STARTUPINFOA startupInfo;
 		memset(&startupInfo, 0, sizeof(startupInfo));
 
-		BOOL ok = CreateProcessA(SelfUpdaterExePath, cli, NULL, NULL, false, 0, NULL, NULL, &startupInfo, &info);
+		BOOL ok = CreateProcessA(SelfUpdaterExePath, (LPSTR)cli.c_str(), NULL, NULL, false, 0, NULL, NULL, &startupInfo, &info);
 		if (!ok) {
 			Logger::Error("Failed to start self-updater process (error code %d)\n", GetLastError());
 			return SELF_UPDATE_ERR_GENERIC;
