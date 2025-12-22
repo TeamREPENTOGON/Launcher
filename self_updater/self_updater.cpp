@@ -105,6 +105,12 @@ HANDLE Updater::TryOpenLauncherProcessHandle(int argc, char** argv) {
 		return INVALID_HANDLE_VALUE;
 	}
 
+	DWORD exit_code{};
+	bool alreadyTerminated = GetExitCodeProcess(launcherHandle, &exit_code) && (exit_code != STILL_ACTIVE);
+	if (alreadyTerminated) {
+		return INVALID_HANDLE_VALUE;
+	}
+
 	if (!HandleMatchesLauncherExe(launcherHandle)) {
 		// This is not the launcher. Assume that the launcher already closed, and the pid may have been re-used.
 		Logger::Warn("Provided process ID is not the launcher exe. Ignoring it.\n");
@@ -268,9 +274,28 @@ void Updater::ProgressBarThread(HWND mainWindow) {
 	Logger::Error("Progress bar thread ended.\n");
 }
 
-bool Updater::StartLauncher() {
+std::string Updater::BuildLauncherCli(int argc, char** argv) {
+	std::ostringstream cli;
+	cli << LauncherExePath;
+	for (int i = 0; i < argc; ++i) {
+		if (strcmp(argv[i], Updater::ForcedArg) == 0) {
+			continue;
+		}
+		if (strcmp(argv[i], Updater::LauncherProcessIdArg) == 0 || strcmp(argv[i], Updater::ReleaseURL) == 0 || strcmp(argv[i], Updater::UpgradeVersion) == 0) {
+			i++;
+			continue;
+		}
+		cli << " " << argv[i];
+	}
+	return cli.str();
+}
+
+bool Updater::StartLauncher(int argc, char** argv) {
 	Updater::SetCurrentUpdaterState(Updater::UPDATER_STARTING_LAUNCHER);
-	Logger::Info("Starting launcher...\n");
+
+	std::string cli = BuildLauncherCli(argc, argv);
+
+	Logger::Info("Starting launcher: %s\n", cli.c_str());
 
 	STARTUPINFOA startup;
 	memset(&startup, 0, sizeof(startup));
@@ -278,8 +303,7 @@ bool Updater::StartLauncher() {
 	PROCESS_INFORMATION info;
 	memset(&info, 0, sizeof(info));
 
-	char cli[] = { 0 };
-	return CreateProcessA(LauncherExePath, cli, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
+	return CreateProcessA(LauncherExePath, (LPSTR)cli.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
 }
 
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
@@ -529,7 +553,11 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 
 	sGithubExecutor->Stop();
 
-	if (!Updater::StartLauncher()) {
+	HANDLE launcherHandle = Updater::TryOpenLauncherProcessHandle(argc, argv);
+	const bool launcherIsOpen = launcherHandle != INVALID_HANDLE_VALUE;
+	CloseHandle(launcherHandle);
+
+	if (!launcherIsOpen && !Updater::StartLauncher(argc, argv)) {
 		return -1;
 	}
 	return res;
