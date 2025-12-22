@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <atomic>
 #include <memory>
+#include <string>
 
 #include "self_updater/unique_window.h"
 
@@ -80,8 +81,11 @@ namespace Updater {
 	// The handle of the progress bar window is sent back to the main thread via the promise.
 	void ProgressBarThread(HWND mainWindow);
 
+	// Constructs the cli to send to the launcher, to allow passthrough of args intended for it.
+	std::string BuildLauncherCli(int argc, char** argv);
+
 	// Starts the launcher exe.
-	bool StartLauncher();
+	bool StartLauncher(int argc, char** argv);
 
 	// "Main" function that initiates the self-update process.
 	UpdateLauncherResult TryUpdateLauncher(int argc, char** argv, HWND mainWindow);
