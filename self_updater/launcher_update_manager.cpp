@@ -203,8 +203,6 @@ namespace Updater {
 			return false;
 		}
 
-		updateData._zipFilename = "./testupdate.zip";
-
 		if (!ExtractArchive(&updateData)) {
 			_gui->LogError("Error while extracting the releases's archive\n");
 			return false;
