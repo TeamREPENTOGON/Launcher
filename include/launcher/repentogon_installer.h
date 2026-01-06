@@ -57,6 +57,8 @@ namespace Launcher {
 		REPENTOGON_INSTALLATION_RESULT_NO_STEAM_APPID,
 		/* Update failed: failed to patch Isaac files. */
 		REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH,
+		/* Update failed: doesnt meet required launcher version. */
+		REPENTOGON_INSTALLATION_RESULT_LAUNCHER_UPDATE_REQUIRED,
 		/* Empty state. */
 		REPENTOGON_INSTALLATION_RESULT_NONE
 	};
@@ -71,9 +73,12 @@ namespace Launcher {
 		RepentogonInstallationPhase phase = REPENTOGON_INSTALLATION_PHASE_CHECK_ASSETS;
 		bool zipOk = false; /* zip is present in assets. */
 		bool hashOk = false; /* hash is present in assets. */
+		bool launcherversionlock = false;
+		std::string launcherversionreqUrl; /* URL to check launcher version. */
 		std::string hashUrl; /* URL to download the hash. */
 		std::string zipUrl; /* URL to download the archive. */
 		ScopedFile hashFile; /* Pointer to the file in which we write the hash. */
+		ScopedFile ReqVersionFile; /* Pointer to the file in which we write the hash. */
 		ScopedFile zipFile; /* Pointer to the file in which we write the zip. */
 		std::string hash; /* Expected hash of the zip file. */
 		std::string zipHash; /* Hash of the zip file. */
@@ -204,6 +209,9 @@ namespace Launcher {
 		 * Return true if the hash matches, false otherwise.
 		 */
 		bool CheckRepentogonIntegrity();
+
+		/* Check that the launcher version meets the required one by the update when it applies */
+		bool CheckLauncherVersionRequirement();
 
 		/* Extract the content of the Repentogon archive.
 		 *

@@ -46,6 +46,7 @@ private:
 
     // Returns true if a patch is available to convert this version into a supported one.
     bool PatchIsAvailable();
+    std::string patchtargetversion = "v1.9.7.12.J273";
 
 public:
     inline void SetGUI(ILoggableGUI* gui) {

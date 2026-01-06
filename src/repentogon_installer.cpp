@@ -11,6 +11,7 @@
 #include "shared/sha256.h"
 #include "shared/zip.h"
 #include <shared/gitlab_versionchecker.h>
+#include <wx/msgdlg.h>
 
 namespace fs = std::filesystem;
 
@@ -20,6 +21,7 @@ namespace Launcher {
 	static const char* RepentogonURL = "https://api.github.com/repos/TeamREPENTOGON/REPENTOGON/releases/latest";
 	static const char* RepentogonZipName = "REPENTOGON.zip";
 	static const char* HashName = "hash.txt";
+	static const char* ReqLauncherVersionName = "launcher.txt";
 
 	RepentogonInstallationState::RepentogonInstallationState() {
 
@@ -83,6 +85,18 @@ namespace Launcher {
 		if (!CheckRepentogonIntegrity()) {
 			Logger::Error("RepentogonInstaller::InstallRepentogonThread: invalid zip\n");
 			_installationState.result = REPENTOGON_INSTALLATION_RESULT_BAD_HASH;
+			return false;
+		}
+		if (!CheckLauncherVersionRequirement()) {
+			Logger::Error("RepentogonInstaller::InstallRepentogonThread: doesnt meet the required launcher version\n");
+			wxMessageBox(
+				"REPENTOGON update failted to download due to an outdated launcher version.\n"
+				"Please update it to continue to get the latest updates!\n",
+				"Update your Launcher!",
+				wxOK | wxOK_DEFAULT | wxICON_ERROR,
+				NULL
+			);
+			_installationState.result = REPENTOGON_INSTALLATION_RESULT_LAUNCHER_UPDATE_REQUIRED;
 			return false;
 		}
 
@@ -364,8 +378,9 @@ namespace Launcher {
 			const char* name = asset["name"].GetString();
 			Logger::Info("RepentogonUpdater::CheckRepentogonAssets: asset %d -> %s\n", i, name);
 			bool isHash = !strcmp(name, HashName);
+			bool isLauncherReq = !strcmp(name, ReqLauncherVersionName);
 			bool isRepentogon = !strcmp(name, RepentogonZipName);
-			if (!isHash && !isRepentogon)
+			if (!isHash && !isRepentogon && !isLauncherReq)
 				continue;
 
 			if (!asset.HasMember("browser_download_url") || !asset["browser_download_url"].IsString()) {
@@ -377,6 +392,10 @@ namespace Launcher {
 			if (isHash) {
 				_installationState.hashOk = true;
 				_installationState.hashUrl = url;
+				hasHash = true;
+			}else if (isLauncherReq) {
+				_installationState.launcherversionlock = true;
+				_installationState.launcherversionreqUrl = url;
 				hasHash = true;
 			} else if (isRepentogon) {
 				_installationState.zipOk = true;
@@ -428,6 +447,33 @@ namespace Launcher {
 			return false;
 		}
 
+		if (_installationState.launcherversionlock) {
+			request.url = _installationState.launcherversionreqUrl;
+
+			Github::GenerateGithubHeaders(request);
+
+			std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> ReqLauncherverDownloadDescriptor =
+				curl::AsyncDownloadFile(request, ReqLauncherVersionName);
+			std::optional<curl::DownloadFileDescriptor> reqlauncherResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
+				&ReqLauncherverDownloadDescriptor->base.monitor, ReqLauncherverDownloadDescriptor->result);
+
+			if (!reqlauncherResult) {
+				ReqLauncherverDownloadDescriptor->base.cancel.store(true, std::memory_order_release);
+				Logger::Info("RepentogonUpdater::DownloadRepentogon: cancel requested\n");
+				return false;
+			}
+
+			if (reqlauncherResult->result != curl::DOWNLOAD_FILE_OK) {
+				Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading launcher version.txt\n");
+				return false;
+			}
+
+			_installationState.ReqVersionFile = fopen(ReqLauncherVersionName, "r");
+			if (!_installationState.ReqVersionFile) {
+				Logger::Error("RepentogonUpdater::DownloadRepentogon: Unable to open %s for reading\n", ReqLauncherVersionName);
+				return false;
+			}
+		}
 		request.url = _installationState.zipUrl;
 		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> zipDownloadDesc =
 			curl::AsyncDownloadFile(request, RepentogonZipName);
@@ -504,6 +550,71 @@ namespace Launcher {
 		}
 
 		return true;
+	}
+	
+	struct Version {
+		std::vector<int> numbers;
+		bool isBeta = false;
+	};
+
+	Version parseVersion(const std::string& s) {
+		Version v;
+		std::string str = s;
+
+		if (!str.empty() && (str[0] == 'v' || str[0] == 'V'))
+			str.erase(0, 1);
+
+		if (str.size() >= 4 && str.substr(str.size() - 4) == "beta") {
+			v.isBeta = true;
+			str.erase(str.size() - 4);
+		}
+
+		std::stringstream ss(str);
+		std::string part;
+		while (std::getline(ss, part, '.')) {
+			v.numbers.push_back(std::stoi(part));
+		}
+
+		return v;
+	}
+
+	int compareVersions(const std::string& a, const std::string& b) {
+		Version va = parseVersion(a);
+		Version vb = parseVersion(b);
+
+		size_t maxParts = std::max(va.numbers.size(), vb.numbers.size());
+		for (size_t i = 0; i < maxParts; ++i) {
+			int na = (i < va.numbers.size()) ? va.numbers[i] : 0;
+			int nb = (i < vb.numbers.size()) ? vb.numbers[i] : 0;
+
+			if (na < nb) return -1;
+			if (na > nb) return 1;
+		}
+
+		//same numbers then release > beta
+		if (va.isBeta != vb.isBeta) {
+			return va.isBeta ? -1 : 1;
+		}
+
+		return 0;
+	}
+
+	bool RepentogonInstaller::CheckLauncherVersionRequirement() {
+		if (!_installationState.launcherversionlock) {
+			return true;
+		}
+		char hash[4096];
+		char* result = fgets(hash, 4096, _installationState.ReqVersionFile);
+
+		if (!result) {
+			Logger::Error("RepentogonUpdater::CheckRepentogonIntegrity: fgets error\n");
+			return false;
+		}
+		size_t len = strlen(hash);
+		std::string reqver = hash;
+		std::string currver = CMAKE_LAUNCHER_VERSION;
+
+		return compareVersions(currver,reqver) >= 0;
 	}
 
 	bool RepentogonInstaller::ExtractRepentogon(const char* outputDir) {

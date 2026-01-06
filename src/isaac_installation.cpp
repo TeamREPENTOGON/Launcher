@@ -19,6 +19,23 @@
 #include "launcher/standalone_rgon_folder.h"
 #include "steam_api.h"
 
+
+#include <io.h>
+#include <fstream>
+#include <filesystem>
+#include <string>
+#include <stdexcept>
+#include <curl/curl.h>
+#include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <ctime>
+#include <string>
+#include <cstdio>
+#include <vector>
+#include <curl/curl.h>
+#include <zip.h>
+
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
 
 namespace srgon = standalone_rgon;
@@ -314,6 +331,140 @@ std::optional<std::string> InstallationData::ComputeVersion(std::string const& p
 	return GetVersionStringFromMemory(path);
 }
 
+static size_t patchwriteresponse(void* contents, size_t size, size_t nmemb, void* userp)
+{
+	FILE* fp = static_cast<FILE*>(userp);
+	return fwrite(contents, size, nmemb, fp);
+}
+
+static void RemoveOldPatchFolder()
+{
+	namespace fs = std::filesystem;
+	if (fs::exists("patch"))
+		fs::remove_all("patch");
+}
+
+static bool ExtractZip(const char* zipPath, const char* outputDir)
+{
+	int err = 0;
+	zip_t* za = zip_open(zipPath, ZIP_RDONLY, &err);
+	if (!za)
+		return false;
+
+	namespace fs = std::filesystem;
+	fs::create_directories(outputDir);
+
+	zip_int64_t numEntries = zip_get_num_entries(za, 0);
+
+	for (zip_uint64_t i = 0; i < (zip_uint64_t)numEntries; ++i)
+	{
+		zip_stat_t st{};
+		if (zip_stat_index(za, i, 0, &st) != 0)
+		{
+			zip_close(za);
+			return false;
+		}
+
+		std::string outPath = std::string(outputDir) + "/" + st.name;
+
+		if (st.name[strlen(st.name) - 1] == '/')
+		{
+			fs::create_directories(outPath);
+			continue;
+		}
+
+		fs::create_directories(fs::path(outPath).parent_path());
+
+		zip_file_t* zf = zip_fopen_index(za, i, 0);
+		if (!zf)
+		{
+			zip_close(za); 
+			return false;
+		}
+
+		FILE* out = fopen(outPath.c_str(), "wb");
+		if (!out)
+		{
+			zip_fclose(zf);
+			zip_close(za);
+			return false;
+		}
+
+		std::vector<char> buffer(8192);
+		zip_int64_t bytesRead;
+
+		while ((bytesRead = zip_fread(zf, buffer.data(), buffer.size())) > 0)
+		{
+			fwrite(buffer.data(), 1, (size_t)bytesRead, out);
+		}
+
+		fclose(out);
+		zip_fclose(zf);
+
+		if (bytesRead < 0)
+		{
+			zip_close(za);
+			return false;
+		}
+	}
+
+	zip_close(za);
+	return true;
+}
+
+bool CheckIfAvailableOnlineNGet(const std::string& currexehash,
+	const std::string& targetversion)
+{
+	const std::string url =
+		"https://gitlab.com/repentogon/versiontracker/-/raw/main/Patches/_" +
+		currexehash + "_-_" + targetversion + "_.zip?inline=false";
+
+	CURL* curl = curl_easy_init();
+	if (!curl)
+		return false;
+
+	FILE* fp = fopen("patch.zip", "wb");
+	if (!fp)
+	{
+		curl_easy_cleanup(curl);
+		return false;
+	}
+
+	struct curl_slist* headers = nullptr;
+	headers = curl_slist_append(headers, "User-Agent: rgon-patch-getter/6.9");
+
+	curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+	curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, patchwriteresponse);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+
+	CURLcode res = curl_easy_perform(curl);
+
+	long http_code = 0;
+	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
+
+	fclose(fp);
+	curl_slist_free_all(headers);
+	curl_easy_cleanup(curl);
+
+	if (res != CURLE_OK || http_code < 200 || http_code >= 300)
+	{
+		return false;
+	}
+	RemoveOldPatchFolder();
+	if (!ExtractZip("patch.zip", "."))
+	{
+		std::filesystem::remove("patch.zip");
+		return false;
+	}
+	std::filesystem::remove("patch.zip");
+	return true;
+}
+
+
+
 bool InstallationData::PatchIsAvailable() {
 	namespace fs = std::filesystem;
 	if (_vanillaexeispatchable > 0) {
@@ -360,6 +511,11 @@ bool InstallationData::PatchIsAvailable() {
 				_vanillaexeispatchable = 1;
 				return true;
 			}
+		}
+		std::transform(vanillaexehash.begin(), vanillaexehash.end(), vanillaexehash.begin(),
+			[](unsigned char c) { return std::toupper(c); });
+		if (CheckIfAvailableOnlineNGet(vanillaexehash, patchtargetversion)) {
+			return PatchIsAvailable();
 		}
 	}
 	_vanillaexeispatchable = 0;

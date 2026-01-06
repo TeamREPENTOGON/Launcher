@@ -151,6 +151,10 @@ namespace Launcher {
 			break;
 		}
 
+		case REPENTOGON_INSTALLATION_RESULT_LAUNCHER_UPDATE_REQUIRED:
+			LogError(text, "Could not install Repentogon: you need to update your launcher!\n");
+			break;
+		
 		case REPENTOGON_INSTALLATION_RESULT_NO_REPENTOGON:
 			LogError(text, "Could not install Repentogon: unable to create the Repentogon folder\n");
 			break;
