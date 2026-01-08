@@ -102,6 +102,7 @@ int UpdateMemory(LauncherConfiguration const* configuration, HANDLE process,
 	IMAGE_SECTION_HEADER* headers = (IMAGE_SECTION_HEADER*)base;
 	bool found = false;
 	for (int i = 0; i < ntHeaders->FileHeader.NumberOfSections; ++i) {
+		Logger::Info("Header: %s\n", (char*)headers->Name);
 		if (!strcmp((char*)headers->Name, ".trampo")) {
 			found = true;
 			break;
@@ -110,7 +111,7 @@ int UpdateMemory(LauncherConfiguration const* configuration, HANDLE process,
 	}
 
 	if (!found) {
-		Logger::Error("Unable to find section \".trampo\"\n");
+		Logger::Error("Unable to find section \".trampo\" in %d headers\n", ntHeaders->FileHeader.NumberOfSections);
 		return -1;
 	}
 
