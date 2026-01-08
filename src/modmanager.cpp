@@ -267,7 +267,7 @@ void ModManagerFrame::RefreshLists() {
     _disabledlist->Clear();
 
     for (const ModInfo& mod : allMods) {
-        wxString name = mod.displayName;
+        wxString name = wxString::FromUTF8(mod.displayName);
         if (mod.islocal) { name = "[[DEV/NoSteam]] " + name; }
         if (!filter.IsEmpty() && !name.Lower().Contains(filter)) continue;
         if (IsDisabled(mod.folderName)) {
@@ -873,7 +873,7 @@ void ModManagerFrame::OnSelectMod(ModInfo mod) {
                     thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
                 }
             }
-            selectedModTitle->SetLabel(mod.displayName);
+            selectedModTitle->SetLabel(wxString::FromUTF8(mod.displayName));
             selectedMod = mod;
             LoadModExtraData();
 }
