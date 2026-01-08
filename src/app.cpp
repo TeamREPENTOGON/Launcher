@@ -106,7 +106,7 @@ void Launcher::App::CheckLauncherUniqueness() {
 
 bool Launcher::App::OnInit() {
 	SetWorkingDirToExe();
-	Logger::Init("../launcher.log", "w");
+	Logger::Init("launcher.log", "w");
 	Externals::Init();
 
 	Logger::Info("Launcher started, version %s\n", LAUNCHER_VERSION);
@@ -265,3 +265,8 @@ int Launcher::App::OnExit() {
 }
 
 wxIMPLEMENT_APP(Launcher::App);
+
+extern "C" __declspec(dllexport) int WINAPI StartLauncherApp(HINSTANCE hInstance, HINSTANCE hPrevInstance, wxCmdLineArgType lpCmdLine, int nCmdShow) {
+	wxDISABLE_DEBUG_SUPPORT();
+	return wxEntry(hInstance, hPrevInstance, lpCmdLine, nCmdShow);
+}

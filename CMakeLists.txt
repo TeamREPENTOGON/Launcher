@@ -65,7 +65,7 @@ target_include_directories (bspatch PRIVATE
 enable_language("RC")
 set (WIN32_RESOURCES ${CMAKE_SOURCE_DIR}/assets/icon.rc)
 file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h")
-add_executable (REPENTOGONLauncher WIN32 ${LAUNCHER_FILES} ${WIN32_RESOURCES})
+add_library (REPENTOGONLauncher SHARED ${LAUNCHER_FILES} ${WIN32_RESOURCES})
 set_target_properties(REPENTOGONLauncher PROPERTIES OUTPUT_NAME "REPENTOGONLauncherApp")
 set_target_properties(REPENTOGONLauncher PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data)
 set_target_properties(inih PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data)

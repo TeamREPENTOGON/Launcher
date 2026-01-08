@@ -999,7 +999,7 @@ namespace Launcher {
 			break;
 
 		case CHECKLOGS_EVENT_LAUNCHERLOG:
-			wxLaunchDefaultBrowser("file:///" + fs::absolute("../launcher.log").string());
+			wxLaunchDefaultBrowser("file:///" + fs::absolute("launcher.log").string());
 			break;
 
 		case CHECKLOGS_EVENT_RGONLOG:
@@ -1012,7 +1012,7 @@ namespace Launcher {
 			break;
 
 		case CHECKLOGS_EVENT_LAUNCHERLOG_LOCATE:
-			ShowFileInExplorer("file:///" + fs::absolute("../launcher.log").string());
+			ShowFileInExplorer("file:///" + fs::absolute("launcher.log").string());
 			break;
 
 		case CHECKLOGS_EVENT_RGONLOG_LOCATE:

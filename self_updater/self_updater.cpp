@@ -27,7 +27,7 @@ const char* Updater::ReleaseURL = "--url";
 const char* Updater::UpgradeVersion = "--version";
 
 namespace Updater {
-	static const char* LauncherExePath = "./launcher-data/REPENTOGONLauncherApp.exe";
+	static const char* LauncherExePath = "./launcher-data/REPENTOGONLauncherApp.dll";
 	static const char* UpdaterProcessName = "REPENTOGON Launcher Updater";
 
 	// During update installation, the existing updater exe is renamed to make room for the new one.
@@ -298,9 +298,47 @@ std::string Updater::BuildLauncherCli(int argc, char** argv) {
 	return cli.str();
 }
 
+void SetWorkingDirToExe() {
+	char exePath[MAX_PATH];
+	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+	SetCurrentDirectoryA(exeDir.string().c_str());
+}
+
+void SetWorkingDirToBin() {
+	char exePath[MAX_PATH];
+	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path() / "launcher-data";
+	SetCurrentDirectoryA(exeDir.string().c_str());
+}
+
 bool Updater::StartLauncher(int argc, char** argv) {
 	Updater::SetCurrentUpdaterState(UPDATER_STARTING_LAUNCHER);
 
+	SetWorkingDirToBin();
+
+	HINSTANCE launcher = LoadLibraryA("REPENTOGONLauncherApp.dll");
+	//FARPROC proc = GetProcAddress(launcher, "main");
+	//proc();
+	if (launcher == NULL) {
+		std::string err = "LoadLibraryA FAILED: " + std::to_string(GetLastError()) + "\n";
+		ShowMessageBox(NULL, err.c_str(), MB_ICONERROR);
+		SetWorkingDirToExe();
+		return false;
+	}
+	FARPROC proc = GetProcAddress(launcher, "_StartLauncherApp@16");
+	if (proc == NULL) {
+		std::string err = "GetProcAddress FAILED: " + std::to_string(GetLastError()) + "\n";
+		ShowMessageBox(NULL, err.c_str(), MB_ICONERROR);
+		SetWorkingDirToExe();
+		return false;
+	}
+	proc();
+	FreeLibrary(launcher);
+	SetWorkingDirToExe();
+	return true;
+
+	/*
 	std::string cli = BuildLauncherCli(argc, argv);
 
 	Logger::Info("Starting launcher: %s\n", cli.c_str());
@@ -312,6 +350,7 @@ bool Updater::StartLauncher(int argc, char** argv) {
 	memset(&info, 0, sizeof(info));
 
 	return CreateProcessA(LauncherExePath, (LPSTR)cli.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
+	*/
 }
 
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
@@ -516,13 +555,6 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	std::filesystem::remove(UnfinishedUpdateMarker);
 	Logger::Info("Update successful!\n");
 	return UPDATE_SUCCESSFUL;
-}
-
-void SetWorkingDirToExe() {//stupid shit to make menu shortcuts work
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(NULL, exePath, MAX_PATH);
-	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-	SetCurrentDirectoryA(exeDir.string().c_str());
 }
 
 int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {

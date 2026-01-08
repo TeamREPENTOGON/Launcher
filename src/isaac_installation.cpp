@@ -37,6 +37,7 @@
 #include <zip.h>
 
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
+static constexpr const char* __patchFolder = "launcher-data/patch";
 
 namespace srgon = standalone_rgon;
 namespace fs = std::filesystem;
@@ -356,8 +357,8 @@ static size_t patchwriteresponse(void* contents, size_t size, size_t nmemb, void
 static void RemoveOldPatchFolder()
 {
 	namespace fs = std::filesystem;
-	if (fs::exists("patch"))
-		fs::remove_all("patch");
+	if (fs::exists(__patchFolder))
+		fs::remove_all(__patchFolder);
 }
 
 static bool ExtractZip(const char* zipPath, const char* outputDir)
@@ -490,7 +491,7 @@ bool InstallationData::PatchIsAvailable() {
 	HashResult result = Sha256::Sha256F(this->GetExePath().c_str(), vanillaexehash);
 
 	if (result == HASH_OK) {
-		fs::path fullPath = fs::current_path() / "patch/exehash.txt";
+		fs::path fullPath = fs::current_path() / __patchFolder / "exehash.txt";
 		std::string s = fullPath.string();
 		if (fs::exists(fullPath)) {
 			ScopedFile file(fopen(s.c_str(), "r"));
