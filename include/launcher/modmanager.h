@@ -46,12 +46,12 @@ struct ModExtraData {
 };
 
 struct ModInfo {
-    std::string folderName;
-    std::string displayName;
+    std::wstring folderName;
+    std::wstring displayName;
     std::string description;
-    std::string directory;
+    std::wstring directory;
     bool islocal;
-    std::string id;
+    std::wstring id;
     ModExtraData extradata;
 };
 
@@ -80,7 +80,7 @@ private:
     fs::path _modspath;
 
     std::vector<ModInfo> allMods;
-    std::unordered_map<std::string, ModInfo> modMap;
+    std::unordered_map<std::wstring, ModInfo> modMap;
 
     void LoadModsFromFolder();
 
@@ -102,9 +102,9 @@ private:
     void OnModSaveFolder(wxCommandEvent& event);
     void OnHover(wxMouseEvent& event);
 
-    void EnableMod(const std::string& modfolder);
-    void DisableMod(const std::string& modfolder);
-    bool IsDisabled(const std::string& modfolder);
+    void EnableMod(const std::wstring& modfolder);
+    void DisableMod(const std::wstring& modfolder);
+    bool IsDisabled(const std::wstring& modfolder);
 
     wxDECLARE_EVENT_TABLE();
 };

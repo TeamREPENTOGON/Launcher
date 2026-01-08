@@ -129,7 +129,10 @@ private:
 
     bool ParseMetadata(const fs::path& metadataPath, std::string& outName, std::string& outVersion) {
         try {
-            rapidxml::file<> xmlFile(metadataPath.string().c_str());
+            std::ifstream file(metadataPath, std::ios::binary);
+            if (!file)
+                return false;
+            rapidxml::file<> xmlFile(file);
             rapidxml::xml_document<> doc;
             doc.parse<0>(xmlFile.data());
             if (auto* root = doc.first_node("metadata")) {
@@ -153,7 +156,10 @@ private:
 
     bool ParseMetadataId(const fs::path& xmlPath, uint64_t& outId) {
         try {
-            rapidxml::file<> xmlFile(xmlPath.string().c_str());
+            std::ifstream file(xmlPath, std::ios::binary);
+            if (!file)
+                return false;
+            rapidxml::file<> xmlFile(file);
             rapidxml::xml_document<> doc;
             doc.parse<0>(xmlFile.data());
 
@@ -348,12 +354,12 @@ private:
             if (!entry.is_directory())
                 continue;
 
-            const auto folderName = entry.path().filename().string();
+            const auto folderName = entry.path().filename().wstring();
             auto pos = folderName.rfind('_');
             if (pos == std::string::npos)
                 continue;
 
-            std::string idStr = folderName.substr(pos + 1);
+            std::wstring idStr = folderName.substr(pos + 1);
             try {
                 uint64 id = std::stoull(idStr);
                 if (!subscribedIds.count(id)) {
@@ -365,9 +371,9 @@ private:
                     std::error_code ec;
                     fs::remove_all(entry.path(), ec);
                     if (ec)
-                        PostProgressEvent(overallPct,"Failed to remove " + folderName + ": " + ec.message());
+                        PostProgressEvent(overallPct,"Failed to remove " + wxString(folderName).ToStdString() + ": " + ec.message());
                     else
-                        PostProgressEvent(overallPct,"DONE: Removed " + folderName);
+                        PostProgressEvent(overallPct,"DONE: Removed " + wxString(folderName).ToStdString());
                 }
             }
             catch (...) {

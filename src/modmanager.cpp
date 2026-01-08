@@ -56,7 +56,14 @@ void OnRichTextUrlClick(wxTextUrlEvent& event)
     wxLaunchDefaultBrowser(url);
 }
 
-
+std::wstring to_wstring(const char* s)
+{
+    if (!s) return {};
+    int len = MultiByteToWideChar(CP_ACP, 0, s, -1, nullptr, 0);
+    std::wstring out(len - 1, L'\0');
+    MultiByteToWideChar(CP_ACP, 0, s, -1, out.data(), len);
+    return out;
+}
 
 void ModManagerFrame::OnHover(wxMouseEvent& event) {
     static wxString lastTip;
@@ -221,10 +228,10 @@ void ModManagerFrame::LoadModsFromFolder() {
     for (const auto& entry : fs::directory_iterator(_modspath)) {
         if (entry.is_directory()) {
             ModInfo info;
-            info.folderName = entry.path().filename().string();
+            info.folderName = entry.path().filename().wstring();
             info.displayName = info.folderName;
             info.id = info.folderName;
-            info.description = info.folderName;
+            info.description = wxString(info.folderName).ToUTF8();
             info.directory = info.folderName;
 
             try {
@@ -237,19 +244,19 @@ void ModManagerFrame::LoadModsFromFolder() {
                     auto* metadata = doc.first_node("metadata");
                     if (metadata) {
                         if (metadata->first_node("name")) {
-                            info.displayName = metadata->first_node("name")->value();
+                            info.displayName = to_wstring(metadata->first_node("name")->value());
                         }
                         if (metadata->first_node("id")) {
-                            info.id = metadata->first_node("id")->value();
+                            info.id = to_wstring(metadata->first_node("id")->value());
                         }
                         if (metadata->first_node("description")) {
                             info.description = metadata->first_node("description")->value();
                         }
                         if (metadata->first_node("directory")) {
-                            info.directory = metadata->first_node("directory")->value();
+                            info.directory = to_wstring(metadata->first_node("directory")->value());
                         }
 
-                        info.islocal = info.folderName != (info.directory + "_" + info.id);
+                        info.islocal = info.folderName != (info.directory + L"_" + info.id);
                     }
                 }
             } catch (...) {
@@ -267,7 +274,7 @@ void ModManagerFrame::RefreshLists() {
     _disabledlist->Clear();
 
     for (const ModInfo& mod : allMods) {
-        wxString name = wxString::FromUTF8(mod.displayName);
+        wxString name = mod.displayName;
         if (mod.islocal) { name = "[[DEV/NoSteam]] " + name; }
         if (!filter.IsEmpty() && !name.Lower().Contains(filter)) continue;
         if (IsDisabled(mod.folderName)) {
@@ -278,15 +285,15 @@ void ModManagerFrame::RefreshLists() {
     }
 }
 
-bool ModManagerFrame::IsDisabled(const std::string& modFolder) {
+bool ModManagerFrame::IsDisabled(const std::wstring& modFolder) {
     return fs::exists(_modspath / modFolder / "disable.it");
 }
 
-void ModManagerFrame::EnableMod(const std::string& modFolder) {
+void ModManagerFrame::EnableMod(const std::wstring& modFolder) {
     fs::remove(_modspath / modFolder / "disable.it");
 }
 
-void ModManagerFrame::DisableMod(const std::string& modFolder) {
+void ModManagerFrame::DisableMod(const std::wstring& modFolder) {
     std::ofstream(_modspath / modFolder / "disable.it");
 }
 
@@ -322,8 +329,8 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) 
     return newLength;
 }
 
-std::string GetThumbnailURL(const std::string& itemId) {
-    std::string url = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + itemId;
+std::string GetThumbnailURL(const std::wstring& itemId) {
+    std::string url = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + wxString(itemId).ToStdString();
     std::string html;
 
     CURL* curl = curl_easy_init();
@@ -364,13 +371,13 @@ std::string GetThumbnailURL(const std::string& itemId) {
     return "";
 }
 
-bool DownloadThumbFromID(const std::string& itemId, const std::string& filePath) {
+bool DownloadThumbFromID(const std::wstring& itemId, const std::wstring& filePath) {
 
     if (itemId.length() <= 0) { return false; }
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    FILE* fp = fopen(filePath.c_str(), "wb");
+    FILE* fp = _wfopen(filePath.c_str(), L"wb");
     if (!fp) {
         curl_easy_cleanup(curl);
         return false;
@@ -389,13 +396,13 @@ bool DownloadThumbFromID(const std::string& itemId, const std::string& filePath)
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
         if (response_code != 200) {
             fclose(fp);
-            remove(filePath.c_str());
+            _wremove(filePath.c_str());
             return false;
         }
     }
     else {
         fclose(fp);
-        remove(filePath.c_str());
+        _wremove(filePath.c_str());
         return false;
     }
 
@@ -404,7 +411,7 @@ bool DownloadThumbFromID(const std::string& itemId, const std::string& filePath)
 }
 
 //God Bless ChatGPT for this hacky stink, FUCK YOU libpng, YOU FUCKING SUCK, "fix your png" they say....dude, its not my effing PNG! (Yes, I know this function FUCKING SUCKS, but nothing to do)
-bool LoadImageQuietly(const std::string& path, wxImage& img) {
+bool LoadImageQuietly(const std::wstring& path, wxImage& img) {
     wxLogNull noLog;
 
     fflush(stderr);
@@ -830,7 +837,7 @@ void ModManagerFrame::OnSelectMod(ModInfo mod) {
             fs::path imagePath = _modspath / mod.folderName / "thumb.png";
             if (fs::exists(imagePath) && fs::file_size(imagePath) > 0) {
                 wxImage img;
-                if (LoadImageQuietly(imagePath.string(), img)) {
+                if (LoadImageQuietly(imagePath.wstring(), img)) {
                     img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
                     thumbnailCtrl->SetBitmap(wxBitmap(img));
                 }
@@ -843,10 +850,10 @@ void ModManagerFrame::OnSelectMod(ModInfo mod) {
                 if ((mod.id.length() > 0) && (mod.id != mod.folderName)) { //check if the thing actually has a valid id
                     thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 102)));
                     std::thread([this, id = mod.id, imagePath]() {
-                    if (DownloadThumbFromID(id, imagePath.string())) {
+                    if (DownloadThumbFromID(id, imagePath.wstring())) {
                         try {
                         wxImage img;
-                        if (LoadImageQuietly(imagePath.string(), img)) {
+                        if (LoadImageQuietly(imagePath.wstring(), img)) {
                             img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
                                 if (selectedMod.id == id) { //so it doesnt get replaced if the mod changes while other thumbs are loading
                                     wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
@@ -873,20 +880,20 @@ void ModManagerFrame::OnSelectMod(ModInfo mod) {
                     thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
                 }
             }
-            selectedModTitle->SetLabel(wxString::FromUTF8(mod.displayName));
+            selectedModTitle->SetLabel(mod.displayName);
             selectedMod = mod;
             LoadModExtraData();
 }
 
 void ModManagerFrame::OnWorkshopPage(wxCommandEvent&) {
     if (!selectedMod.id.empty()) {
-        wxLaunchDefaultBrowser("https://steamcommunity.com/sharedfiles/filedetails/?id=" + selectedMod.id);
+        wxLaunchDefaultBrowser(L"https://steamcommunity.com/sharedfiles/filedetails/?id=" + selectedMod.id);
     }
 }
 
 void ModManagerFrame::OnModFolder(wxCommandEvent&) {
     if (!selectedMod.folderName.empty()) {
-        wxLaunchDefaultBrowser("file:///" + fs::absolute(_modspath / selectedMod.folderName).string());
+        wxLaunchDefaultBrowser(L"file:///" + fs::absolute(_modspath / selectedMod.folderName).wstring());
     }
 }
 
@@ -908,10 +915,10 @@ void ModManagerFrame::OnSearch(wxCommandEvent&) {
 void ModManagerFrame::OnSave(wxCommandEvent&) {
     wxFileDialog dlg(this, "Save Enabled Mods", "", "", "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     if (dlg.ShowModal() == wxID_OK) {
-        std::ofstream out(dlg.GetPath().ToStdString());
+        std::ofstream out(dlg.GetPath().ToUTF8());
         for (const auto& mod : allMods) {
             if (!IsDisabled(mod.folderName)) {
-                out << mod.folderName << "\n";
+                out << wxString(mod.folderName).ToUTF8() << "\n";
             }
         }
     }
@@ -920,12 +927,12 @@ void ModManagerFrame::OnSave(wxCommandEvent&) {
 void ModManagerFrame::OnLoad(wxCommandEvent&) {
     wxFileDialog dlg(this, "Load Enabled Mods", "", "", "Text files (*.txt)|*.txt", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dlg.ShowModal() == wxID_OK) {
-        std::ifstream in(dlg.GetPath().ToStdString());
-        std::unordered_set<std::string> enabledSet;
+        std::ifstream in(dlg.GetPath().ToUTF8());
+        std::unordered_set<std::wstring> enabledSet;
         std::string line;
 
         while (std::getline(in, line)) {
-            enabledSet.insert(line);
+            enabledSet.insert(wxString::FromUTF8(line).ToStdWstring());
         }
 
         for (const auto& mod : allMods) {
