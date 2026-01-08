@@ -315,30 +315,6 @@ void SetWorkingDirToBin() {
 bool Updater::StartLauncher(int argc, char** argv) {
 	Updater::SetCurrentUpdaterState(UPDATER_STARTING_LAUNCHER);
 
-	SetWorkingDirToBin();
-
-	HINSTANCE launcher = LoadLibraryA("REPENTOGONLauncherApp.dll");
-	//FARPROC proc = GetProcAddress(launcher, "main");
-	//proc();
-	if (launcher == NULL) {
-		std::string err = "LoadLibraryA FAILED: " + std::to_string(GetLastError()) + "\n";
-		ShowMessageBox(NULL, err.c_str(), MB_ICONERROR);
-		SetWorkingDirToExe();
-		return false;
-	}
-	FARPROC proc = GetProcAddress(launcher, "_StartLauncherApp@16");
-	if (proc == NULL) {
-		std::string err = "GetProcAddress FAILED: " + std::to_string(GetLastError()) + "\n";
-		ShowMessageBox(NULL, err.c_str(), MB_ICONERROR);
-		SetWorkingDirToExe();
-		return false;
-	}
-	proc();
-	FreeLibrary(launcher);
-	SetWorkingDirToExe();
-	return true;
-
-	/*
 	std::string cli = BuildLauncherCli(argc, argv);
 
 	Logger::Info("Starting launcher: %s\n", cli.c_str());
@@ -350,7 +326,6 @@ bool Updater::StartLauncher(int argc, char** argv) {
 	memset(&info, 0, sizeof(info));
 
 	return CreateProcessA(LauncherExePath, (LPSTR)cli.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
-	*/
 }
 
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
@@ -557,7 +532,9 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	return UPDATE_SUCCESSFUL;
 }
 
-int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
+typedef int(__cdecl* MYPROC)(HINSTANCE, HINSTANCE, LPSTR, int);
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cli, int nCmdShow) {
 	SetWorkingDirToExe();
 	Logger::Init("updater.log", true);
 	Logger::Info("%s started with command-line args: %s\n", Updater::UpdaterProcessName, cli);
@@ -601,12 +578,33 @@ int APIENTRY WinMain(HINSTANCE, HINSTANCE, LPSTR cli, int) {
 	sGithubExecutor->Stop();
 
 	if (!Updater::Utils::FileLocked(Updater::LauncherExePath)) {
-		if (!Updater::StartLauncher(argc, argv)) {
+		//if (!Updater::StartLauncher(argc, argv)) {
+		//	return -1;
+		//}
+
+		Updater::SetCurrentUpdaterState(Updater::UPDATER_STARTING_LAUNCHER);
+
+		SetWorkingDirToBin();
+
+		HINSTANCE launcher = LoadLibraryA("REPENTOGONLauncherApp.dll");
+		if (launcher == NULL) {
+			std::string err = "LoadLibraryA FAILED: " + std::to_string(GetLastError()) + "\n";
+			Updater::ShowMessageBox(NULL, err.c_str(), MB_ICONERROR);
 			return -1;
 		}
+		MYPROC proc = (MYPROC)GetProcAddress(launcher, "_StartLauncherApp@16");
+		if (proc == NULL) {
+			std::string err = "GetProcAddress FAILED: " + std::to_string(GetLastError()) + "\n";
+			Updater::ShowMessageBox(NULL, err.c_str(), MB_ICONERROR);
+			return -1;
+		}
+		proc(hInstance, hPrevInstance, cli, nCmdShow);
+		FreeLibrary(launcher);
+		SetWorkingDirToExe();
+
 		Updater::SetCurrentUpdaterState(Updater::UPDATER_SHUTTING_DOWN);
 		// Give the launcher a moment to start up so that Windows Explorer doesn't snatch back focus.
-		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		// std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	}
 	return res;
 }

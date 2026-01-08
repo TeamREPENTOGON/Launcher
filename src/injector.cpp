@@ -95,7 +95,7 @@ DWORD CreateIsaac(const char* path, bool isLegacy, LauncherConfiguration const* 
 int UpdateMemory(LauncherConfiguration const* configuration, HANDLE process,
 	PROCESS_INFORMATION const*, void** page, size_t* functionOffset,
 	size_t* paramOffset) {
-	HMODULE self = GetModuleHandle(NULL);
+	HMODULE self = GetModuleHandle(L"REPENTOGONLauncherApp.dll");
 	PIMAGE_NT_HEADERS ntHeaders = ImageNtHeader(self);
 	char* base = (char*)&(ntHeaders->OptionalHeader);
 	base += ntHeaders->FileHeader.SizeOfOptionalHeader;

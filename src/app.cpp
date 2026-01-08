@@ -264,9 +264,9 @@ int Launcher::App::OnExit() {
 	return 0;
 }
 
-wxIMPLEMENT_APP(Launcher::App);
+wxIMPLEMENT_WX_THEME_SUPPORT wxIMPLEMENT_APP_NO_MAIN(Launcher::App);
 
-extern "C" __declspec(dllexport) int WINAPI StartLauncherApp(HINSTANCE hInstance, HINSTANCE hPrevInstance, wxCmdLineArgType lpCmdLine, int nCmdShow) {
+extern "C" __declspec(dllexport) int WINAPI StartLauncherApp(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
 	wxDISABLE_DEBUG_SUPPORT();
 	return wxEntry(hInstance, hPrevInstance, lpCmdLine, nCmdShow);
 }
