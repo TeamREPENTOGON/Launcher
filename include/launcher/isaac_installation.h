@@ -34,6 +34,7 @@ private:
     std::string _folderPath;
     std::variant<const Version*, std::string> _version;
     bool _isCompatibleWithRepentogon = false;
+    std::string _CompatReason = "Maybe it works?, probably not tho, try it!";
     bool _isValid = false;
     bool _needsPatch = false;
     int _vanillaexeispatchable = -1; //-1 not checked, 0 not pachable, 1 pachable
@@ -67,6 +68,9 @@ public:
 
     inline bool IsValid() const {
         return _isValid;
+    }
+    inline std::string GetReason() const {
+        return _CompatReason;
     }
 
     inline const char* GetVersion() const {

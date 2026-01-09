@@ -448,7 +448,7 @@ namespace Launcher {
 		case ISAAC_LAUNCH_VANILLA_INVALID:
 			return "The vanilla installation is broken!";
 		case ISAAC_LAUNCH_REPENTOGON_INVALID:
-			return "The REPENTOGON installation is broken!";
+			return "The REPENTOGON installation is broken or incomplete! (try repair)";
 		case ISAAC_LAUNCH_REPENTOGON_INCOMPATIBLE:
 			return "The Isaac executable is not compatible with REPENTOGON!";
 		default:

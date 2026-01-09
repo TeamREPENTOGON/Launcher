@@ -230,6 +230,22 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 	 */
 	_needsPatch = !repentogon && PatchIsAvailable();
 	_isCompatibleWithRepentogon = _needsPatch || RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
+	if (_isCompatibleWithRepentogon) {
+		if (_needsPatch) {
+			_CompatReason = "Will work, the launcher has a patch to adapt it to a compatible version.";
+		}
+		else {
+			_CompatReason = "Should just work.";
+		}
+	}
+	else {
+		if (!strncmp(GetVersion(), "v1.7", strlen("v1.7"))) {
+			_CompatReason = "You need the Repentance+ dlc, you currently only have Repentance installed.";
+		}
+		else {
+			_CompatReason = "You dont have a proper version or your exe is corrupted/cracked (verify your files with steam or download the specific version rgon uses)";
+		}
+	}
 
 	bool isStandalone = srgon::IsStandaloneFolder(sourcePath);
 	if (isStandalone && !repentogon) {

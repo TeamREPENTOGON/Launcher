@@ -145,13 +145,21 @@ void LauncherWizard::AddIsaacSetupPage() {
 
     wxStaticText* compatibilityWithRepentogon = new wxStaticText(infoBox, wxID_ANY, "Compatible with Repentogon: ");
     wxStaticText* compatibleWithRepentogon = new wxStaticText(infoBox, wxID_ANY, "");
+    
+    wxStaticText* compatreasonlab = new wxStaticText(infoBox, wxID_ANY, "Reason: ");
+    wxStaticText* compatreasonval = new wxStaticText(infoBox, wxID_ANY, "");
 
     _isaacSetup._compatibleWithRepentogonValueText = compatibleWithRepentogon;
+    _isaacSetup._compatibleWithRepentogonReasonText = compatreasonval;
     SetupCompatibilityWithRepentogonText();
 
     wxSizer* compatibilitySizer = new wxBoxSizer(wxHORIZONTAL);
     compatibilitySizer->Add(compatibilityWithRepentogon, textBorder);
     compatibilitySizer->Add(compatibleWithRepentogon);
+    
+    wxSizer* reasonSizer = new wxBoxSizer(wxHORIZONTAL);
+    reasonSizer->Add(compatreasonlab, textBorder);
+    reasonSizer->Add(compatreasonval);
 
     wxSizer* versionSizer = new wxBoxSizer(wxHORIZONTAL);
     versionSizer->Add(executableVersionText, textBorder);
@@ -159,6 +167,7 @@ void LauncherWizard::AddIsaacSetupPage() {
 
     infoSizer->Add(versionSizer, flags);
     infoSizer->Add(compatibilitySizer, flags);
+    infoSizer->Add(reasonSizer, flags);
     // infoBox->SetSizerAndFit(infoSizer);
     sizer->Add(infoSizer, flags);
     page->SetSizerAndFit(sizer);
@@ -439,21 +448,26 @@ void LauncherWizard::SetupCompatibilityWithRepentogonText() {
     IsaacInstallation const& isaac = _installation->GetIsaacInstallation();
     InstallationData const& isaacData = isaac.GetMainInstallation();
     wxStaticText* compatibleWithRepentogon = _isaacSetup._compatibleWithRepentogonValueText;
+    wxStaticText* compatibleWithRepentogonreason = _isaacSetup._compatibleWithRepentogonReasonText;
 
+    compatibleWithRepentogonreason->SetLabel(isaacData.GetReason());
     if (isaacData.IsValid()) {
         if (isaacData.IsCompatibleWithRepentogon()) {
             compatibleWithRepentogon->SetForegroundColour(wxColour(23, 122, 23));
             compatibleWithRepentogon->SetLabel("yes");
             _compatibleWithRepentogon = true;
+            compatibleWithRepentogonreason->SetForegroundColour(wxColour(23, 122, 23));
         } else {
             compatibleWithRepentogon->SetForegroundColour(*wxRED);
             compatibleWithRepentogon->SetLabel("no");
             _compatibleWithRepentogon = false;
+            compatibleWithRepentogonreason->SetForegroundColour(*wxRED);
         }
     } else {
         compatibleWithRepentogon->SetForegroundColour(*wxBLACK);
         compatibleWithRepentogon->SetLabel("unknown");
         _compatibleWithRepentogon = false;
+        compatibleWithRepentogonreason->SetForegroundColour(*wxBLACK);
     }
 }
 

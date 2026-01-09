@@ -109,6 +109,7 @@ private:
         wxStaticText* _executableVersionValueText = nullptr;
         wxStaticText* _compatibleWithRepentogonText = nullptr;
         wxStaticText* _compatibleWithRepentogonValueText = nullptr;
+        wxStaticText* _compatibleWithRepentogonReasonText = nullptr;
     } _isaacSetup;
 
     struct {
