@@ -1,5 +1,6 @@
 #include <cstdarg>
 #include <future>
+#include <regex>
 
 #include "launcher/cli.h"
 #include "launcher/repentogon_installer.h"
@@ -10,8 +11,8 @@
 #include "shared/logger.h"
 #include "shared/sha256.h"
 #include "shared/zip.h"
-#include <shared/gitlab_versionchecker.h>
-#include <wx/msgdlg.h>
+#include "shared/gitlab_versionchecker.h"
+#include "wx/msgdlg.h"
 
 namespace fs = std::filesystem;
 
@@ -90,7 +91,7 @@ namespace Launcher {
 		if (!CheckLauncherVersionRequirement()) {
 			Logger::Error("RepentogonInstaller::InstallRepentogonThread: doesnt meet the required launcher version\n");
 			wxMessageBox(
-				"REPENTOGON update failted to download due to an outdated launcher version.\n"
+				"REPENTOGON update failed to download due to an outdated launcher version.\n"
 				"Please update it to continue to get the latest updates!\n",
 				"Update your Launcher!",
 				wxOK | wxOK_DEFAULT | wxICON_ERROR,
@@ -555,24 +556,48 @@ namespace Launcher {
 	struct Version {
 		std::vector<int> numbers;
 		bool isBeta = false;
+		bool isUnstable = false;
+		bool isDev = false;
 	};
 
 	Version parseVersion(const std::string& s) {
 		Version v;
+
+		if (s.empty())
+			return v;
+
+		// Make a copy so we can manipulate it
 		std::string str = s;
 
-		if (!str.empty() && (str[0] == 'v' || str[0] == 'V'))
-			str.erase(0, 1);
+		// Normalize to lowercase
+		std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::tolower(c); });
 
-		if (str.size() >= 4 && str.substr(str.size() - 4) == "beta") {
-			v.isBeta = true;
-			str.erase(str.size() - 4);
+		if (str == "dev") {
+			v.isDev = true;
+			return v;
 		}
 
-		std::stringstream ss(str);
-		std::string part;
-		while (std::getline(ss, part, '.')) {
-			v.numbers.push_back(std::stoi(part));
+		// Trim leading v
+		if (str[0] == 'v')
+			str.erase(0, 1);
+
+		// Split into tokens
+		std::regex re(R"([.\-_]+)");
+		std::sregex_token_iterator first{str.begin(), str.end(), re, -1}, last;
+		std::vector<std::string> tokens{first, last};
+
+		for (const std::string& token : tokens) {
+			if (token == "beta") {
+				v.isBeta = true;
+			} else if (token == "unstable") {
+				v.isUnstable = true;
+			} else {
+				try {
+					v.numbers.push_back(std::stoi(token));
+				} catch (...) {
+					Logger::Error("RepentogonUpdater::parseVersion: Unrecognized token `%s` found in version string `%s`\n", token.c_str(), s.c_str());
+				}
+			}
 		}
 
 		return v;
@@ -581,6 +606,14 @@ namespace Launcher {
 	int compareVersions(const std::string& a, const std::string& b) {
 		Version va = parseVersion(a);
 		Version vb = parseVersion(b);
+
+		// "dev" > everything else
+		if (va.isDev || vb.isDev) {
+			if (va.isDev && vb.isDev) {
+				return 0;
+			}
+			return va.isDev ? 1 : -1;
+		}
 
 		size_t maxParts = std::max(va.numbers.size(), vb.numbers.size());
 		for (size_t i = 0; i < maxParts; ++i) {
@@ -591,7 +624,10 @@ namespace Launcher {
 			if (na > nb) return 1;
 		}
 
-		//same numbers then release > beta
+		//same numbers then release > beta > unstable
+		if (va.isUnstable != vb.isUnstable) {
+			return va.isUnstable ? -1 : 1;
+		}
 		if (va.isBeta != vb.isBeta) {
 			return va.isBeta ? -1 : 1;
 		}
@@ -603,15 +639,14 @@ namespace Launcher {
 		if (!_installationState.launcherversionlock) {
 			return true;
 		}
-		char hash[4096];
-		char* result = fgets(hash, 4096, _installationState.ReqVersionFile);
+		char reqverbuffer[4096];
+		char* result = fgets(reqverbuffer, 4096, _installationState.ReqVersionFile);
 
 		if (!result) {
-			Logger::Error("RepentogonUpdater::CheckRepentogonIntegrity: fgets error\n");
+			Logger::Error("RepentogonUpdater::CheckLauncherVersionRequirement: fgets error\n");
 			return false;
 		}
-		size_t len = strlen(hash);
-		std::string reqver = hash;
+		std::string reqver = reqverbuffer;
 		std::string currver = CMAKE_LAUNCHER_VERSION;
 
 		return compareVersions(currver,reqver) >= 0;
