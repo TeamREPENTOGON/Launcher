@@ -189,18 +189,23 @@ namespace Updater {
 
 		new (&_updater) LauncherUpdater(url);
 
-		if (!DoPreUpdateChecks()) {
-			return false;
-		}
-
 		LauncherUpdateData updateData;
-		bool downloadResult = DownloadUpdate(&updateData);
+		std::string strurl = url;
+		if (strurl.find("github") != std::string::npos) { //if its not from github, it assumes it's a local filepath
+			if (!DoPreUpdateChecks()) {
+				return false;
+			}
+			bool downloadResult = DownloadUpdate(&updateData);
 
-		_gui->Log("Update scheduled from version %s to version %s\n", Launcher::LAUNCHER_VERSION, _updater.GetReleaseInfo()["name"].GetString());
+			_gui->Log("Update scheduled from version %s to version %s\n", Launcher::LAUNCHER_VERSION, _updater.GetReleaseInfo()["name"].GetString());
 
-		if (!PostDownloadChecks(downloadResult, &updateData)) {
-			_gui->LogError("Error while downloading release\n");
-			return false;
+			if (!PostDownloadChecks(downloadResult, &updateData)) {
+				_gui->LogError("Error while downloading release\n");
+				return false;
+			}
+		}
+		else {
+			updateData._zipFilename = strurl + "/Launcher/REPENTOGONLauncher.zip";
 		}
 
 		if (!ExtractArchive(&updateData)) {

@@ -954,7 +954,7 @@ namespace Launcher {
 			break;
 		case ADVANCED_EVENT_REINSTALL:
 			_logWindow.Log("Attempting Repair...");
-			if (fs::remove_all(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon")) {
+			if (!fs::exists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon") || fs::remove_all(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon")) {
 				ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
 			}
 			else {

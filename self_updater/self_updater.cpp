@@ -285,7 +285,6 @@ void Updater::StartLauncher() {
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv) {
 	// Open a handle for the active launcher process, if provided by the launcher itself.
 	HANDLE launcherHandle = TryOpenLauncherProcessHandle(argc, argv);
-
 	// Validate that no other instance of the updater is running.
 	HANDLE lockFile = NULL;
 
