@@ -924,6 +924,26 @@ void ModManagerFrame::OnSave(wxCommandEvent&) {
     }
 }
 
+bool ExtractWorkshopId(const std::wstring& input, uint64_t& outId)
+{
+    // Match the LAST run of digits in the string
+    static const std::wregex re(LR"((\d+)(?!.*\d))");
+
+    std::wsmatch match;
+    if (!std::regex_search(input, match, re))
+        return false;
+
+    try
+    {
+        outId = std::stoull(match[1].str());
+        return true;
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
 void ModManagerFrame::OnLoad(wxCommandEvent&) {
     wxFileDialog dlg(this, "Load Enabled Mods", "", "", "Text files (*.txt)|*.txt", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dlg.ShowModal() == wxID_OK) {
@@ -943,6 +963,24 @@ void ModManagerFrame::OnLoad(wxCommandEvent&) {
             }
         }
         RefreshLists();
+        if ((_enabledlist->GetCount() < enabledSet.size()) && issteam && SteamUGC()) {
+            std::ostringstream s;
+            s << "You are missing some mods from the loaded list, want to subscribe to them on the workshop? \n (they will be downloaded by steam shortly after)";
+            wxMessageDialog modal(this, s.str(), "Subscribe to missing mods?", wxYES_NO);
+            int result = modal.ShowModal();
+            if (result == wxID_YES || result == wxID_OK) {
+                std::unordered_set<int> justsubbed;
+                for (const auto& modfolder : enabledSet) {
+                    if (!fs::exists(_modspath / modfolder)) {
+                        uint64_t id = 0;
+                        if (ExtractWorkshopId(modfolder, id)) {
+                          SteamUGC()->SubscribeItem(id);
+                          justsubbed.insert(id);
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
