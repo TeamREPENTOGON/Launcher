@@ -529,6 +529,44 @@ namespace Launcher {
 		return true;
 	}
 
+
+
+	std::string GetLastLinesOLog(const fs::path& filePath, int lineCount)
+	{
+		std::ifstream file(filePath, std::ios::binary);
+		if (!file)
+			return {};
+
+		file.seekg(0, std::ios::end);
+		std::streamoff fileSize = file.tellg();
+
+		if (fileSize <= 0)
+			return {};
+
+		std::string buffer;
+		int linesFound = 0;
+
+		for (std::streamoff pos = fileSize - 1; pos >= 0; --pos)
+		{
+			file.seekg(pos);
+			char c;
+			file.get(c);
+
+			if (c == '\n')
+			{
+				if (++linesFound > lineCount)
+					break;
+			}
+
+			buffer.push_back(c);
+
+			if (pos == 0)
+				break;
+		}
+		std::reverse(buffer.begin(), buffer.end());
+		return buffer;
+	}
+
 	void LauncherMainWindow::OnIsaacCompleted(DWORD exitCode) {
 		if (_exePath) {
 			delete[] _exePath;
@@ -551,6 +589,11 @@ namespace Launcher {
 			exitCode != STATUS_CONTROL_C_EXIT) {
 			if (exitCode != 0xFFFFFFFF) {
 				_logWindow.LogWarn("Game exited with error code %#lx (%s)\n", exitCode, desc.c_str());
+				_logWindow.LogWarn("Last few lines of the log.txt: \n");
+				_logWindow.LogWarn("-- START -- \n");
+				_logWindow.LogWarn(GetLastLinesOLog(fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt", 10).c_str());
+				_logWindow.LogWarn("--  END  -- \n");
+				_logWindow.LogWarn("Check log.txt and launcher.log for more details! \n");
 			}
 			if (exitCode == 0xc0000135) { //missing dll, the lua5.3.3r will be missing in older versions of rgon with potentially fucked exes by the old launcher practices
 				wxMessageBox(
