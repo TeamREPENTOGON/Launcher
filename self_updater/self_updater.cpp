@@ -347,6 +347,18 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		}
 	}
 
+	// Check for steam_appid.txt
+	if (!std::filesystem::exists("steam_appid.txt")) {
+		Logger::Warn("steam_appid.txt is missing. Generating one...\n");
+		std::ofstream outFile("steam_appid.txt");
+		if (outFile) {
+			outFile << "250900";
+			outFile.close();
+		} else {
+			Logger::Error("Failed to generate steam_appid.txt!\n");
+		}
+	}
+
 	// Check for available updates.
 	using lu = LauncherUpdateManager;
 	lu updateManager;
