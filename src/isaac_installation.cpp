@@ -16,6 +16,7 @@
 #include "shared/sha256.h"
 #include "shared/steam.h"
 #include "shared/unique_free_ptr.h"
+#include "shared/zip.h"
 #include "launcher/standalone_rgon_folder.h"
 #include "steam_api.h"
 
@@ -34,14 +35,16 @@
 #include <cstdio>
 #include <vector>
 #include <curl/curl.h>
-#include <zip.h>
 
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
+static constexpr const char* __launcherDataFolder = "launcher-data";
 static constexpr const char* __patchFolder = "launcher-data/patch";
+static constexpr const char* __patchZip = "launcher-data/patch.zip";
 
 namespace srgon = standalone_rgon;
 namespace fs = std::filesystem;
 
+/*
 Version const knownVersions[] = {
 		{ "fd5b4a2ea3b397aec9f2b311ecc3be2e7e66bcd8723989096008d4d8258d92ea", "v1.9.7.10.J212 (Steam)", true },
 		{ "d00523d04dd43a72071f1d936e5ff34892da20800d32f05a143eba0a4fe29361", "Dummy (Test Suite)", true },
@@ -63,6 +66,7 @@ Version const* GetIsaacVersionFromHash(const char* hash) {
 
 	return NULL;
 }
+*/
 
 bool InstallationData::ValidateExecutable(std::string const& path) {
 	_isValid = DoValidateExecutable(path);
@@ -361,74 +365,6 @@ static void RemoveOldPatchFolder()
 		fs::remove_all(__patchFolder);
 }
 
-static bool ExtractZip(const char* zipPath, const char* outputDir)
-{
-	int err = 0;
-	zip_t* za = zip_open(zipPath, ZIP_RDONLY, &err);
-	if (!za)
-		return false;
-
-	namespace fs = std::filesystem;
-	fs::create_directories(outputDir);
-
-	zip_int64_t numEntries = zip_get_num_entries(za, 0);
-
-	for (zip_uint64_t i = 0; i < (zip_uint64_t)numEntries; ++i)
-	{
-		zip_stat_t st{};
-		if (zip_stat_index(za, i, 0, &st) != 0)
-		{
-			zip_close(za);
-			return false;
-		}
-
-		std::string outPath = std::string(outputDir) + "/" + st.name;
-
-		if (st.name[strlen(st.name) - 1] == '/')
-		{
-			fs::create_directories(outPath);
-			continue;
-		}
-
-		fs::create_directories(fs::path(outPath).parent_path());
-
-		zip_file_t* zf = zip_fopen_index(za, i, 0);
-		if (!zf)
-		{
-			zip_close(za); 
-			return false;
-		}
-
-		FILE* out = fopen(outPath.c_str(), "wb");
-		if (!out)
-		{
-			zip_fclose(zf);
-			zip_close(za);
-			return false;
-		}
-
-		std::vector<char> buffer(8192);
-		zip_int64_t bytesRead;
-
-		while ((bytesRead = zip_fread(zf, buffer.data(), buffer.size())) > 0)
-		{
-			fwrite(buffer.data(), 1, (size_t)bytesRead, out);
-		}
-
-		fclose(out);
-		zip_fclose(zf);
-
-		if (bytesRead < 0)
-		{
-			zip_close(za);
-			return false;
-		}
-	}
-
-	zip_close(za);
-	return true;
-}
-
 bool CheckIfAvailableOnlineNGet(const std::string& currexehash,
 	const std::string& targetversion)
 {
@@ -440,7 +376,7 @@ bool CheckIfAvailableOnlineNGet(const std::string& currexehash,
 	if (!curl)
 		return false;
 
-	FILE* fp = fopen("patch.zip", "wb");
+	FILE* fp = fopen(__patchZip, "wb");
 	if (!fp)
 	{
 		curl_easy_cleanup(curl);
@@ -471,18 +407,18 @@ bool CheckIfAvailableOnlineNGet(const std::string& currexehash,
 		return false;
 	}
 	RemoveOldPatchFolder();
-	if (!ExtractZip("patch.zip", "."))
+	if (!Zip::ExtractAllToFolder(__patchZip, __launcherDataFolder))
 	{
-		std::filesystem::remove("patch.zip");
+		std::filesystem::remove(__patchZip);
 		return false;
 	}
-	std::filesystem::remove("patch.zip");
+	std::filesystem::remove(__patchZip);
 	return true;
 }
 
 
 
-bool InstallationData::PatchIsAvailable() {
+bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
 	namespace fs = std::filesystem;
 	if (_vanillaexeispatchable > 0) {
 		return _vanillaexeispatchable == 1; //so it doesnt do the whole check and we can call this a shitton of times without worrying, the vanilla exe shouldnt change while the launcher is open anyway, since the launcher doesnt update it and...if it does, just fucking restart the launcher, dude
@@ -496,7 +432,7 @@ bool InstallationData::PatchIsAvailable() {
 		if (fs::exists(fullPath)) {
 			ScopedFile file(fopen(s.c_str(), "r"));
 			if (!file) {
-				Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: failed to open patch file %s\n", s.c_str());
+				Logger::Error("InstallationData::PatchIsAvailable: failed to open patch file %s\n", s.c_str());
 				return false;
 			}
 
@@ -504,7 +440,7 @@ bool InstallationData::PatchIsAvailable() {
 			fseek(file, 0, SEEK_END);
 
 			if (ferror(file)) {
-				Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: failed to fseek\n");
+				Logger::Error("InstallationData::PatchIsAvailable: failed to fseek\n");
 				return false;
 			}
 
@@ -513,7 +449,7 @@ bool InstallationData::PatchIsAvailable() {
 
 			std::unique_ptr<char[]> content = std::make_unique<char[]>(end - begin + 1);
 			if (!content) {
-				Logger::Error("InstallationData::CheckCompatibilityWithRepentogon: unable to allocate memory\n");
+				Logger::Error("InstallationData::PatchIsAvailable: unable to allocate memory\n");
 				return false;
 			}
 
@@ -527,12 +463,24 @@ bool InstallationData::PatchIsAvailable() {
 			if (vanillaexehash == currexehash) {
 				_vanillaexeispatchable = 1;
 				return true;
+			} else {
+				Logger::Warn("InstallationData::PatchIsAvailable: Available patch's exe hash does not match the vanilla exe!\n");
 			}
+		} else {
+			Logger::Warn("InstallationData::PatchIsAvailable: Patch files missing!\n");
 		}
-		std::transform(vanillaexehash.begin(), vanillaexehash.end(), vanillaexehash.begin(),
-			[](unsigned char c) { return std::toupper(c); });
-		if (CheckIfAvailableOnlineNGet(vanillaexehash, patchtargetversion)) {
-			return PatchIsAvailable();
+		if (skipOnlineCheck) {
+			Logger::Warn("InstallationData::PatchIsAvailable: Skipping online check for available patches (possible failure/recursion).\n");
+		} else {
+			std::transform(vanillaexehash.begin(), vanillaexehash.end(), vanillaexehash.begin(),
+				[](unsigned char c) { return std::toupper(c); });
+			Logger::Info("InstallationData::PatchIsAvailable: Checking for patches online...\n");
+			if (CheckIfAvailableOnlineNGet(vanillaexehash, patchtargetversion)) {
+				Logger::Info("InstallationData::PatchIsAvailable: Potentially found usable patch online. Retrying...\n");
+				return PatchIsAvailable(/*skipOnlineCheck=*/true);
+			} else {
+				Logger::Info("InstallationData::PatchIsAvailable: No online patch found.\n");
+			}
 		}
 	}
 	_vanillaexeispatchable = 0;

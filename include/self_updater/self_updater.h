@@ -24,6 +24,7 @@ namespace Updater {
 	// Represents the final state of an attempted execution.
 	enum UpdateLauncherResult {
 		UPDATE_ERROR,
+		UPDATE_CHECK_STEAM_METHOD_FAILED,
 		UPDATE_ALREADY_UP_TO_DATE,
 		UPDATE_SKIPPED,
 		UPDATE_SUCCESSFUL,
@@ -38,6 +39,7 @@ namespace Updater {
 		UPDATER_DOWNLOADING_UPDATE,
 		UPDATER_INSTALLING_UPDATE,
 		UPDATER_STARTING_LAUNCHER,
+		UPDATER_RUNNING_LAUNCHER,
 		UPDATER_SHUTTING_DOWN,
 		UPDATER_FAILED,
 	};
@@ -79,18 +81,22 @@ namespace Updater {
 
 	// Initializes the window for the progress bar and returns the handle within a UniqueWindow wrapper.
 	// Returns nullptr if the window could not be created.
-	std::unique_ptr<Updater::UniqueWindow> CreateProgressBarWindow();
+	std::unique_ptr<Updater::UniqueWindow> CreateProgressBarWindow(POINT windowPos);
 
 	// A progress bar window is created/run on a separate thread so that it doesn't freeze during the update.
 	// The handle of the progress bar window is sent back to the main thread via the promise.
-	void ProgressBarThread();
-
-	// Constructs the cli to send to the launcher, to allow passthrough of args intended for it.
-	std::string BuildLauncherCli(int argc, char** argv);
-
-	// Starts the launcher exe.
-	bool StartLauncher(int argc, char** argv);
+	void ProgressBarThread(POINT windowPos);
 
 	// "Main" function that initiates the self-update process.
 	UpdateLauncherResult TryUpdateLauncher(int argc, char** argv, HWND mainWindow);
+
+	// Constructs a clean CLI for passing to the core launcher app, or for a restart.
+	// Certain flags are excluded.
+	std::string BuildCleanCli(int argc, char** argv, bool addCheckSelfUpdate);
+
+	// Loads and starts the launcher application.
+	int RunLauncher(HWND mainWindow, int argc, char** argv, bool checkUpdates);
+
+	// Restart self.
+	bool Restart(int argc, char** argv);
 }

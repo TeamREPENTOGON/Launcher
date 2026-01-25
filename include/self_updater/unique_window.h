@@ -11,6 +11,9 @@ namespace Updater {
 
 		~UniqueWindow();
 
+		operator HWND () const { return _window; }
+		operator bool() const { return _window != NULL; }
+
 		HWND GetHandle();
 	private:
 		HWND _window = NULL;

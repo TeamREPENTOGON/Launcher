@@ -13,6 +13,7 @@
 #include "rapidxml/rapidxml_utils.hpp"
 #include <unordered_set>
 #include "widgets/text_ctrl_log_widget.h"
+#include "shared/logger.h"
 
 namespace fs = std::filesystem;
 

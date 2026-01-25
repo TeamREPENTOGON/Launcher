@@ -157,12 +157,6 @@ namespace Launcher {
 		 */
 		bool PromptLegacyUninstall();
 
-		/* Check whether there is a launcher update file present in the current
-		 * folder.
-		 */
-		bool SanityCheckLauncherUpdate();
-		void SanitizeLauncherUpdate();
-
 		bool SelectIsaacExecutablePath();
 		void RefreshGUIFromInstallation();
 

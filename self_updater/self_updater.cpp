@@ -6,15 +6,14 @@
 #include <memory>
 #include <fstream>
 
-#include "comm/messages.h"
 #include "shared/github_executor.h"
 #include "shared/logger.h"
 #include "self_updater/self_updater.h"
 #include "self_updater/utils.h"
 #include "self_updater/launcher_update_manager.h"
 #include "self_updater/unique_window.h"
-#include "self_updater/unpacker.h"
 #include "launcher/version.h"
+#include "zip.h"
 
 // Enables windows visual styles for a nicer-looking progress bar & the marquee style.
 // Incantation obtained from official docs: https://learn.microsoft.com/en-us/windows/win32/controls/cookbook-overview
@@ -27,7 +26,8 @@ const char* Updater::ReleaseURL = "--url";
 const char* Updater::UpgradeVersion = "--version";
 
 namespace Updater {
-	static const char* LauncherExePath = "./launcher-data/REPENTOGONLauncherApp.dll";
+	static const char* LauncherBinFilename = "launcher-data.bin";
+	static const char* LauncherDllPath = "./launcher-data/REPENTOGONLauncherApp.dll";
 	static const char* UpdaterProcessName = "REPENTOGON Launcher Updater";
 
 	// During update installation, the existing updater exe is renamed to make room for the new one.
@@ -39,6 +39,8 @@ namespace Updater {
 	static const char* LauncherDataFolder = "launcher-data";
 	static const char* LauncherDataBackupFolder = "launcher-data.old";
 	static const char* UnfinishedUpdateMarker = "launcher-data/unfinished.it";
+
+	const char* CheckSelfUpdateLauncherArg = "--check-self-update";
 
 	const std::unordered_map<UpdaterState, const char*> UpdaterStateProgressBarLabels = {
 		{ UPDATER_CHECKING_FOR_UPDATE, "REPENTOGON Launcher Updater: Checking for update..." },
@@ -66,6 +68,8 @@ int Updater::ShowMessageBox(HWND window, const char* text, UINT flags) {
 }
 
 bool Updater::HandleMatchesLauncherExe(HANDLE handle) {
+	Logger::Info("HandleMatchesLauncherExe started.\n");
+
 	// Query the name/filepath of the process and verify that it corresponds to the launcher exe.
 	char buffer[MAX_PATH];
 	DWORD bufferSize = MAX_PATH;
@@ -75,14 +79,14 @@ bool Updater::HandleMatchesLauncherExe(HANDLE handle) {
 		return false;
 	}
 
-	Logger::Info("Comparing path of provided process ID (%s) to the launcher exe (%s)\n", buffer, LauncherExePath);
+	Logger::Info("Comparing path of provided process ID (%s) to the launcher exe (%s)\n", buffer, UpdaterExeFilename);
 
 	try {
-		return std::filesystem::equivalent(buffer, LauncherExePath);
+		return std::filesystem::equivalent(buffer, UpdaterExeFilename);
 	}
 	catch (const std::filesystem::filesystem_error& ex) {
 		// Most likely one or the other does not exist.
-		Logger::Warn("Error when checking filepath equivalence of `%s` and `%s`: %s", buffer, LauncherExePath, ex.what());
+		Logger::Warn("Error when checking filepath equivalence of `%s` and `%s`: %s", buffer, UpdaterExeFilename, ex.what());
 	}
 	return false;
 }
@@ -157,7 +161,7 @@ bool Updater::TryDeleteOldRenamedUpdaterExe(HWND mainWindow) {
 
 bool Updater::VerifyLauncherNotRunning(HWND mainWindow) {
 	int attempts = 0;
-	while (Utils::FileLocked(LauncherExePath)) {
+	while (Utils::FileLocked(LauncherDllPath)) {
 		attempts++;
 		if (attempts == 1) {
 			Logger::Error("The launcher exe is currently locked!\n");
@@ -179,7 +183,7 @@ bool Updater::VerifyLauncherNotRunning(HWND mainWindow) {
 	return true;
 }
 
-std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow() {
+std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(POINT windowPos) {
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 
 	WNDCLASSEX windowClass = {};
@@ -201,23 +205,10 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow() {
 	// Create main window
 	auto window = std::make_unique<UniqueWindow>(nullptr, windowClass.lpszClassName,
 		Updater::UpdaterProcessName, WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU,
-		0, 0, 450, 95, windowClass.hInstance);
+		windowPos.x - 225, windowPos.y - 30, 450, 95, windowClass.hInstance);
 	HWND windowHandle = window->GetHandle();
 	if (windowHandle == NULL) {
 		Logger::Error("Error creating progress bar window (%d)\n", GetLastError());
-		return nullptr;
-	}
-
-	// Move window to center of screen
-	RECT rect;
-	if (!GetWindowRect(windowHandle, &rect)) {
-		Logger::Error("Error getting rect of progress bar window (%d)\n", GetLastError());
-		return nullptr;
-	}
-	const int xpos = (GetSystemMetrics(SM_CXSCREEN) - rect.right) / 2;
-	const int ypos = (GetSystemMetrics(SM_CYSCREEN) - rect.bottom) / 2;
-	if (!SetWindowPos(windowHandle, 0, xpos, ypos, 0, 0, SWP_NOSIZE | SWP_NOZORDER)) {
-		Logger::Error("Error setting position of progress bar window (%d)\n", GetLastError());
 		return nullptr;
 	}
 
@@ -239,7 +230,7 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow() {
 	return window;
 }
 
-void Updater::ProgressBarThread() {
+void Updater::ProgressBarThread(POINT windowPos) {
 	std::unique_ptr<Updater::UniqueWindow> progressBarWindow = nullptr;
 
 	UpdaterState state = UPDATER_STARTUP;
@@ -261,7 +252,7 @@ void Updater::ProgressBarThread() {
 
 			if (UpdaterStateProgressBarLabels.find(state) != UpdaterStateProgressBarLabels.end()) {
 				if (!progressBarWindow) {
-					progressBarWindow = Updater::CreateProgressBarWindow();
+					progressBarWindow = Updater::CreateProgressBarWindow(windowPos);
 					if (!progressBarWindow) {
 						Logger::Error("Failed to create progress bar window\n");
 						break;
@@ -282,63 +273,8 @@ void Updater::ProgressBarThread() {
 	Logger::Error("Progress bar thread ended.\n");
 }
 
-std::string Updater::BuildLauncherCli(int argc, char** argv) {
-	std::ostringstream cli;
-	cli << LauncherExePath;
-	for (int i = 0; i < argc; ++i) {
-		if (strcmp(argv[i], Updater::ForcedArg) == 0) {
-			continue;
-		}
-		if (strcmp(argv[i], Updater::LauncherProcessIdArg) == 0 || strcmp(argv[i], Updater::ReleaseURL) == 0 || strcmp(argv[i], Updater::UpgradeVersion) == 0) {
-			i++;
-			continue;
-		}
-		cli << " " << argv[i];
-	}
-	return cli.str();
-}
-
-void SetWorkingDirToExe() {
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(NULL, exePath, MAX_PATH);
-	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-	SetCurrentDirectoryA(exeDir.string().c_str());
-}
-
-void SetWorkingDirToBin() {
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(NULL, exePath, MAX_PATH);
-	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path() / "launcher-data";
-	SetCurrentDirectoryA(exeDir.string().c_str());
-}
-
-bool Updater::StartLauncher(int argc, char** argv) {
-	Updater::SetCurrentUpdaterState(UPDATER_STARTING_LAUNCHER);
-
-	std::string cli = BuildLauncherCli(argc, argv);
-
-	Logger::Info("Starting launcher: %s\n", cli.c_str());
-
-	STARTUPINFOA startup;
-	memset(&startup, 0, sizeof(startup));
-
-	PROCESS_INFORMATION info;
-	memset(&info, 0, sizeof(info));
-
-	return CreateProcessA(LauncherExePath, (LPSTR)cli.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
-}
-
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
-	if (std::filesystem::exists(UnfinishedUpdateMarker) || !std::filesystem::exists(LauncherExePath)) {
-		Logger::Error("Detected broken update/installation!\n");
-		std::filesystem::remove_all(LauncherDataFolder);
-		if (std::filesystem::exists(LauncherDataBackupFolder)) {
-			std::filesystem::rename(LauncherDataBackupFolder, LauncherDataFolder);
-			Logger::Info("Successfully restored previous installation!\n");
-		} else {
-			Logger::Error("No prior installation exists to restore!\n");
-		}
-	}
+	Logger::Info("TryUpdateLauncher started.\n");
 
 	// Open a handle for the active launcher process, if provided by the launcher itself.
 	HANDLE launcherHandle = TryOpenLauncherProcessHandle(argc, argv);
@@ -375,13 +311,47 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	SetCurrentUpdaterState(UPDATER_CHECKING_FOR_UPDATE);
 
-	// Check for available updates.
-	// TODO: Properly hook up logging from LauncherUpdateManager
-	NopLogGUI gui;
-	using lu = LauncherUpdateManager;
-	lu updateManager(&gui);
+	// If the version backup folder exists, and an unfinished/broken update is detected, attempt to roll back.
+	if (std::filesystem::exists(LauncherDataBackupFolder) && (std::filesystem::exists(UnfinishedUpdateMarker) || !std::filesystem::exists(LauncherDllPath))) {
+		Logger::Error("Detected failed update!\n");
+		if (std::filesystem::exists(LauncherDataBackupFolder)) {
+			std::filesystem::remove_all(LauncherDataFolder);
+			std::filesystem::rename(LauncherDataBackupFolder, LauncherDataFolder);
+			Logger::Info("Successfully restored previous installation!\n");
+		} else {
+			Logger::Error("No prior installation exists to restore!\n");
+		}
+	}
 
-	bool allowUnstable = Utils::AllowUnstable(argc, argv);
+	// If no installation exists, but we have our bin file, attempt to extract it.
+	if (!std::filesystem::exists(LauncherDllPath)) {
+		if (!std::filesystem::exists(LauncherBinFilename)) {
+			Logger::Warn("No installation detected, but `%s` does not exist. Will attempt to force update...\n", LauncherBinFilename);
+		} else {
+			if (!std::filesystem::exists(LauncherDataFolder)) {
+				std::filesystem::create_directories(LauncherDataFolder);
+			} else if (!std::filesystem::is_directory(LauncherDataFolder)) {
+				// Dude???
+				Logger::Error("`%s` is not a directory! Deleting it...\n", LauncherDataFolder);
+				std::filesystem::remove(LauncherDataFolder);
+				std::filesystem::create_directories(LauncherDataFolder);
+			}
+			Logger::Info("Extracting %s...\n", LauncherBinFilename);
+			std::ofstream((const char*)UnfinishedUpdateMarker);  // Creates an empty file.
+			if (!Zip::ExtractAllToFolder(LauncherBinFilename, LauncherDataFolder)) {
+				Logger::Info("Extraction of `%s` failed (%d) : %s\n", LauncherBinFilename);
+				std::filesystem::remove_all(LauncherDataFolder);
+			} else {
+				std::filesystem::remove(UnfinishedUpdateMarker);
+			}
+		}
+	}
+
+	// Check for available updates.
+	using lu = LauncherUpdateManager;
+	lu updateManager;
+
+	const bool allowUnstable = Utils::AllowUnstable(argc, argv);
 	if (allowUnstable) {
 		Logger::Info("Fetching unstable releases is enabled.\n");
 	}
@@ -400,20 +370,29 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		version = versionGiven;
 	}
 
-	const bool forceUpdate = urlGiven || !std::filesystem::exists(LauncherExePath);
+	const bool launcherMissing = !std::filesystem::exists(LauncherDllPath);
+	const bool skipConfirmation = urlGiven || launcherMissing;
 
-	if (!forceUpdate) {
+	if (!urlGiven) {
 		lu::SelfUpdateCheckResult checkResult = updateManager.CheckSelfUpdateAvailability(allowUnstable, version, url);
 
 		switch (checkResult) {
 		case lu::SELF_UPDATE_CHECK_UP_TO_DATE:
-			Logger::Info("launcher is already up-to-date.\n");
-			return UPDATE_ALREADY_UP_TO_DATE;
+			if (launcherMissing) {
+				Logger::Info("Launcher DLL missing. Forcing update to version: %s (from %s)\n", version.c_str(), url.c_str());
+			} else {
+				Logger::Info("launcher is already up-to-date.\n");
+				return UPDATE_ALREADY_UP_TO_DATE;
+			}
+			break;
+
+		case lu::SELF_UPDATE_CHECK_STEAM_METHOD_FAILED:
+			Logger::Error("Error while checking for updates, and failed to use steam as a backup. Passing along to the launcher to try again using the Steam API.\n");
+			return UPDATE_CHECK_STEAM_METHOD_FAILED;
 
 		case lu::SELF_UPDATE_CHECK_ERR_GENERIC:
 			SetCurrentUpdaterState(UPDATER_FAILED);
 			ShowMessageBox(mainWindow, "An error was encountered while checking for the availability of updates. Check the log file for more details.\n", MB_ICONERROR);
-			Logger::Error("Error while checking for updates.\n");
 			return UPDATE_ERROR;
 
 		case lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE:
@@ -435,7 +414,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		return UPDATE_ERROR;
 	}
 
-	if (!forceUpdate) {
+	if (!skipConfirmation) {
 		SetCurrentUpdaterState(UPDATER_PROMPTING_USER);
 
 		// An appropriate update is available. Prompt the user about it.
@@ -467,14 +446,23 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	Logger::Info("Starting update download from %s\n", url.c_str());
 
-	if (!updateManager.DownloadAndExtractUpdate(url.c_str())) {
+	std::string updateZipFilename;
+
+	if (!updateManager.DownloadUpdate(url, updateZipFilename)) {
 		SetCurrentUpdaterState(UPDATER_FAILED);
 		ShowMessageBox(mainWindow, "Failed to download the update for the launcher. Check the log file for more details.\n", MB_ICONERROR);
 		Logger::Error("Error trying to download update from URL: %s\n", url.c_str());
 		return UPDATE_ERROR;
 	}
 
-	Logger::Info("Downloaded from %s\n", url.c_str());
+	if (updateZipFilename.empty()) {
+		SetCurrentUpdaterState(UPDATER_FAILED);
+		ShowMessageBox(mainWindow, "Failed to download the update for the launcher. Check the log file for more details.\n", MB_ICONERROR);
+		Logger::Error("No zip file found after downloading update from URL: %s\n", url.c_str());
+		return UPDATE_ERROR;
+	}
+
+	Logger::Info("Downloaded update zip file: %s\n", updateZipFilename.c_str());
 
 	SetCurrentUpdaterState(UPDATER_INSTALLING_UPDATE);
 
@@ -488,8 +476,10 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		Logger::Info("Deleting backup of previous version...\n");
 		std::filesystem::remove_all(LauncherDataBackupFolder);
 	}
-	Logger::Info("Backing up current version...\n");
-	std::filesystem::rename(LauncherDataFolder, LauncherDataBackupFolder);
+	if (std::filesystem::exists(LauncherDataFolder)) {
+		Logger::Info("Backing up current version...\n");
+		std::filesystem::rename(LauncherDataFolder, LauncherDataBackupFolder);
+	}
 	Logger::Info("Initializing directory for new version...\n");
 	std::filesystem::create_directories(LauncherDataFolder);
 	std::ofstream((const char*)UnfinishedUpdateMarker);  // Creates an empty file.
@@ -512,18 +502,10 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		}
 	}
 
-	if (!Unpacker::ExtractArchive(Comm::UnpackedArchiveName)) {
+	if (!Zip::ExtractAllToFolder(updateZipFilename.c_str(), ".")) {
 		SetCurrentUpdaterState(UPDATER_FAILED);
-		ShowMessageBox(mainWindow, "Unable to unpack the update, check log file\n", MB_ICONERROR);
+		ShowMessageBox(mainWindow, "Unable to extract the update, check updater.log\n", MB_ICONERROR);
 		Logger::Error("Error while extracting archive\n");
-		return UPDATE_ERROR;
-	}
-
-	if (!DeleteFileA(Comm::UnpackedArchiveName)) {
-		SetCurrentUpdaterState(UPDATER_FAILED);
-		ShowMessageBox(mainWindow, "Unable to delete the archive containing the update.\n"
-			"Delete the archive (launcher_update.bin) then you can start the launcher\n", MB_ICONERROR);
-		Logger::Error("Error while deleting archive (%d)\n", GetLastError());
 		return UPDATE_ERROR;
 	}
 
@@ -532,12 +514,99 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	return UPDATE_SUCCESSFUL;
 }
 
-typedef int(__cdecl* MYPROC)(HINSTANCE, HINSTANCE, LPSTR, int);
+void SetWorkingDirToExe() {
+	char exePath[MAX_PATH];
+	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
+	SetCurrentDirectoryA(exeDir.string().c_str());
+}
 
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cli, int nCmdShow) {
+void SetWorkingDirToBin() {
+	char exePath[MAX_PATH];
+	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path() / "launcher-data";
+	SetCurrentDirectoryA(exeDir.string().c_str());
+}
+
+std::string Updater::BuildCleanCli(int argc, char** argv, bool addCheckSelfUpdate) {
+	std::ostringstream cli;
+	cli << UpdaterExeFilename;
+	for (int i = 0; i < argc; ++i) {
+		if (strcmp(argv[i], ForcedArg) == 0 || strcmp(argv[i], CheckSelfUpdateLauncherArg) == 0) {
+			continue;
+		}
+		if (strcmp(argv[i], ReleaseURL) == 0 || strcmp(argv[i], UpgradeVersion) == 0 || strcmp(argv[i], LauncherProcessIdArg) == 0) {
+			i++;
+			continue;
+		}
+		cli << " " << argv[i];
+	}
+	if (addCheckSelfUpdate) {
+		cli << " " << CheckSelfUpdateLauncherArg;
+	}
+	return cli.str();
+}
+
+typedef int(__stdcall* LAUNCHERPROC)(int argc, char** argv);
+
+int Updater::RunLauncher(HWND mainWindow, int argc, char** argv, bool checkUpdates) {
+	Updater::SetCurrentUpdaterState(Updater::UPDATER_STARTING_LAUNCHER);
+
+	Logger::Info("Preparing to start launcher...\n");
+	SetWorkingDirToBin();
+
+	HINSTANCE launcher = LoadLibraryA("REPENTOGONLauncherApp.dll");
+	if (launcher == NULL) {
+		std::string err = "Failed to load REPENTOGONLauncherApp.dll: " + std::to_string(GetLastError()) + "\n";
+		ShowMessageBox(mainWindow, err.c_str(), MB_ICONERROR);
+		Logger::Error(err.c_str());
+		return -1;
+	}
+
+	LAUNCHERPROC proc = (LAUNCHERPROC)GetProcAddress(launcher, "_StartLauncherApp@8");
+	if (proc == NULL) {
+		std::string err = "Failed to start launcher: " + std::to_string(GetLastError()) + "\n";
+		ShowMessageBox(mainWindow, err.c_str(), MB_ICONERROR);
+		Logger::Error(err.c_str());
+		return -1;
+	}
+
+	const std::string cli = BuildCleanCli(argc, argv, checkUpdates);
+	int newargc = 0;
+	char** newargv = Utils::CommandLineToArgvA(cli.c_str(), &newargc);
+
+	SetCurrentUpdaterState(UPDATER_RUNNING_LAUNCHER);
+	Logger::Info("Starting launcher with cli: %s\n", cli.c_str());
+	SetForegroundWindow(mainWindow);
+	int res = proc(newargc, newargv);
+	Logger::Info("Launcher application closed with return code %d\n", res);
+	Utils::FreeCli(newargc, newargv);
+	FreeLibrary(launcher);
+
+	SetWorkingDirToExe();
+
+	return res;
+}
+
+bool Updater::Restart(int argc, char** argv) {
+	SetCurrentUpdaterState(UPDATER_SHUTTING_DOWN);
+
+	STARTUPINFOA startup;
+	memset(&startup, 0, sizeof(startup));
+
+	PROCESS_INFORMATION info;
+	memset(&info, 0, sizeof(info));
+
+	std::string cli = BuildCleanCli(argc, argv, false);
+
+	Logger::Info("Restarting: %s\n", cli.c_str());
+	return CreateProcessA(UpdaterExeFilename, (LPSTR)cli.c_str(), NULL, NULL, FALSE, 0, NULL, NULL, &startup, &info);
+}
+
+int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 	SetWorkingDirToExe();
 	Logger::Init("updater.log", true);
-	Logger::Info("%s started with command-line args: %s\n", Updater::UpdaterProcessName, cli);
+	Logger::Info("Updater started with command-line args: %s\n", cli);
 
 	int argc = 0;
 	char** argv = Updater::Utils::CommandLineToArgvA(cli, &argc);
@@ -545,24 +614,33 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cli, in
 	sGithubExecutor->Start();
 
 	// Create a dummy window to use as a parent for popups.
-	Updater::UniqueWindow mainWindow(NULL, "STATIC", NULL, WS_POPUP, 0, 0, 0, 0, GetModuleHandle(NULL));
+	Updater::UniqueWindow mainWindow(NULL, "STATIC", NULL, NULL, CW_USEDEFAULT, CW_USEDEFAULT, 1, 1, hInstance);
+	
+	// Get the center of the appropriate monitor.
+	HMONITOR monitor = MonitorFromWindow(mainWindow, MONITOR_DEFAULTTONEAREST);
+	MONITORINFO monitorInfo{ sizeof(monitorInfo) };
+	GetMonitorInfo(monitor, &monitorInfo);
+	POINT screenCenter{ (monitorInfo.rcWork.left + monitorInfo.rcWork.right) / 2, (monitorInfo.rcWork.top + monitorInfo.rcWork.bottom) / 2 };
 
 	// Start up a progress bar window on a separate thread so that we can show some not-frozen UI to the user.
-	std::thread progressBarThread(Updater::ProgressBarThread);
+	std::thread progressBarThread(Updater::ProgressBarThread, screenCenter);
 	progressBarThread.detach();
 
-	Updater::UpdateLauncherResult result = Updater::TryUpdateLauncher(argc, argv, mainWindow.GetHandle());
+	Updater::UpdateLauncherResult result = Updater::TryUpdateLauncher(argc, argv, mainWindow);
 
 	int res = -1;
 
 	switch (result) {
 	case Updater::UPDATE_ALREADY_UP_TO_DATE:
 	case Updater::UPDATE_SKIPPED:
-		res = 0;
+	case Updater::UPDATE_CHECK_STEAM_METHOD_FAILED:
+		// Run the launcher!
+		res = Updater::RunLauncher(mainWindow, argc, argv, result == Updater::UPDATE_CHECK_STEAM_METHOD_FAILED);
 		break;
 
 	case Updater::UPDATE_SUCCESSFUL:
-		res = 0;
+		// Restart before starting the launcher in case we made changes to the updater.
+		res = !Updater::Restart(argc, argv);
 		break;
 
 	case Updater::UPDATE_ERROR:
@@ -575,36 +653,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cli, in
 		break;
 	}
 
+	Updater::SetCurrentUpdaterState(Updater::UPDATER_SHUTTING_DOWN);
+
 	sGithubExecutor->Stop();
 
-	if (!Updater::Utils::FileLocked(Updater::LauncherExePath)) {
-		//if (!Updater::StartLauncher(argc, argv)) {
-		//	return -1;
-		//}
-
-		Updater::SetCurrentUpdaterState(Updater::UPDATER_STARTING_LAUNCHER);
-
-		SetWorkingDirToBin();
-
-		HINSTANCE launcher = LoadLibraryA("REPENTOGONLauncherApp.dll");
-		if (launcher == NULL) {
-			std::string err = "LoadLibraryA FAILED: " + std::to_string(GetLastError()) + "\n";
-			Updater::ShowMessageBox(NULL, err.c_str(), MB_ICONERROR);
-			return -1;
-		}
-		MYPROC proc = (MYPROC)GetProcAddress(launcher, "_StartLauncherApp@16");
-		if (proc == NULL) {
-			std::string err = "GetProcAddress FAILED: " + std::to_string(GetLastError()) + "\n";
-			Updater::ShowMessageBox(NULL, err.c_str(), MB_ICONERROR);
-			return -1;
-		}
-		proc(hInstance, hPrevInstance, cli, nCmdShow);
-		FreeLibrary(launcher);
-		SetWorkingDirToExe();
-
-		Updater::SetCurrentUpdaterState(Updater::UPDATER_SHUTTING_DOWN);
-		// Give the launcher a moment to start up so that Windows Explorer doesn't snatch back focus.
-		// std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	}
 	return res;
 }

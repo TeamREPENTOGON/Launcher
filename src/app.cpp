@@ -53,6 +53,10 @@ RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(
 
 Launcher::LauncherMainWindow* Launcher::App::CreateMainWindow() {
 	LauncherMainWindow* frame = new LauncherMainWindow(__installation, &__configuration);
+	wxWindow* win = wxTheApp->GetTopWindow();
+	win->Show();
+	win->Raise();
+	win->SetFocus();
 	return frame;
 }
 
@@ -104,12 +108,26 @@ void Launcher::App::CheckLauncherUniqueness() {
 	_lockFile = file;
 }
 
+void Launcher::App::ReleaseLockFile() {
+	if (_lockFile != INVALID_HANDLE_VALUE) {
+		CloseHandle(_lockFile);
+		_lockFile = INVALID_HANDLE_VALUE;
+	}
+}
+
 bool Launcher::App::OnInit() {
 	SetWorkingDirToExe();
 	Logger::Init("launcher.log", "w");
 	Externals::Init();
 
 	Logger::Info("Launcher started, version %s\n", LAUNCHER_VERSION);
+
+	// Log the command line
+	std::ostringstream cli;
+	for (int i = 0; i < argc; ++i) {
+		cli << " " << argv[i];
+	}
+	Logger::Info("Command line: %s\n", cli.str().c_str());
 
 	if (sCLI->Parse(argc, argv) > 0) {
 		Logger::Error("Syntax error while parsing command line\n");
@@ -128,8 +146,9 @@ bool Launcher::App::OnInit() {
 	icon.CopyFromBitmap(wxBitmap(wxICON(IDI_ICON1)));
 	_mainFrame->SetIcon(icon);
 
-	if (!sCLI->SkipSelfUpdate()) {
-		// HandleSelfUpdate(_mainFrame, false, false);
+	if (sCLI->CheckSelfUpdate()) {
+		Logger::Info("Self-update startup check requested...\n");
+		HandleSelfUpdate(_mainFrame, sCLI->UnstableLauncher(), false);
 	}
 
 	LauncherConfigurationInitialize initializationResult;
@@ -258,15 +277,49 @@ bool Launcher::App::OnInit() {
 }
 
 int Launcher::App::OnExit() {
-	CloseHandle(_lockFile);
+	ReleaseLockFile();
 	delete __installation;
 	Externals::End();
 	return 0;
 }
 
+void Launcher::App::RestartForSelfUpdate(const std::string& updateUrl, const std::string& updateVersion) {
+	std::ostringstream cli;
+	cli << "REPENTOGONLauncher.exe"
+		<< " --launcherpid " << GetCurrentProcessId()
+		<< " --url " << updateUrl
+		<< " --version " << updateVersion;
+	for (int i = 1; i < argc; ++i) {
+		cli << " " << argv[i];
+	}
+
+	_mainFrame->Hide();
+
+	// Release the lockfile. We intend to terminate.
+	ReleaseLockFile();
+
+	PROCESS_INFORMATION info;
+	memset(&info, 0, sizeof(info));
+
+	STARTUPINFOA startupInfo;
+	memset(&startupInfo, 0, sizeof(startupInfo));
+
+	if (!CreateProcessA("REPENTOGONLauncher.exe", (LPSTR)cli.str().c_str(), NULL, NULL, false, 0, NULL, NULL, &startupInfo, &info)) {
+		Logger::Fatal("Failed to restart (error code %d)\n", GetLastError());
+	}
+
+	// Expect for the new process to terminate us.
+	WaitForSingleObject(info.hProcess, INFINITE);
+
+	// The updater closed and we were not terminated. Something probably went wrong, so we'll just die anyway.
+	CloseHandle(info.hProcess);
+	CloseHandle(info.hThread);
+	Logger::Fatal("Failed to restart (unknown issue, check updater.log)\n");
+}
+
 wxIMPLEMENT_WX_THEME_SUPPORT wxIMPLEMENT_APP_NO_MAIN(Launcher::App);
 
-extern "C" __declspec(dllexport) int WINAPI StartLauncherApp(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-	wxDISABLE_DEBUG_SUPPORT();
-	return wxEntry(hInstance, hPrevInstance, lpCmdLine, nCmdShow);
+extern "C" __declspec(dllexport) int WINAPI StartLauncherApp(int argc, char** argv) {
+	wxDISABLE_DEBUG_SUPPORT()
+	return wxEntry(argc, argv);
 }

@@ -46,7 +46,7 @@ private:
     static std::string StripVersion(std::string const& version);
 
     // Returns true if a patch is available to convert this version into a supported one.
-    bool PatchIsAvailable();
+    bool PatchIsAvailable(bool skipOnlineCheck = false);
     std::string patchtargetversion = "v1.9.7.12.J273";
 
 public:

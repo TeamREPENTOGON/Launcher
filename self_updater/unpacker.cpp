@@ -1,6 +1,7 @@
 #include <WinSock2.h>
 #include <ktmw32.h>
 #include <vector>
+#include <filesystem>
 
 #include "shared/logger.h"
 #include "self_updater/unpacker.h"
@@ -132,6 +133,8 @@ bool Unpacker::MemoryToDisk(std::vector<FileContent> const& files) {
 				Logger::Error("Unpacker::MemoryToDisk: unable to create folder %s (%d)\n", content.name, GetLastError());
 			}
 			continue;
+		} else if (!Filesystem::CreateFileHierarchy(content.name, "/")) {
+			Logger::Error("Unpacker::MemoryToDisk: unable to create file hierarchy %s (%d)\n", content.name, GetLastError());
 		}
 
 		HANDLE file = CreateFileA(content.name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);

@@ -5,6 +5,7 @@
 
 #include "shared/externals.h"
 #include "shared/github.h"
+#include "shared/logger.h"
 #include "self_updater/launcher_update_manager.h"
 #include "launcher/version.h"
 
@@ -13,37 +14,31 @@ namespace Externals {
 }
 
 namespace Updater {
-	char LauncherUpdateManager::_printBuffer[LauncherUpdateManager::BUFF_SIZE] = { 0 };
-
-	LauncherUpdateManager::LauncherUpdateManager(ILoggableGUI* gui) : _gui(gui) {
-
-	}
-
 	bool LauncherUpdateManager::DoPreUpdateChecks() {
 		UpdateStartupCheckResult startupCheck = _updater.DoStartupCheck();
 		switch (startupCheck) {
 		case UPDATE_STARTUP_CHECK_CANNOT_FETCH_RELEASE:
-			_gui->LogError("Unable to download release information from GitHub");
+			Logger::Error("Unable to download release information from GitHub\n");
 			LogGithubDownloadAsString("Download release information", _updater.GetReleaseDownloadResult());
 			return false;
 
 		case UPDATE_STARTUP_CHECK_INVALID_RELEASE_INFO:
-			_gui->LogError("Release information is invalid");
+			Logger::Error("Release information is invalid\n");
 			switch (_updater.GetReleaseInfoState()) {
 			case RELEASE_INFO_STATE_NO_ASSETS:
-				_gui->LogError("The release contains neither a hash file nor a launcher archive file");
+				Logger::Error("The release contains neither a hash file nor a launcher archive file\n");
 				break;
 
 			case RELEASE_INFO_STATE_NO_HASH:
-				_gui->LogError("The release contains no hash file");
+				Logger::Error("The release contains no hash file\n");
 				break;
 
 			case RELEASE_INFO_STATE_NO_ZIP:
-				_gui->LogError("The release contains no launcher archive file");
+				Logger::Error("The release contains no launcher archive file\n");
 				break;
 
 			default:
-				_gui->LogError("Sylmir forgot to handle this case");
+				Logger::Error("Sylmir forgot to handle this case\n");
 				break;
 			}
 		}
@@ -76,19 +71,19 @@ namespace Updater {
 				while (message = s->monitor->Get(&timedout)) {
 					switch (message->type) {
 					case curl::DOWNLOAD_INIT_CURL:
-						_gui->Log("", true, "[%s] Initializing cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						Logger::Info("[%s] Initializing cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case curl::DOWNLOAD_INIT_CURL_DONE:
-						_gui->Log("", true, "[%s] Initialized cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						Logger::Info("[%s] Initialized cURL connection to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case curl::DOWNLOAD_CURL_PERFORM:
-						_gui->Log("", true, "[%s] Performing cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						Logger::Info("[%s] Performing cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case curl::DOWNLOAD_CURL_PERFORM_DONE:
-						_gui->Log("", true, "[%s] Performed cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						Logger::Info("[%s] Performed cURL request to %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					case curl::DOWNLOAD_DATA_RECEIVED:
@@ -97,18 +92,18 @@ namespace Updater {
 
 						std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 						if (std::chrono::duration_cast<std::chrono::nanoseconds>(now - lastReceived).count() > 100000000) {
-							_gui->Log("", true, "[%s] Downloaded %lu bytes\n", s->name.c_str(), s->totalDownloadSize);
+							Logger::Info("[%s] Downloaded %lu bytes\n", s->name.c_str(), s->totalDownloadSize);
 							lastReceived = now;
 						}
 						break;
 					}
 
 					case curl::DOWNLOAD_DONE:
-						_gui->Log("", true, "[%s] Successfully downloaded content from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
+						Logger::Info("[%s] Successfully downloaded content from %s\n", s->name.c_str(), std::get<std::string>(message->data).c_str());
 						break;
 
 					default:
-						_gui->LogError("[%s] Unexpected asynchronous notification (id = %d)\n", s->name.c_str(), message->type);
+						Logger::Error("[%s] Unexpected asynchronous notification (id = %d)\n", s->name.c_str(), message->type);
 						break;
 					}
 				}
@@ -139,7 +134,7 @@ namespace Updater {
 
 	bool LauncherUpdateManager::PostDownloadChecks(bool downloadOk, LauncherUpdateData* data) {
 		if (!downloadOk) {
-			_gui->LogError("Error while downloading launcher update");
+			Logger::Error("Error while downloading launcher update\n");
 
 			if (data->_hashDescriptor->result != curl::DOWNLOAD_STRING_OK) {
 				LogGithubDownloadAsString("hash download", data->_hashDescriptor->result);
@@ -148,175 +143,101 @@ namespace Updater {
 			if (data->_zipDescriptor->result != curl::DOWNLOAD_FILE_OK) {
 				switch (data->_zipDescriptor->result) {
 				case curl::DOWNLOAD_FILE_BAD_CURL:
-					_gui->LogError("Launcher archive: error while initializeing cURL connection to %s", data->_zipUrl.c_str());
+					Logger::Error("Launcher archive: error while initializeing cURL connection to %s\n", data->_zipUrl.c_str());
 					break;
 
 				case curl::DOWNLOAD_FILE_BAD_FS:
-					_gui->LogError("Launcher archive: error while creating file %s on disk", data->_zipFilename.c_str());
+					Logger::Error("Launcher archive: error while creating file %s on disk\n", data->_zipFilename.c_str());
 					break;
 
 				case curl::DOWNLOAD_FILE_DOWNLOAD_ERROR:
-					_gui->LogError("Launcher archive: error while downloading archive from %s", data->_zipUrl.c_str());
+					Logger::Error("Launcher archive: error while downloading archive from %s\n", data->_zipUrl.c_str());
 					break;
 
 				default:
-					_gui->LogError("Launcher archive: unexpected error code %d", data->_zipDescriptor->result);
+					Logger::Error("Launcher archive: unexpected error code %d\n", data->_zipDescriptor->result);
 					break;
 				}
 			}
 
 			return false;
 		} else {
-			_gui->Log("Checking release integrity...\n");
+			Logger::Info("Checking release integrity...\n");
 
 			Sha256::Trim(data->_hashDescriptor->string);
 			if (!_updater.CheckHashConsistency(data->_zipFilename.c_str(), data->_hashDescriptor->string.c_str())) {
-				_gui->LogError("Hash mismatch: download was corrupted\n");
+				Logger::Error("Hash mismatch: download was corrupted\n");
 				return false;
 			} else {
-				_gui->Log("OK\n");
+				Logger::Info("OK\n");
 			}
 
 			return true;
 		}
 
-		_gui->LogError("Sylmir probably forgot a return path in this function, please report this as an error");
+		Logger::Error("Sylmir probably forgot a return path in this function, please report this as an error\n");
 		return false;
 	}
 
-	bool LauncherUpdateManager::DownloadAndExtractUpdate(const char* url) {
-		_gui->Log("Downloading update for the the REPENTOGON launcher from %s\n", url);
+	bool LauncherUpdateManager::DownloadUpdate(const std::string& url, std::string& zipFilename) {
+		if (url.find("github") == std::string::npos) { //if its not from github, it assumes it's a local filepath
+			zipFilename = url + "/Launcher/REPENTOGONLauncher.zip";
+			Logger::Info("Found update for the REPENTOGON launcher at local filepath %s\n", zipFilename.c_str());
+			return true;
+		}
 
-		new (&_updater) LauncherUpdater(url);
+		Logger::Info("Downloading update for the the REPENTOGON launcher from %s\n", url.c_str());
+
+		new (&_updater) LauncherUpdater(url.c_str());
 
 		LauncherUpdateData updateData;
-		std::string strurl = url;
-		if (strurl.find("github") != std::string::npos) { //if its not from github, it assumes it's a local filepath
-			if (!DoPreUpdateChecks()) {
-				return false;
-			}
-			bool downloadResult = DownloadUpdate(&updateData);
-
-			_gui->Log("Update scheduled from version %s to version %s\n", Launcher::LAUNCHER_VERSION, _updater.GetReleaseInfo()["name"].GetString());
-
-			if (!PostDownloadChecks(downloadResult, &updateData)) {
-				_gui->LogError("Error while downloading release\n");
-				return false;
-			}
+		if (!DoPreUpdateChecks()) {
+			return false;
 		}
-		else {
-			updateData._zipFilename = strurl + "/Launcher/REPENTOGONLauncher.zip";
-		}
+		bool downloadResult = DownloadUpdate(&updateData);
 
-		if (!ExtractArchive(&updateData)) {
-			_gui->LogError("Error while extracting the releases's archive\n");
+		Logger::Info("Update scheduled from version %s to version %s\n", Launcher::LAUNCHER_VERSION, _updater.GetReleaseInfo()["name"].GetString());
+
+		if (!PostDownloadChecks(downloadResult, &updateData)) {
+			Logger::Error("Error while downloading release\n");
 			return false;
 		}
 
-		_gui->Log("Successfully downloaded and extracted the new release\n");
+		Logger::Info("Successfully downloaded and extracted the new release\n");
+		zipFilename = updateData._zipFilename;
 		return true;
-	}
-
-	bool LauncherUpdateManager::ExtractArchive(LauncherUpdateData* data) {
-		const char* filename = data->_zipFilename.c_str();
-		ExtractArchiveResult result = _updater.ExtractArchive(filename);
-		switch (result.errCode) {
-		case EXTRACT_ARCHIVE_OK:
-			_gui->Log("Sucessfully extracted new version\n");
-			return true;
-
-		case EXTRACT_ARCHIVE_ERR_NO_EXE:
-			_gui->LogError("Downloaded archive contains no exe\n");
-			break;
-
-		case EXTRACT_ARCHIVE_ERR_OTHER:
-			_gui->LogError("Unexpected error while extracting archive\n");
-			break;
-
-		case EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_ZIP:
-			_gui->LogError("Unable to open archive %s\n", filename);
-			break;
-
-		case EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_BINARY_OUTPUT:
-			_gui->LogError("Unable to open file in which to write unpacked archive\n");
-			break;
-
-		case EXTRACT_ARCHIVE_ERR_FILE_EXTRACT:
-			_gui->LogError("Errors encountered while extracting files\n");
-			break;
-
-		case EXTRACT_ARCHIVE_ERR_FWRITE:
-			_gui->LogError("Error while writing uncompressed files\n");
-			break;
-
-		case EXTRACT_ARCHIVE_ERR_ZIP_ERROR:
-			_gui->LogError("libzip error encountered: %s\n", result.zipError.c_str());
-			break;
-
-		default:
-			_gui->LogError("Unknown error %d encountered\n", result.errCode);
-			break;
-		}
-
-		_gui->Log("", true, "************ Archive content read before error ************");
-		for (auto const& [name, state] : result.files) {
-			_gui->Log("\t", false, "%s: ", name.c_str());
-			switch (state) {
-			case Zip::EXTRACT_FILE_OK:
-				_gui->Log("", true, "OK");
-				break;
-
-			case Zip::EXTRACT_FILE_ERR_ZIP_FREAD:
-				_gui->Log("", true, "error while reading file content");
-				break;
-
-			case Zip::EXTRACT_FILE_ERR_FOPEN:
-				_gui->Log("", true, "unable to open file on disk to write content");
-				break;
-
-			case Zip::EXTRACT_FILE_ERR_FWRITE:
-				_gui->Log("", true, "unable to write extracted file");
-				break;
-
-			case Zip::EXTRACT_FILE_ERR_ZIP_STAT:
-				_gui->Log("", true, "unable to read file size");
-				break;
-
-			default:
-				_gui->Log("", true, "unknown error");
-				break;
-			}
-		}
-
-		return false;
 	}
 
 	void LauncherUpdateManager::LogGithubDownloadAsString(const char* prefix,
 		curl::DownloadStringResult result) {
-		_gui->Log("%s: %s\n", prefix, curl::DownloadAsStringResultToLogString(result));
+		Logger::Info("%s: %s\n", prefix, curl::DownloadAsStringResultToLogString(result));
 	}
 
 	LauncherUpdateManager::SelfUpdateCheckResult LauncherUpdateManager::CheckSelfUpdateAvailability(bool allowPreReleases,
 		std::string& version, std::string& url) {
-		_gui->LogNoNL("Checking for availability of launcher updates... ");
+		Logger::Info("Checking for availability of launcher updates...\n");
 		curl::DownloadStringResult downloadReleasesResult;
-		if (_updateChecker.IsSelfUpdateAvailable(allowPreReleases, false, version, url, &downloadReleasesResult)) {
-			_gui->Log("OK\n");
-			_gui->Log("", true, "New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
+		Shared::SteamLauncherUpdateStatus steamUpdateStatus;
+		if (_updateChecker.IsSelfUpdateAvailable(allowPreReleases, false, version, url, downloadReleasesResult, steamUpdateStatus)) {
+			Logger::Info("...OK\n");
+			Logger::Info("New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
 			return SELF_UPDATE_CHECK_UPDATE_AVAILABLE;
 		} else {
-			if (downloadReleasesResult != curl::DOWNLOAD_STRING_OK) {
-				_gui->Log("KO");
-				_gui->LogError("Error encountered while checking for availability of launcher update");
+			if (downloadReleasesResult != curl::DOWNLOAD_STRING_OK && steamUpdateStatus != Shared::STEAM_LAUNCHER_UPDATE_UP_TO_DATE) {
+				Logger::Error("...KO\n");
+				Logger::Error("Error encountered while checking for availability of launcher update\n");
 				LogGithubDownloadAsString("Launcher Update Check", downloadReleasesResult);
+				if (steamUpdateStatus == Shared::STEAM_LAUNCHER_UPDATE_FAILED) {
+					return SELF_UPDATE_CHECK_STEAM_METHOD_FAILED;
+				}
 				return SELF_UPDATE_CHECK_ERR_GENERIC;
 			} else {
-				_gui->Log("Up-to-date");
+				Logger::Info("...Up-to-date\n");
 				return SELF_UPDATE_CHECK_UP_TO_DATE;
 			}
 		}
 
-		_gui->LogWarn("You should not be seeing this, Sylmir probably forgot a return path somewhere, report it as a bug");
+		Logger::Error("You should not be seeing this, Sylmir probably forgot a return path somewhere, report it as a bug\n");
 		return SELF_UPDATE_CHECK_UP_TO_DATE;
 	}
 }

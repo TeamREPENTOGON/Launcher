@@ -16,6 +16,10 @@ namespace Launcher {
 		bool OnInit() override;
 		int OnExit() override;
 
+		void ReleaseLockFile();
+
+		void RestartForSelfUpdate(const std::string& updateUrl, const std::string& updateVersion);
+
 	private:
 		bool RunWizard(LauncherMainWindow* mainWindow, bool* installedRepentogon);
 		RepentogonInstallerFrame* CreateRepentogonInstallerWindow(
@@ -23,8 +27,10 @@ namespace Launcher {
 		LauncherMainWindow* CreateMainWindow();
 
 		LauncherMainWindow* _mainFrame;
-		HANDLE _lockFile;
+		HANDLE _lockFile = INVALID_HANDLE_VALUE;
 
 		void CheckLauncherUniqueness();
 	};
 }
+
+wxDECLARE_APP(Launcher::App);

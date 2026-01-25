@@ -25,8 +25,8 @@ public:
         return _repentogonInstallerRefreshRate;
     }
 
-    inline bool SkipSelfUpdate() const {
-        return _skipSelfUpdate;
+    inline bool CheckSelfUpdate() const {
+        return _checkSelfUpdate;
     }
 
     inline bool StealthMode() const {
@@ -130,6 +130,10 @@ public:
         return _skipUnique;
     }
 
+    inline bool UnstableLauncher() const {
+        return _unstableLauncher;
+    }
+
 private:
     CLIParser();
 
@@ -141,7 +145,7 @@ private:
         static constexpr const char* forceRepentogonUpdate = "force-repentogon-update";
         static constexpr const char* repentogonInstallerWait = "repentogon-installer-wait";
         static constexpr const char* repentogonInstallerRefresh = "repentogon-installer-refresh";
-        static constexpr const char* skipSelfUpdate = "skip-self-update";
+        static constexpr const char* checkSelfUpdate = "check-self-update";
         static constexpr const char* stealthMode = "stealth-mode";
         static constexpr const char* basementRenovator = "basement-renovator";
         static constexpr const char* curlLimit = "curl-limit";
@@ -152,6 +156,7 @@ private:
         static constexpr const char* isaacWaitTime = "isaac-wait-time";
         static constexpr const char* strictThreadCancel = "strict-thread-cancel";
         static constexpr const char* skipUniqueCheck = "skip-unique";
+        static constexpr const char* unstableLauncher = "unstable";
 
         // Start from Steam options
         static constexpr const char* steam = "steam";
@@ -175,11 +180,12 @@ private:
     bool _skipRepentogonUpdate = false;
     bool _forceRepentogonUpdate = false;
     bool _repentogonInstallerWaitOnFinished = false;
-    bool _skipSelfUpdate = false;
+    bool _checkSelfUpdate = false;
     bool _stealthMode = false;
     bool _basementRenovator = false;
     bool _strictThreadCancel = false;
     bool _skipUnique = false;
+    bool _unstableLauncher = false;
     unsigned long _repentogonInstallerRefreshRate = Options::_repentogonInstallerDefaultRefreshRate;
     unsigned long _curlLimit = 0;
     unsigned long _curlTimeout = 0;

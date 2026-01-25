@@ -1,32 +1,41 @@
 #include <string>
+#include <filesystem>
 
 #include <wx/progdlg.h>
 
+#include "launcher/app.h"
 #include "launcher/launcher_self_update.h"
 #include "launcher/version.h"
+#include "launcher/steam_workshop.h"
 #include "shared/github_executor.h"
 #include "shared/logger.h"
 #include "shared/launcher_update_checker.h"
+#include "wx/busyinfo.h"
 
 namespace Launcher {
-	static const char* SelfUpdaterExePath = "../REPENTOGONLauncher.exe";
-
-	enum SelfUpdateResult {
-		SELF_UPDATE_ERR_GENERIC,
-		SELF_UPDATE_ERR_EXE
-	};
-
-	static SelfUpdateResult DoSelfUpdate(const char* version, const char* url);
-
 	void HandleSelfUpdate(LauncherMainWindow* mainWindow, bool allowUnstable, bool force) {
-		wxProgressDialog dialog("Launcher updater checker",
-			"Checking for updates of the launcher...", 100, mainWindow,
-			wxPD_APP_MODAL | wxPD_CAN_ABORT);
-
 		Shared::LauncherUpdateChecker checker;
 		std::string version, url;
 		curl::DownloadStringResult result;
-		if (checker.IsSelfUpdateAvailable(allowUnstable, force, version, url, &result)) {
+		Shared::SteamLauncherUpdateStatus steamUpdateStatus;
+		bool updateAvailable = false;
+
+		// Lil scope for the wxBusyInfo
+		{
+			wxBusyInfo wait("Checking for launcher updates, please wait...", mainWindow);
+
+			updateAvailable = checker.IsSelfUpdateAvailable(allowUnstable, force, version, url, result, steamUpdateStatus);
+
+			if (!updateAvailable && steamUpdateStatus == Shared::STEAM_LAUNCHER_UPDATE_FAILED) {
+				// (Re)generate steamentrydir.txt (also checks the workshop item being subbed/downloaded) and try again.
+				if (!SteamWorkshop::CreateSteamEntryDirFile()) {
+					Logger::Error("Failed to create steamentrydir.txt\n");
+				}
+				updateAvailable = checker.IsSelfUpdateAvailable(allowUnstable, force, version, url, result, steamUpdateStatus);
+			}
+		}
+
+		if (updateAvailable) {
 			mainWindow->Show();
 
 			std::ostringstream stream;
@@ -34,72 +43,13 @@ namespace Launcher {
 				Launcher::LAUNCHER_VERSION << " -> " << version << ").\n" <<
 				"Do you want to update the launcher ?";
 			int msgResult = wxMessageBox(stream.str(), "New launcher release available",
-				wxYES_NO, &dialog);
+				wxYES_NO | wxICON_INFORMATION, mainWindow);
 
 			if (msgResult == wxYES || msgResult == wxOK) {
-				SelfUpdateResult updateResult = DoSelfUpdate(version.c_str(), url.c_str());
-
-				std::ostringstream errMsg;
-				errMsg << "Error while attempting self-update: check the ";
-				switch (updateResult) {
-				case SELF_UPDATE_ERR_GENERIC:
-					errMsg << "launcher.log";
-					break;
-
-				case SELF_UPDATE_ERR_EXE:
-					errMsg << "updater.log";
-					break;
-
-				default:
-					errMsg << "[[internal error " << (int)updateResult << " please "
-						"report this to receive a place in the Repentogon debug "
-						"team hall of fame]]";
-					break;
-				}
-
-				errMsg << " file for details";
-
-				wxMessageBox(errMsg.str(), "Error during self update", wxOK, &dialog);
+				wxGetApp().RestartForSelfUpdate(url, version);
 			}
+		} else if (result != curl::DOWNLOAD_STRING_OK || steamUpdateStatus == Shared::STEAM_LAUNCHER_UPDATE_FAILED) {
+			wxMessageBox("An error was encountered while checking for launcher updates. Check the log file for more details.", "REPENTOGON Launcher Error", wxICON_ERROR, mainWindow);
 		}
-	}
-
-	std::string BuildUpdaterCli(const char* version, const char* url) {
-		std::ostringstream cli;
-		cli << SelfUpdaterExePath << " --launcherpid " << GetCurrentProcessId() << " --version " << version << " --url " << url;
-		for (int i = 1; i < wxTheApp->argc; ++i) {
-			cli << " " << wxTheApp->argv[i];
-		}
-		return cli.str();
-	}
-
-	SelfUpdateResult DoSelfUpdate(const char* version, const char* url) {
-		std::string cli = BuildUpdaterCli(version, url);
-
-		Logger::Info("Launching self-updater: %s\n", cli.c_str());
-
-		PROCESS_INFORMATION info;
-		memset(&info, 0, sizeof(info));
-
-		STARTUPINFOA startupInfo;
-		memset(&startupInfo, 0, sizeof(startupInfo));
-
-		BOOL ok = CreateProcessA(SelfUpdaterExePath, (LPSTR)cli.c_str(), NULL, NULL, false, 0, NULL, NULL, &startupInfo, &info);
-		if (!ok) {
-			Logger::Error("Failed to start self-updater process (error code %d)\n", GetLastError());
-			return SELF_UPDATE_ERR_GENERIC;
-		}
-
-		// Wait for the updater process to close.
-		// If an update is initiated, the updater will terminate us.
-		// The updater is responsible for having visible UI at this time.
-		WaitForSingleObject(info.hProcess, INFINITE);
-
-		// The updater closed and we were not terminated.
-		// Assume that this means either there was no update, or the user rejected the update.
-		CloseHandle(info.hProcess);
-		CloseHandle(info.hThread);
-
-		return SELF_UPDATE_ERR_EXE;
 	}
 }

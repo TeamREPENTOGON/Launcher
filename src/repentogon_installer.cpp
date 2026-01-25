@@ -5,6 +5,7 @@
 #include "launcher/cli.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/standalone_rgon_folder.h"
+#include "launcher/steam_workshop.h"
 #include "launcher/version.h"
 #include "shared/github_executor.h"
 #include "shared/filesystem.h"
@@ -12,6 +13,7 @@
 #include "shared/sha256.h"
 #include "shared/zip.h"
 #include "shared/gitlab_versionchecker.h"
+#include "shared/version_utils.h"
 #include "wx/msgdlg.h"
 
 namespace fs = std::filesystem;
@@ -147,7 +149,7 @@ namespace Launcher {
 
 				if (isaacData.NeedsPatch()) {
 					PushNotification(false, "Patching Isaac files, please wait...");
-					if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "patch").string())) {
+					if (!standalone_rgon::Patch(outputDir, (fs::current_path() / "launcher-data/patch").string())) {
 						Logger::Error("RepentogonInstaller::InstallRepentogonThread: unable to patch Isaac files\n");
 						_installationState.result = REPENTOGON_INSTALLATION_RESULT_NO_ISAAC_PATCH;
 						return false;
@@ -420,68 +422,6 @@ namespace Launcher {
 		return hasHash && hasZip;
 	}
 
-
-	bool WaitForWorkshopDownload(PublishedFileId_t fileId, uint32 timeoutMs = 60000)
-	{
-		uint32 elapsed = 0;
-		const uint32 step = 100;
-
-		while (elapsed < timeoutMs)
-		{
-			SteamAPI_RunCallbacks();
-
-			uint32 state = SteamUGC()->GetItemState(fileId);
-
-			if (state & k_EItemStateInstalled)
-				return true;
-
-			if (state & k_EItemStateDownloadPending ||
-				state & k_EItemStateDownloading)
-			{
-				Sleep(step);
-				elapsed += step;
-				continue;
-			}
-			SteamUGC()->DownloadItem(fileId, true);
-			Sleep(step);
-			elapsed += step;
-		}
-
-		return false;
-	}
-
-	bool SubscribeDownloadAndGetFile(
-		PublishedFileId_t workshopId,
-		const std::string& relativeFilePath,
-		std::string& outFullPath)
-	{
-		if (!SteamUGC())
-			return false;
-		SteamUGC()->SubscribeItem(workshopId);
-		if (!WaitForWorkshopDownload(workshopId))
-			return false;
-
-		uint64 sizeOnDisk = 0;
-		char installPath[1024] = {};
-		uint32 timeStamp = 0;
-
-		if (!SteamUGC()->GetItemInstallInfo(
-			workshopId,
-			&sizeOnDisk,
-			installPath,
-			sizeof(installPath),
-			&timeStamp))
-			return false;
-
-		outFullPath = std::string(installPath) + "/" + relativeFilePath;
-
-		if (GetFileAttributesA(outFullPath.c_str()) == INVALID_FILE_ATTRIBUTES)
-			return false;
-
-		return true;
-	}
-
-
 	bool RepentogonInstaller::DownloadRepentogon() {
 		// curl::DownloadMonitor monitor;
 		curl::RequestParameters request;
@@ -507,7 +447,7 @@ namespace Launcher {
 			std::string filePath;
 			std::string relpath = HashName;
 			Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading hash, trying steam\n");
-			if (SubscribeDownloadAndGetFile(3643104060, "REPENTOGON/" + relpath, filePath)) { //3643104060 is dummy id for testing
+			if (SteamWorkshop::SubscribeDownloadAndGetFile(SteamWorkshop::REPENTOGON_WORKSHOP_ID, "REPENTOGON/" + relpath, filePath)) {
 				_installationState.hashFile = fopen(filePath.c_str(), "r");
 			}
 			else {
@@ -546,7 +486,7 @@ namespace Launcher {
 				std::string filePath;
 				std::string relpath = ReqLauncherVersionName;
 				Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading launcher version.txt trying steam\n");
-				if (SubscribeDownloadAndGetFile(3643104060, "REPENTOGON/" + relpath, filePath)) { //3643104060 is dummy id for testing
+				if (SteamWorkshop::SubscribeDownloadAndGetFile(SteamWorkshop::REPENTOGON_WORKSHOP_ID, "REPENTOGON/" + relpath, filePath)) {
 					_installationState.ReqVersionFile = fopen(filePath.c_str(), "r");
 				}
 				else {
@@ -579,7 +519,7 @@ namespace Launcher {
 			std::string filePath;
 			std::string relpath = RepentogonZipName;
 			Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading zip, trying steam\n");
-			if (SubscribeDownloadAndGetFile(3643104060, "REPENTOGON/" + relpath, filePath)) { //3643104060 is dummy id for testing
+			if (SteamWorkshop::SubscribeDownloadAndGetFile(SteamWorkshop::REPENTOGON_WORKSHOP_ID, "REPENTOGON/" + relpath, filePath)) {
 				_installationState.zipFile = fopen(filePath.c_str(), "r");
 				fs::copy_file(filePath,fs::current_path() / RepentogonZipName,fs::copy_options::overwrite_existing); //needed for hashing later
 			}
@@ -651,88 +591,6 @@ namespace Launcher {
 
 		return true;
 	}
-	
-	struct Version {
-		std::vector<int> numbers;
-		bool isBeta = false;
-		bool isUnstable = false;
-		bool isDev = false;
-	};
-
-	Version parseVersion(const std::string& s) {
-		Version v;
-
-		if (s.empty())
-			return v;
-
-		// Make a copy so we can manipulate it
-		std::string str = s;
-
-		// Normalize to lowercase
-		std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::tolower(c); });
-
-		if (str == "dev") {
-			v.isDev = true;
-			return v;
-		}
-
-		// Trim leading v
-		if (str[0] == 'v')
-			str.erase(0, 1);
-
-		// Split into tokens
-		std::regex re(R"([.\-_]+)");
-		std::sregex_token_iterator first{str.begin(), str.end(), re, -1}, last;
-		std::vector<std::string> tokens{first, last};
-
-		for (const std::string& token : tokens) {
-			if (token == "beta") {
-				v.isBeta = true;
-			} else if (token == "unstable") {
-				v.isUnstable = true;
-			} else {
-				try {
-					v.numbers.push_back(std::stoi(token));
-				} catch (...) {
-					Logger::Error("RepentogonUpdater::parseVersion: Unrecognized token `%s` found in version string `%s`\n", token.c_str(), s.c_str());
-				}
-			}
-		}
-
-		return v;
-	}
-
-	int compareVersions(const std::string& a, const std::string& b) {
-		Version va = parseVersion(a);
-		Version vb = parseVersion(b);
-
-		// "dev" > everything else
-		if (va.isDev || vb.isDev) {
-			if (va.isDev && vb.isDev) {
-				return 0;
-			}
-			return va.isDev ? 1 : -1;
-		}
-
-		size_t maxParts = std::max(va.numbers.size(), vb.numbers.size());
-		for (size_t i = 0; i < maxParts; ++i) {
-			int na = (i < va.numbers.size()) ? va.numbers[i] : 0;
-			int nb = (i < vb.numbers.size()) ? vb.numbers[i] : 0;
-
-			if (na < nb) return -1;
-			if (na > nb) return 1;
-		}
-
-		//same numbers then release > beta > unstable
-		if (va.isUnstable != vb.isUnstable) {
-			return va.isUnstable ? -1 : 1;
-		}
-		if (va.isBeta != vb.isBeta) {
-			return va.isBeta ? -1 : 1;
-		}
-
-		return 0;
-	}
 
 	bool RepentogonInstaller::CheckLauncherVersionRequirement() {
 		if (!_installationState.launcherversionlock) {
@@ -748,7 +606,7 @@ namespace Launcher {
 		std::string reqver = reqverbuffer;
 		std::string currver = CMAKE_LAUNCHER_VERSION;
 
-		return compareVersions(currver,reqver) >= 0;
+		return LauncherVersion(currver) >= LauncherVersion(reqver);
 	}
 
 	bool RepentogonInstaller::ExtractRepentogon(const char* outputDir) {
@@ -866,12 +724,10 @@ namespace Launcher {
 		if (fetchResult != Github::RELEASE_INFO_OK) {
 			std::string filePath;
 			Logger::Error("RepentogonInstaller::CheckRepentogonUpdatesThread error while checking version, trying steam\n");
-			if (SubscribeDownloadAndGetFile(3643104060, "versiontracker/version.txt", filePath)) { //3643104060 is dummy id for testing
-				fs::path p(filePath);
-				p = p.parent_path().parent_path();
-				std::wofstream out("steamentrydir.txt"); //this is mainly for the updater to find later kind of hacky, but its the only way I could think of where the updater can use the steam entry when available without the steamapi (wont be able to make it available if it isnt tho)
-				out << p.wstring();
-
+			if (!SteamWorkshop::CreateSteamEntryDirFile()) {
+				Logger::Error("Failed to create steamentrydir.txt\n");
+			}
+			if (SteamWorkshop::SubscribeDownloadAndGetFile(SteamWorkshop::REPENTOGON_WORKSHOP_ID, "versiontracker/version.txt", filePath)) {
 				std::ifstream file(filePath);
 				std::stringstream buffer;
 				buffer << file.rdbuf();

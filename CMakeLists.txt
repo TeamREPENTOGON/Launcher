@@ -67,8 +67,8 @@ set (WIN32_RESOURCES ${CMAKE_SOURCE_DIR}/assets/icon.rc)
 file (GLOB_RECURSE LAUNCHER_FILES src/*.cpp "include/launcher/*.h")
 add_library (REPENTOGONLauncher SHARED ${LAUNCHER_FILES} ${WIN32_RESOURCES})
 set_target_properties(REPENTOGONLauncher PROPERTIES OUTPUT_NAME "REPENTOGONLauncherApp")
-set_target_properties(REPENTOGONLauncher PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data)
-set_target_properties(inih PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data)
+set_target_properties(REPENTOGONLauncher PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data-build)
+set_target_properties(inih PROPERTIES RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:REPENTOGONLauncher>)
 target_compile_options (REPENTOGONLauncher PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
 target_include_directories (REPENTOGONLauncher PRIVATE 
     "${CMAKE_SOURCE_DIR}/deps/curl/include"
@@ -94,15 +94,26 @@ target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt
 add_custom_command(
     TARGET REPENTOGONLauncher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/deps/steamapi/lib/steam_api.dll"
         $<TARGET_FILE_DIR:REPENTOGONLauncher>/
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/deps/steamapi/lib/steam_appid.txt"
-        $<TARGET_FILE_DIR:REPENTOGONLauncher>
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/patch"
         "$<TARGET_FILE_DIR:REPENTOGONLauncher>/patch"
+    COMMAND ${CMAKE_COMMAND} -E tar cf ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data.bin --format=zip
+        "patch"
+        "inih.dll"
+        "REPENTOGONLauncherApp.dll"
+        $<$<CONFIG:Debug>:REPENTOGONLauncherApp.pdb>
+        "steam_api.dll"
+        "wxbase330ud_vc.dll"
+        "wxbase330ud_xml_vc.dll"
+        "wxmsw330ud_core_vc.dll"
+        "wxmsw330ud_html_vc.dll"
+        "wxmsw330ud_richtext_vc.dll"
+        "zlibd.dll"
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data"
+    WORKING_DIRECTORY "$<TARGET_FILE_DIR:REPENTOGONLauncher>"
 )
 
 
@@ -117,8 +128,13 @@ target_include_directories (REPENTOGONLauncherUpdater PRIVATE
     "${CMAKE_SOURCE_DIR}/deps/rapidjson/include")
 target_compile_definitions (REPENTOGONLauncherUpdater PRIVATE NOMINMAX "CMAKE_LAUNCHER_VERSION=\"${CMAKE_LAUNCHER_VERSION}\"")
 target_compile_options (REPENTOGONLauncherUpdater PUBLIC "/MD" ${MSVC_EXTRA_WARNINGS})
-
-# add_custom_command (TARGET REPENTOGONLauncherUpdater POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:REPENTOGONLauncherUpdater> "${CMAKE_SOURCE_DIR}/self_updater_rsrc")
+add_custom_command(
+    TARGET REPENTOGONLauncherUpdater POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/deps/steamapi/lib/steam_appid.txt"
+        $<TARGET_FILE_DIR:REPENTOGONLauncherUpdater>
+    COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data"
+)
 
 if (LAUNCHER_UNSTABLE)
     # add_subdirectory (testing)

@@ -51,26 +51,7 @@ namespace Updater {
 		RELEASE_INFO_STATE_NO_ASSETS
 	};
 
-	enum ExtractArchiveResultCode {
-		EXTRACT_ARCHIVE_OK,
-		EXTRACT_ARCHIVE_ERR_FWRITE,
-		EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_ZIP,
-		EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_BINARY_OUTPUT,
-		EXTRACT_ARCHIVE_ERR_ZIP_ERROR,
-		EXTRACT_ARCHIVE_ERR_FILE_EXTRACT,
-		EXTRACT_ARCHIVE_ERR_NO_EXE,
-		EXTRACT_ARCHIVE_ERR_OTHER
-	};
-
-	struct ExtractArchiveResult {
-		ExtractArchiveResultCode errCode;
-		std::string zipError;
-		std::vector<std::tuple<std::string, Zip::ExtractFileResult>> files;
-
-		void SetZipError(zip_error_t* z);
-	};
-
-	static constexpr const char* LauncherFileNameTemplate = "Launcher_%s.zip";
+	static constexpr const char* LauncherUpdateFileName = "launcher-update.zip";
 
 	struct LauncherUpdateData {
 		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> _zipDownloadDesc;
@@ -112,8 +93,6 @@ namespace Updater {
 		 * Descriptors inside @a data are set accordingly.
 		 */
 		void DownloadUpdate(LauncherUpdateData* data);
-
-		ExtractArchiveResult ExtractArchive(const char* name);
 
 		bool CheckHashConsistency(const char* zipFile, const char* hash);
 

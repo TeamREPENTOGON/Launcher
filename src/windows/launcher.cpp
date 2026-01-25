@@ -17,7 +17,6 @@
 #include "wx/statline.h"
 
 #include "chained_future/chained_future.h"
-#include "comm/messages.h"
 #include "curl/curl.h"
 #include "launcher/app.h"
 #include "launcher/windows/advanced_options.h"
@@ -34,6 +33,9 @@
 #include "launcher/windows/launch_countdown.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/windows/options_ini.h"
+#include "launcher/modmanager.h"
+#include "launcher/modupdater.h"
+#include "launcher/cli.h"
 #include "launcher/version.h"
 #include "shared/compat.h"
 #include "shared/github.h"
@@ -49,8 +51,7 @@
 #ifdef min
 #undef min
 #endif
-#include <launcher/modmanager.h>
-#include <launcher/modupdater.h>
+
 #include <shtypes.h>
 #include <ShObjIdl_core.h>
 #include <ShlObj_core.h>
@@ -634,18 +635,6 @@ namespace Launcher {
 #endif
 	}
 
-	bool LauncherMainWindow::SanityCheckLauncherUpdate() {
-		return !Filesystem::Exists(Comm::UnpackedArchiveName);
-	}
-
-	void LauncherMainWindow::SanitizeLauncherUpdate() {
-		if (!SanityCheckLauncherUpdate()) {
-			_logWindow.LogWarn("Found launcher update file %s in the current folder."
-				"This may indicate a broken update. Deleting it.\n", Comm::UnpackedArchiveName);
-			Filesystem::RemoveFile(Comm::UnpackedArchiveName);
-		}
-	}
-
 	void LauncherMainWindow::OneTimeIsaacPathInitialization() {
 		std::string const& isaacPath = _installation->GetIsaacInstallation()
 			.GetMainInstallation().GetExePath();
@@ -707,8 +696,6 @@ namespace Launcher {
 		std::string currentDir = Filesystem::GetCurrentDirectory_();
 		_logWindow.Log("Current directory is: %s", currentDir.c_str());
 		_logWindow.Log("Using configuration file %s\n", LauncherConfiguration::GetConfigurationPath());
-
-		SanitizeLauncherUpdate();
 
 		LPSTR cli = GetCommandLineA();
 		_logWindow.Log("Command line: %s", cli);
@@ -918,7 +905,9 @@ namespace Launcher {
 
 	void LauncherMainWindow::ForceLauncherUpdate(bool allowUnstable) {
 		_logWindow.Log("Performing self-update (forcibly triggered)...");
+		EnableInterface(false);
 		Launcher::HandleSelfUpdate(this, allowUnstable, true);
+		EnableInterface(true);
 	}
 
 	std::string LauncherMainWindow::PromptIsaacInstallation() {
@@ -950,7 +939,7 @@ namespace Launcher {
 			break;
 
 		case ADVANCED_EVENT_FORCE_LAUNCHER_UPDATE:
-			ForceLauncherUpdate(false);
+			ForceLauncherUpdate(sCLI->UnstableLauncher());
 			break;
 		case ADVANCED_EVENT_REINSTALL:
 			_logWindow.Log("Attempting Repair...");

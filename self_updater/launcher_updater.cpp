@@ -1,7 +1,6 @@
 #include <iostream>
 #include <sstream>
 
-#include "comm/messages.h"
 #include "shared/logger.h"
 #include "shared/scoped_file.h"
 #include "shared/sha256.h"
@@ -63,12 +62,6 @@ namespace Updater {
 		data->_zipDownloadDesc = curl::AsyncDownloadFile(request, data->_zipFilename);
 	}
 
-	void LauncherUpdater::GenerateArchiveFilename(LauncherUpdateData* data) {
-		char buffer[4096];
-		sprintf(buffer, LauncherFileNameTemplate, _releaseInfo["name"].GetString());
-		data->_zipFilename = buffer;
-	}
-
 	curl::DownloadStringResult LauncherUpdater::GetReleaseDownloadResult() const {
 		return _releaseDownloadResult;
 	}
@@ -119,109 +112,8 @@ namespace Updater {
 	}
 
 	void LauncherUpdater::PopulateUpdateData(LauncherUpdateData* data) {
-		GenerateArchiveFilename(data);
+		data->_zipFilename = LauncherUpdateFileName;
 		data->_hashUrl = _hashUrl;
 		data->_zipUrl = _zipUrl;
-	}
-
-	ExtractArchiveResult LauncherUpdater::ExtractArchive(const char* filename) {
-		class ScopedZip {
-		public:
-			ScopedZip(zip_t* zip) : _zip(zip) { }
-			~ScopedZip() { if (_zip) zip_close(_zip); }
-
-		private:
-			zip_t* _zip = nullptr;
-		};
-
-		ExtractArchiveResult result;
-
-		int error = 0;
-		zip_t* zip = zip_open(filename, ZIP_RDONLY | ZIP_CHECKCONS, &error);
-		ScopedZip scopedZip(zip);
-
-		if (zip == NULL) {
-			result.errCode = EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_ZIP;
-			return result;
-		}
-
-		const char* outputName = Comm::UnpackedArchiveName;
-		FILE* output = fopen(outputName, "wb");
-		ScopedFile scopedFile(output);
-		if (!output) {
-			result.errCode = EXTRACT_ARCHIVE_ERR_CANNOT_OPEN_BINARY_OUTPUT;
-			return result;
-		}
-
-		bool extractError = false;
-		bool foundExe = false;
-
-		int nFiles = zip_get_num_files(zip);
-		if (fwrite(&nFiles, sizeof(nFiles), 1, output) != 1) {
-			result.errCode = EXTRACT_ARCHIVE_ERR_FWRITE;
-			return result;
-		}
-
-		for (int i = 0; i < nFiles; ++i) {
-			zip_file_t* file = zip_fopen_index(zip, i, 0);
-			if (!file) {
-				result.SetZipError(zip_get_error(zip));
-				return result;
-			}
-
-			const char* name = zip_get_name(zip, i, 0);
-			if (!name) {
-				result.SetZipError(zip_get_error(zip));
-				return result;
-			}
-
-			if (!strcmp(name, "REPENTOGONLauncher.exe")) {
-				foundExe = true;
-			}
-
-			size_t nameLength = strlen(name);
-			if (fwrite(&nameLength, sizeof(nameLength), 1, output) != 1) {
-				result.errCode = EXTRACT_ARCHIVE_ERR_FWRITE;
-				return result;
-			}
-
-			if (fwrite(name, nameLength, 1, output) != 1) {
-				result.errCode = EXTRACT_ARCHIVE_ERR_FWRITE;
-				return result;
-			}
-
-			zip_stat_t fileStat;
-			int statResult = zip_stat_index(zip, i, 0, &fileStat);
-			if (statResult) {
-				result.files.push_back(std::make_tuple(std::string(name), Zip::EXTRACT_FILE_ERR_ZIP_STAT));
-				extractError = true;
-			} else {
-				if (fwrite(&fileStat.size, sizeof(fileStat.size), 1, output) != 1) {
-					result.errCode = EXTRACT_ARCHIVE_ERR_FWRITE;
-					return result;
-				}
-
-				Zip::ExtractFileResult extractFileResult = Zip::ExtractFile(zip, i, file, output);
-				result.files.push_back(std::make_tuple(std::string(name), extractFileResult));
-				if (!extractError) {
-					extractError = extractFileResult != Zip::EXTRACT_FILE_OK;
-				}
-			}
-		}
-
-		if (!foundExe) {
-			result.errCode = EXTRACT_ARCHIVE_ERR_NO_EXE;
-		} else if (extractError) {
-			result.errCode = EXTRACT_ARCHIVE_ERR_FILE_EXTRACT;
-		} else {
-			result.errCode = EXTRACT_ARCHIVE_OK;
-		}
-
-		return result;
-	}
-
-	void ExtractArchiveResult::SetZipError(zip_error_t* error) {
-		errCode = EXTRACT_ARCHIVE_ERR_ZIP_ERROR;
-		zipError = zip_error_strerror(error);
 	}
 }

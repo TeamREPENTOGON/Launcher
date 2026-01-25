@@ -30,6 +30,14 @@ namespace Shared {
 			CandidateVersion> detail;
 	};
 
+	// Related to using a steam workshop entry as a backup for finding launcher updates.
+	enum SteamLauncherUpdateStatus {
+		STEAM_LAUNCHER_UPDATE_NOT_USED,
+		STEAM_LAUNCHER_UPDATE_FAILED,
+		STEAM_LAUNCHER_UPDATE_AVAILABLE,
+		STEAM_LAUNCHER_UPDATE_UP_TO_DATE,
+	};
+
 	class LauncherUpdateChecker {
 	public:
 		/* Check if an update of the launcher is available.
@@ -45,7 +53,7 @@ namespace Shared {
 		 * also returned on error.
 		 */
 		bool IsSelfUpdateAvailable(bool allowDrafts, bool force,
-			std::string& version, std::string& url, curl::DownloadStringResult* fetchReleaseResult);
+			std::string& version, std::string& url, curl::DownloadStringResult& fetchReleaseResult, SteamLauncherUpdateStatus& steamUpdateStatus);
 
 		/* Select the target release for a self update.
 		 *
