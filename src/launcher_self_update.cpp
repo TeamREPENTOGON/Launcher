@@ -48,7 +48,7 @@ namespace Launcher {
 			if (msgResult == wxYES || msgResult == wxOK) {
 				wxGetApp().RestartForSelfUpdate(url, version);
 			}
-		} else if (result != curl::DOWNLOAD_STRING_OK || steamUpdateStatus == Shared::STEAM_LAUNCHER_UPDATE_FAILED) {
+		} else if (result != curl::DOWNLOAD_STRING_OK && steamUpdateStatus != Shared::STEAM_LAUNCHER_UPDATE_UP_TO_DATE) {
 			wxMessageBox("An error was encountered while checking for launcher updates. Check the log file for more details.", "REPENTOGON Launcher Error", wxICON_ERROR, mainWindow);
 		}
 	}
