@@ -320,6 +320,6 @@ void Launcher::App::RestartForSelfUpdate(const std::string& updateUrl, const std
 wxIMPLEMENT_WX_THEME_SUPPORT wxIMPLEMENT_APP_NO_MAIN(Launcher::App);
 
 extern "C" __declspec(dllexport) int WINAPI StartLauncherApp(int argc, char** argv) {
-	wxDISABLE_DEBUG_SUPPORT()
+	wxDISABLE_DEBUG_SUPPORT();
 	return wxEntry(argc, argv);
 }
