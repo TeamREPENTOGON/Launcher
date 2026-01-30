@@ -100,18 +100,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_SOURCE_DIR}/patch"
         "$<TARGET_FILE_DIR:REPENTOGONLauncher>/patch"
-    COMMAND ${CMAKE_COMMAND} -E tar cf ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data.bin --format=zip
-        "patch"
-        "inih.dll"
-        "REPENTOGONLauncherApp.dll"
-        $<$<CONFIG:Debug>:REPENTOGONLauncherApp.pdb>
-        "steam_api.dll"
-        "wxbase330ud_vc.dll"
-        "wxbase330ud_xml_vc.dll"
-        "wxmsw330ud_core_vc.dll"
-        "wxmsw330ud_html_vc.dll"
-        "wxmsw330ud_richtext_vc.dll"
-        "zlibd.dll"
+    COMMAND ${CMAKE_COMMAND} -E tar cf ${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data.bin --format=zip .
     COMMAND ${CMAKE_COMMAND} -E remove_directory "${CMAKE_BINARY_DIR}/$<CONFIG>/launcher-data"
     WORKING_DIRECTORY "$<TARGET_FILE_DIR:REPENTOGONLauncher>"
 )
