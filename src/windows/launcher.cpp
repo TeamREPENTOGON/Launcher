@@ -1006,7 +1006,7 @@ namespace Launcher {
 	void LauncherMainWindow::OnAdvancedModOptionsClick(wxCommandEvent&) {
 		AdvancedModOptionsWindow window(this);
 		window.ShowModal();
-		window.luaheapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
+		//window.luaheapSize->Enable(!_configuration->LuaHeapSizeHasOverride());
 		window.luaDebug->Enable(!_configuration->LuaDebugHasOverride());
 	}
 

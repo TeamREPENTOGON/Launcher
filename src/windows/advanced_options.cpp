@@ -136,16 +136,16 @@ namespace Launcher {
 			luaDebug->SetValue(_mainFrame->_configuration->LuaDebug());
 			mainSizer->Add(luaDebug, 0, wxALL, 10);
 
-			wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
-			luaheapSize = new wxTextCtrl(this, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024M");
-			wxStaticText* heapSizeText = new wxStaticText(this, -1, "Lua heap size: ");
-			luaheapSize->SetValue(_mainFrame->_configuration->LuaHeapSize());
-			heapSizeText->SetToolTip("Debug option that allows you to set the amount of memory the game allocates to the Lua engine used by mods.\n\nRealistically, you'll probably never need to change this from the default (1024M).");
-			luaheapSize->CopyToolTip(heapSizeText->GetToolTip());
-			heapSizeBox->Add(heapSizeText, 0, wxALIGN_CENTER_VERTICAL);
-			heapSizeBox->Add(luaheapSize, 0, wxALIGN_CENTER_VERTICAL);
-
-			mainSizer->Add(heapSizeBox, 0, wxBOTTOM | wxLEFT | wxRIGHT, 10);
+			//wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
+			//luaheapSize = new wxTextCtrl(this, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024M");
+			//wxStaticText* heapSizeText = new wxStaticText(this, -1, "Lua heap size: ");
+			//luaheapSize->SetValue(_mainFrame->_configuration->LuaHeapSize());
+			//heapSizeText->SetToolTip("Debug option that allows you to set the amount of memory the game allocates to the Lua engine used by mods.\n\nRealistically, you'll probably never need to change this from the default (1024M).");
+			//luaheapSize->CopyToolTip(heapSizeText->GetToolTip());
+			//heapSizeBox->Add(heapSizeText, 0, wxALIGN_CENTER_VERTICAL);
+			////heapSizeBox->Add(luaheapSize, 0, wxALIGN_CENTER_VERTICAL); //fuck this shit
+			//
+			//mainSizer->Add(heapSizeBox, 0, wxBOTTOM | wxLEFT | wxRIGHT, 10);
 
 		Fit();
 	}
