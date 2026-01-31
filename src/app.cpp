@@ -148,7 +148,7 @@ bool Launcher::App::OnInit() {
 
 	if (sCLI->CheckSelfUpdate()) {
 		Logger::Info("Self-update startup check requested...\n");
-		HandleSelfUpdate(_mainFrame, sCLI->UnstableLauncher(), false);
+		HandleSelfUpdate(_mainFrame, sCLI->UnstableLauncher(), true);
 	}
 
 	LauncherConfigurationInitialize initializationResult;

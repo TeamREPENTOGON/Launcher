@@ -43,16 +43,16 @@ namespace Shared {
 		return true;
 	}
 
-	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
+	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPreRelease,
 		bool force, std::string& version, std::string& url);
 
-	bool LauncherUpdateChecker::IsSelfUpdateAvailable(bool allowDrafts, bool force,
+	bool LauncherUpdateChecker::IsSelfUpdateAvailable(bool allowPreRelease, bool force,
 		std::string& version, std::string& url, curl::DownloadStringResult& fetchReleasesResult, SteamLauncherUpdateStatus& steamUpdateStatus) {
 
 		steamUpdateStatus = STEAM_LAUNCHER_UPDATE_NOT_USED;
 
 		//GitLab Barrier
-		if (!force && !ShouldDoTimeBasedGitLabSkip()) {
+		if (!force && !allowPreRelease && !ShouldDoTimeBasedGitLabSkip()) {
 			if (RemoteGitLabVersionMatches("versionlauncher", Launcher::LAUNCHER_VERSION)) {
 				fetchReleasesResult = curl::DownloadStringResult::DOWNLOAD_STRING_OK; //I would call this up a level so I dont have to do this hacky, but here is more convenient because I have some things already pre-chewed
 				return false;
@@ -97,10 +97,10 @@ namespace Shared {
 		}
 
 		_hasRelease = true;
-		return SelectTargetRelease(_releasesInfo, allowDrafts, force, version, url) && strcmp(::Launcher::LAUNCHER_VERSION, version.c_str());
+		return SelectTargetRelease(_releasesInfo, allowPreRelease, force, version, url) && strcmp(::Launcher::LAUNCHER_VERSION, version.c_str());
 	}
 
-	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPre,
+	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPreRelease,
 		bool, std::string& version, std::string& url) {
 		if (!releases.IsArray()) {
 			rapidjson::StringBuffer buffer;
@@ -112,7 +112,7 @@ namespace Shared {
 
 		auto releaseArray = releases.GetArray();
 		for (auto const& release : releaseArray) {
-			if (!release["prerelease"].IsTrue() || allowPre) {
+			if (!release["prerelease"].IsTrue() || allowPreRelease) {
 				version = release["name"].GetString();
 				url = release["url"].GetString();
 				return true;

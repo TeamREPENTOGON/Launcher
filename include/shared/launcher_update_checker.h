@@ -42,9 +42,9 @@ namespace Shared {
 	public:
 		/* Check if an update of the launcher is available.
 		 *
-		 *   allowDrafts indicates if a prerelease is considered a valid update.
+		 *   allowPreRelease indicates if a prerelease is considered a valid update.
 		 *   force causes the function to pick the first available release,
-		 * regardless of allowDrafts and regardless of whether said release is
+		 * regardless of allowPreRelease and regardless of whether said release is
 		 * new than the current one.
 		 *   version receives the name of new available version, if any.
 		 *   url receives the url to download the newest available version, if any.
@@ -52,7 +52,7 @@ namespace Shared {
 		 * Return true if an update is available, false otherwise. false is
 		 * also returned on error.
 		 */
-		bool IsSelfUpdateAvailable(bool allowDrafts, bool force,
+		bool IsSelfUpdateAvailable(bool allowPreRelease, bool force,
 			std::string& version, std::string& url, curl::DownloadStringResult& fetchReleaseResult, SteamLauncherUpdateStatus& steamUpdateStatus);
 
 		/* Select the target release for a self update.
@@ -61,17 +61,17 @@ namespace Shared {
 		 * the releases and pick the first valid one depending on whether it is
 		 * a prerelease or not, and whether it is newer than the currently
 		 * installed release. This can be controlled through the two
-		 * parameters allowDrafts and force.
+		 * parameters allowPreRelease and force.
 		 *
-		 *   allowDrafts indicates if a prerelease is considered a valid update.
+		 *   allowPreRelease indicates if a prerelease is considered a valid update.
 		 *   force causes the function to pick the first available release,
-		 * regardless of allowDrafts and regardless of wheter said release
+		 * regardless of allowPreRelease and regardless of wheter said release
 		 * if newer than the current one.
 		 *
 		 * The function returns an extended error code that can designate
 		 * multiple points of failure in the entire process.
 		 */
-		SelfUpdateErrorCode SelectReleaseTarget(bool allowDrafts, bool force);
+		SelfUpdateErrorCode SelectReleaseTarget(bool allowPreRelease, bool force);
 
 	private:
 		rapidjson::Document _releasesInfo;

@@ -35,6 +35,7 @@ namespace Updater {
 	// The old renamed exe will be deleted the next time the updater runs.
 	static const char* UpdaterExeFilename = "REPENTOGONLauncher.exe";
 	static const char* RenamedUpdaterExeFilename = "REPENTOGONLauncher.exe.bak";
+	static const char* LegacyUpdaterExeFilename = "REPENTOGONLauncherUpdater.exe";
 
 	static const char* LauncherDataFolder = "launcher-data";
 	static const char* LauncherDataBackupFolder = "launcher-data.old";
@@ -276,8 +277,6 @@ void Updater::ProgressBarThread(POINT windowPos) {
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
 	Logger::Info("TryUpdateLauncher started.\n");
 
-	// Open a handle for the active launcher process, if provided by the launcher itself.
-	HANDLE launcherHandle = TryOpenLauncherProcessHandle(argc, argv);
 	// Validate that no other instance of the updater is running.
 	HANDLE lockFile = NULL;
 
@@ -310,6 +309,12 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	Updater::Utils::ScopedHandle scopedHandle(lockFile);
 
 	SetCurrentUpdaterState(UPDATER_CHECKING_FOR_UPDATE);
+
+	// Delete the legacy updater exe, if it exists.
+	if (std::filesystem::exists(LegacyUpdaterExeFilename)) {
+		Logger::Info("Deleting legacy updater exe...\n");
+		std::filesystem::remove(LegacyUpdaterExeFilename);
+	}
 
 	// If the version backup folder exists, and an unfinished/broken update is detected, attempt to roll back.
 	if (std::filesystem::exists(LauncherDataBackupFolder) && (std::filesystem::exists(UnfinishedUpdateMarker) || !std::filesystem::exists(LauncherDllPath))) {
@@ -442,19 +447,6 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	}
 
 	SetCurrentUpdaterState(UPDATER_DOWNLOADING_UPDATE);
-
-	// If we opened a launcher process handle, terminate it now.
-	if (launcherHandle != INVALID_HANDLE_VALUE) {
-		Logger::Info("Terminating launcher...\n");
-		if (TerminateProcess(launcherHandle, 0)) {
-			WaitForSingleObject(launcherHandle, INFINITE);
-		}
-		else {
-			// We continue on after this error since we'll notice if the launcher exe is locked and prompt the user about it then.
-			Logger::Error("Failed to terminate launcher process (%d)\n", GetLastError());
-		}
-		CloseHandle(launcherHandle);
-	}
 
 	Logger::Info("Starting update download from %s\n", url.c_str());
 
@@ -622,6 +614,18 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 
 	int argc = 0;
 	char** argv = Updater::Utils::CommandLineToArgvA(cli, &argc);
+
+	// Open a handle for the prior launcher process, if provided, and kill it.
+	if (HANDLE launcherHandle = Updater::TryOpenLauncherProcessHandle(argc, argv); launcherHandle != INVALID_HANDLE_VALUE) {
+		Logger::Info("Restart detected. Terminating previous launcher instance...\n");
+		if (TerminateProcess(launcherHandle, 0)) {
+			WaitForSingleObject(launcherHandle, INFINITE);
+		} else {
+			// We can continue on after this and hope for the best.
+			Logger::Error("Failed to terminate launcher process (%d)\n", GetLastError());
+		}
+		CloseHandle(launcherHandle);
+	}
 
 	sGithubExecutor->Start();
 
