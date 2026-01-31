@@ -5,6 +5,7 @@
 #include <thread>
 #include <memory>
 #include <fstream>
+#include <set>
 
 #include "shared/github_executor.h"
 #include "shared/logger.h"
@@ -35,7 +36,12 @@ namespace Updater {
 	// The old renamed exe will be deleted the next time the updater runs.
 	static const char* UpdaterExeFilename = "REPENTOGONLauncher.exe";
 	static const char* RenamedUpdaterExeFilename = "REPENTOGONLauncher.exe.bak";
-	static const char* LegacyUpdaterExeFilename = "REPENTOGONLauncherUpdater.exe";
+
+	// Files related to legacy versions that should be deleted if found.
+	static const std::set<std::string> LegacyCleanupFiles = {
+		"REPENTOGONLauncherUpdater.exe",
+		"REPENTOGONLauncherUpdater.exe.bak",
+	};
 
 	static const char* LauncherDataFolder = "launcher-data";
 	static const char* LauncherDataBackupFolder = "launcher-data.old";
@@ -310,12 +316,6 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	SetCurrentUpdaterState(UPDATER_CHECKING_FOR_UPDATE);
 
-	// Delete the legacy updater exe, if it exists.
-	if (std::filesystem::exists(LegacyUpdaterExeFilename)) {
-		Logger::Info("Deleting legacy updater exe...\n");
-		std::filesystem::remove(LegacyUpdaterExeFilename);
-	}
-
 	// If the version backup folder exists, and an unfinished/broken update is detected, attempt to roll back.
 	if (std::filesystem::exists(LauncherDataBackupFolder) && (std::filesystem::exists(UnfinishedUpdateMarker) || !std::filesystem::exists(LauncherDllPath))) {
 		Logger::Error("Detected failed update!\n");
@@ -525,13 +525,6 @@ void SetWorkingDirToExe() {
 	SetCurrentDirectoryA(exeDir.string().c_str());
 }
 
-void SetWorkingDirToBin() {
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(NULL, exePath, MAX_PATH);
-	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path() / "launcher-data";
-	SetCurrentDirectoryA(exeDir.string().c_str());
-}
-
 std::string Updater::BuildCleanCli(int argc, char** argv, bool addCheckSelfUpdate) {
 	std::ostringstream cli;
 	cli << UpdaterExeFilename;
@@ -557,9 +550,19 @@ int Updater::RunLauncher(HWND mainWindow, int argc, char** argv, bool checkUpdat
 	Updater::SetCurrentUpdaterState(Updater::UPDATER_STARTING_LAUNCHER);
 
 	Logger::Info("Preparing to start launcher...\n");
-	SetWorkingDirToBin();
 
-	HINSTANCE launcher = LoadLibraryA("REPENTOGONLauncherApp.dll");
+	std::filesystem::path launcherDllFullPath(LauncherDllPath);
+
+	try {
+		launcherDllFullPath = std::filesystem::absolute(launcherDllFullPath);
+	} catch (std::filesystem::filesystem_error const& ex) {
+		std::string err = "Filesystem error locating REPENTOGONLauncherApp.dll: " + std::string(ex.what()) + "\n";
+		ShowMessageBox(mainWindow, err.c_str(), MB_ICONERROR);
+		Logger::Error(err.c_str());
+		return -1;
+	}
+
+	HINSTANCE launcher = LoadLibraryExA(launcherDllFullPath.string().c_str(), NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
 	if (launcher == NULL) {
 		std::string err = "Failed to load REPENTOGONLauncherApp.dll: " + std::to_string(GetLastError()) + "\n";
 		ShowMessageBox(mainWindow, err.c_str(), MB_ICONERROR);
@@ -586,8 +589,6 @@ int Updater::RunLauncher(HWND mainWindow, int argc, char** argv, bool checkUpdat
 	Logger::Info("Launcher application closed with return code %d\n", res);
 	Utils::FreeCli(newargc, newargv);
 	FreeLibrary(launcher);
-
-	SetWorkingDirToExe();
 
 	return res;
 }
@@ -625,6 +626,14 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 			Logger::Error("Failed to terminate launcher process (%d)\n", GetLastError());
 		}
 		CloseHandle(launcherHandle);
+	}
+
+	// Clean up any legacy files lying around from old versions.
+	for (const std::string& filename : Updater::LegacyCleanupFiles) {
+		if (std::filesystem::exists(filename)) {
+			Logger::Info("Deleting legacy file %s...\n", filename.c_str());
+			std::filesystem::remove(filename);
+		}
 	}
 
 	sGithubExecutor->Start();
