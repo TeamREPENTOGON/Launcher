@@ -91,9 +91,9 @@ bool Updater::HandleMatchesLauncherExe(HANDLE handle) {
 	try {
 		return std::filesystem::equivalent(buffer, UpdaterExeFilename);
 	}
-	catch (const std::filesystem::filesystem_error& ex) {
+	catch (const std::filesystem::filesystem_error& err) {
 		// Most likely one or the other does not exist.
-		Logger::Warn("Error when checking filepath equivalence of `%s` and `%s`: %s", buffer, UpdaterExeFilename, ex.what());
+		Logger::Warn("Error when checking filepath equivalence of `%s` and `%s`: %s", buffer, UpdaterExeFilename, err.what());
 	}
 	return false;
 }
@@ -152,7 +152,7 @@ bool Updater::TryDeleteOldRenamedUpdaterExe(HWND mainWindow) {
 			continue;
 		}
 		SetCurrentUpdaterState(UPDATER_PROMPTING_USER);
-		int response = ShowMessageBox(mainWindow, "Failed to delete REPENTOGONLauncherUpdater.exe.bak file from prior update.\n"
+		int response = ShowMessageBox(mainWindow, "Failed to delete REPENTOGONLauncher.exe.bak file from prior update.\n"
 			"The update was most likely successful, but please report this as a bug.\n"
 			"Select \"cancel\" to allow the Launcher to start.\n", MB_ICONINFORMATION | MB_RETRYCANCEL);
 		if (response == IDRETRY || response == IDOK || response == IDTRYAGAIN) {
@@ -320,6 +320,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	if (std::filesystem::exists(LauncherDataBackupFolder) && (std::filesystem::exists(UnfinishedUpdateMarker) || !std::filesystem::exists(LauncherDllPath))) {
 		Logger::Error("Detected failed update!\n");
 		if (std::filesystem::exists(LauncherDataBackupFolder)) {
+			Logger::Info("Attempting to restore prior installation...\n");
 			std::filesystem::remove_all(LauncherDataFolder);
 			std::filesystem::rename(LauncherDataBackupFolder, LauncherDataFolder);
 			Logger::Info("Successfully restored previous installation!\n");
@@ -470,8 +471,8 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	SetCurrentUpdaterState(UPDATER_INSTALLING_UPDATE);
 
-	// Check if the launcher exe is still locked. If so, prompt the user about it.
-	// The exe file can remain locked very briefly after terminating the launcher, so we check this after the download.
+	// Check if the launcher dlls are locked. If so, prompt the user about it.
+	// Files could remain locked briefly after termination, so we check this after the download.
 	if (!VerifyLauncherNotRunning(mainWindow)) {
 		return UPDATE_ERROR;
 	}
@@ -495,7 +496,9 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	// So the result of this is that the running exe has been renamed as `exe.bak` (and is still locked by windows),
 	// AND we have a copy under the original name (which is not locked and can be overwritten).
 	if (std::filesystem::exists(UpdaterExeFilename)) {
+		Logger::Info("Renaming exe...\n");
 		std::filesystem::rename(UpdaterExeFilename, RenamedUpdaterExeFilename);
+		Logger::Info("Copying exe...\n");
 		try {
 			std::filesystem::copy(RenamedUpdaterExeFilename, UpdaterExeFilename);
 		} catch (std::filesystem::filesystem_error& err) {
@@ -513,7 +516,9 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		return UPDATE_ERROR;
 	}
 
+	Logger::Info("Deleting 'unfinished update' marker...\n");
 	std::filesystem::remove(UnfinishedUpdateMarker);
+
 	Logger::Info("Update successful!\n");
 	return UPDATE_SUCCESSFUL;
 }
@@ -632,7 +637,11 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 	for (const std::string& filename : Updater::LegacyCleanupFiles) {
 		if (std::filesystem::exists(filename)) {
 			Logger::Info("Deleting legacy file %s...\n", filename.c_str());
-			std::filesystem::remove(filename);
+			try {
+				std::filesystem::remove(filename);
+			} catch (const std::filesystem::filesystem_error& err) {
+				Logger::Error("Error trying to delete legacy file: %s\n", err.what());
+			}
 		}
 	}
 
