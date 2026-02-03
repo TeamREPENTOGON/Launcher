@@ -207,6 +207,108 @@ bool Updater::VerifyLauncherNotRunning(HWND mainWindow) {
 	return true;
 }
 
+bool Updater::CheckInstallationIntegrity() {
+	return !UnfinishedUpdateMarkerExists() && std::filesystem::exists(LauncherDllPath);
+}
+
+void Updater::CleanInstallation() {
+	if (!Updater::CheckInstallationIntegrity()) {
+		Logger::Error("Not performing installation cleanup: Integrity check failed!\n");
+		return;
+	}
+	try {
+		if (std::filesystem::exists(LauncherBinBackupFilename)) {
+			Logger::Info("Deleting bin backup...\n");
+			std::filesystem::remove(LauncherBinBackupFilename);
+		}
+		if (std::filesystem::exists(LauncherDataBackupFolder)) {
+			Logger::Info("Deleting backup folder...\n");
+			std::filesystem::remove_all(LauncherDataBackupFolder);
+		}
+		if (std::filesystem::exists(UpdateStagingFolder)) {
+			Logger::Info("Deleting staging folder...\n");
+			std::filesystem::remove_all(UpdateStagingFolder);
+		}
+		if (std::filesystem::exists(RenamedUpdaterExeFilename) && !Utils::FileLocked(RenamedUpdaterExeFilename)) {
+			Logger::Info("Deleting old exe...\n");
+			std::filesystem::remove(RenamedUpdaterExeFilename);
+		}
+		for (const std::string& filename : Updater::LegacyCleanupFiles) {
+			if (std::filesystem::exists(filename)) {
+				Logger::Info("Deleting legacy file %s...\n", filename.c_str());
+				std::filesystem::remove(filename);
+			}
+		}
+	} catch (std::filesystem::filesystem_error& err) {
+		Logger::Error("Error trying to clean up installation: %s", err.what());
+	}
+}
+
+void Updater::TryRepairInstallation(HWND mainWindow) {
+	if (!Updater::CheckInstallationIntegrity()) {
+		Logger::Info("Incomplete or broken installation detected. Verifying...\n");
+		if (UnfinishedUpdateMarkerExists()) {
+			Logger::Error("Detected failed update!\n");
+			ShowMessageBox(mainWindow, "A previous attempt to update the launcher failed. "
+				"Will attempt to roll back to your previous installation. "
+				"More details may be found in updater.log.\n\n"
+				"If this issue persists, please report it. "
+				"If needed, you may also manually download the latest version of the launcher from `REPENTOGON.COM`.\n", MB_ICONERROR);
+
+			// Check for a backup of the bin file from before the update attempt.
+			if (std::filesystem::exists(LauncherBinBackupFilename)) {
+				Logger::Info("Restoring %s...\n", LauncherBinBackupFilename);
+				if (std::filesystem::exists(LauncherBinFilename)) {
+					std::filesystem::remove(LauncherBinFilename);
+				}
+				std::filesystem::rename(LauncherBinBackupFilename, LauncherBinFilename);
+				Logger::Info("Successfully restored backup bin!\n");
+			}
+		} else {
+			Logger::Info("Installation incomplete, or simply first-time setup. Will attempt to extract %s...\n", LauncherBinFilename);
+		}
+
+		std::filesystem::remove_all(LauncherDataFolder);
+
+		// Try extracting files from the bin.
+		if (std::filesystem::exists(LauncherBinFilename)) {
+			Logger::Info("Extracting %s...\n", LauncherBinFilename);
+			std::filesystem::create_directories(LauncherDataFolder);
+			CreateUnfinishedUpdateMarker();
+			if (!Zip::ExtractAllToFolder(LauncherBinFilename, LauncherDataFolder)) {
+				Logger::Error("Extraction of `%s` failed.\n", LauncherBinFilename);
+				std::filesystem::remove_all(LauncherDataFolder);
+			} else {
+				DeleteUnfinishedUpdateMarker();
+				Logger::Info("...done!\n");
+				return;
+			}
+		}
+
+		// Try restoring a backup folder.
+		if (std::filesystem::exists(LauncherDataBackupFolder)) {
+			Logger::Info("Restoring backup installation folder...\n");
+			std::filesystem::rename(LauncherDataBackupFolder, LauncherDataFolder);
+			Logger::Info("Successfully restored backup folder!\n");
+		} else {
+			Logger::Warn("Unable to restore backups or install from bin. Will attempt to force update...\n");
+		}
+	}
+}
+
+void Updater::CheckSteamAppIdTxt() {
+	if (!std::filesystem::exists("steam_appid.txt")) {
+		Logger::Warn("steam_appid.txt is missing. Generating one...\n");
+		std::ofstream outFile("steam_appid.txt");
+		if (outFile) {
+			outFile << "250900";
+			outFile.close();
+		} else {
+			Logger::Error("Failed to generate steam_appid.txt!\n");
+		}
+	}
+}
+
 std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(POINT windowPos) {
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 
@@ -331,65 +433,14 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	Updater::Utils::ScopedHandle scopedHandle(lockFile);
 
-	// Detect unfinished updates or broken/incomplete installations, and attempt repair.
-	if (UnfinishedUpdateMarkerExists() || !std::filesystem::exists(LauncherDllPath)) {
-		Logger::Info("Incomplete or broken installation detected. Verifying...\n");
-		if (UnfinishedUpdateMarkerExists()) {
-			Logger::Error("Detected failed update!\n");
-			ShowMessageBox(mainWindow, "A previous attempt to update the launcher failed. "
-				"Will attempt to roll back to your previous installation. "
-				"More details may be found in updater.log.\n\n"
-				"If this issue persists, please report it. "
-				"If needed, you may also manually download the latest version of the launcher from `REPENTOGON.COM`.\n", MB_ICONERROR);
-
-			// Check for a backup of the bin file from before the update attempt.
-			if (std::filesystem::exists(LauncherBinBackupFilename)) {
-				Logger::Info("Restoring %s...\n", LauncherBinBackupFilename);
-				if (std::filesystem::exists(LauncherBinFilename)) {
-					std::filesystem::remove(LauncherBinFilename);
-				}
-				std::filesystem::rename(LauncherBinBackupFilename, LauncherBinFilename);
-				Logger::Info("Successfully restored backup bin!\n");
-			}
-		} else {
-			Logger::Info("Installation incomplete, or simply first-time setup. Will attempt to extract %s...\n", LauncherBinFilename);
-		}
-
-		std::filesystem::remove_all(LauncherDataFolder);
-
-		if (std::filesystem::exists(LauncherBinFilename)) {
-			// Extract files from the bin.
-			Logger::Info("Extracting %s...\n", LauncherBinFilename);
-			std::filesystem::create_directories(LauncherDataFolder);
-			CreateUnfinishedUpdateMarker();
-			if (!Zip::ExtractAllToFolder(LauncherBinFilename, LauncherDataFolder)) {
-				Logger::Error("Extraction of `%s` failed. Will attempt to force update...\n", LauncherBinFilename);
-				std::filesystem::remove_all(LauncherDataFolder);
-			} else {
-				DeleteUnfinishedUpdateMarker();
-				Logger::Info("...done!\n");
-			}
-		} else if (std::filesystem::exists(LauncherDataBackupFolder)) {
-			// The bin is missing, but we have a backup folder from before the update attempt, so try that.
-			Logger::Info("Restoring backup installation folder...\n");
-			std::filesystem::rename(LauncherDataBackupFolder, LauncherDataFolder);
-			Logger::Info("Successfully restored backup folder!\n");
-		} else {
-			Logger::Warn("Unable to restore backups or install from bin. Will attempt to force update...\n");
-		}
+	// Verify integrity of installation, detect unfinished updates or broken/incomplete installs, and attempt repair if needed.
+	if (!CheckInstallationIntegrity()) {
+		TryRepairInstallation(mainWindow);
 	}
-
-	// Check for steam_appid.txt
-	if (!std::filesystem::exists("steam_appid.txt")) {
-		Logger::Warn("steam_appid.txt is missing. Generating one...\n");
-		std::ofstream outFile("steam_appid.txt");
-		if (outFile) {
-			outFile << "250900";
-			outFile.close();
-		} else {
-			Logger::Error("Failed to generate steam_appid.txt!\n");
-		}
+	if (CheckInstallationIntegrity()) {
+		CleanInstallation();
 	}
+	CheckSteamAppIdTxt();
 
 	SetCurrentUpdaterState(UPDATER_CHECKING_FOR_UPDATE);
 
@@ -564,14 +615,18 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	std::optional<std::filesystem::directory_entry> newExe = std::nullopt;
 	for (const auto& entry : std::filesystem::directory_iterator(UpdateStagingFolder)) {
 		if (entry.is_directory()) {
+			Logger::Info("Copying directory: %s\n", entry.path().string().c_str());
 			std::filesystem::copy(entry, std::filesystem::current_path() / entry.path().filename(), std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::recursive);
 		} else if (entry.path().filename() == UpdaterExeFilename) {
+			Logger::Info("Found exe: %s\n", entry.path().string().c_str());
 			newExe = entry;
 		} else {
+			Logger::Info("Copying file: %s\n", entry.path().string().c_str());
 			std::filesystem::copy(entry, std::filesystem::current_path(), std::filesystem::copy_options::overwrite_existing);
 		}
 	}
 	if (newExe && std::filesystem::exists(*newExe)) {
+		Logger::Info("Copying exe: %s\n", newExe->path().string().c_str());
 		std::filesystem::copy(*newExe, std::filesystem::current_path(), std::filesystem::copy_options::overwrite_existing);
 	} else {
 		Logger::Warn("Did not find %s in unpacked update!\n", UpdaterExeFilename);
@@ -705,18 +760,6 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 			Logger::Error("Failed to terminate launcher process (%d)\n", GetLastError());
 		}
 		CloseHandle(launcherHandle);
-	}
-
-	// Clean up any legacy files lying around from old versions.
-	for (const std::string& filename : Updater::LegacyCleanupFiles) {
-		if (std::filesystem::exists(filename)) {
-			Logger::Info("Deleting legacy file %s...\n", filename.c_str());
-			try {
-				std::filesystem::remove(filename);
-			} catch (const std::filesystem::filesystem_error& err) {
-				Logger::Error("Error trying to delete legacy file: %s\n", err.what());
-			}
-		}
 	}
 
 	sGithubExecutor->Start();

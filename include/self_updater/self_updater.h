@@ -79,6 +79,18 @@ namespace Updater {
 	// The updater cannot continue in this case.
 	bool VerifyLauncherNotRunning(HWND mainWindow);
 
+	// Returns false if an incomplete installation or unfinished update is detected.
+	bool CheckInstallationIntegrity();
+
+	// Cleans unnecessary files potentially left behind by the update process or legacy versions.
+	void CleanInstallation();
+
+	// If the installation is broken in some way, attempts repair.
+	void TryRepairInstallation(HWND mainWindow);
+
+	// Checks if steam_appid.txt exists, and creates it if it doesn't.
+	void CheckSteamAppIdTxt();
+
 	// Initializes the window for the progress bar and returns the handle within a UniqueWindow wrapper.
 	// Returns nullptr if the window could not be created.
 	std::unique_ptr<Updater::UniqueWindow> CreateProgressBarWindow(POINT windowPos);
