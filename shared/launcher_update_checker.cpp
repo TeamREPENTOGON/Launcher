@@ -63,6 +63,11 @@ namespace Shared {
 		bool downloadResult = FetchReleases(&fetchReleasesResult, _releasesInfo);
 
 		if (!downloadResult) {
+			// Double check with gitlab before resorting to steam (we may not have checked gitlab earlier).
+			if (!allowPreRelease && RemoteGitLabVersionMatches("versionlauncher", Launcher::LAUNCHER_VERSION)) {
+				fetchReleasesResult = curl::DownloadStringResult::DOWNLOAD_STRING_OK;
+				return false;
+			}
 			Logger::Warn("Failed to fetch releases from GitHub. Trying Steam...\n");
 			if (!std::filesystem::exists("steamentrydir.txt")) {
 				Logger::Warn("steamentrydir.txt does not exist. Cannot proceed.\n");
