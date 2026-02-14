@@ -12,9 +12,13 @@
 
 namespace SteamWorkshop {
 
-const PublishedFileId_t REPENTOGON_WORKSHOP_ID = 3643104060;  // 3643104060 is dummy id for testing
+// "REPENTOGON Download Helper", a workshop entry that contains the latest versions of
+// REPENTOGON and the launcher, for getting updates if GitHub connection fails.
+const PublishedFileId_t REPENTOGON_WORKSHOP_ID = 3643104060;
 
 bool WaitForWorkshopDownload(PublishedFileId_t fileId, uint32 timeoutMs = 60000) {
+	Logger::Info("Checking download for steam workshop item %llu...\n", fileId);
+
 	uint32 elapsed = 0;
 	const uint32 step = 100;
 
@@ -23,8 +27,10 @@ bool WaitForWorkshopDownload(PublishedFileId_t fileId, uint32 timeoutMs = 60000)
 
 		uint32 state = SteamUGC()->GetItemState(fileId);
 
-		if (state & k_EItemStateInstalled)
+		if (state & k_EItemStateInstalled) {
+			Logger::Info("Workshop item up-to-date.\n", fileId);
 			return true;
+		}
 
 		if (state & k_EItemStateDownloadPending ||
 			state & k_EItemStateDownloading) {
@@ -66,6 +72,11 @@ bool SubscribeAndDownload(PublishedFileId_t workshopId, std::string& outPath) {
 	}
 
 	outPath = std::string(installPath);
+
+	if (workshopId == REPENTOGON_WORKSHOP_ID && !std::filesystem::exists(outPath + "/disable.it")) {
+		std::ofstream(outPath + "/disable.it");
+	}
+
 	return true;
 }
 
