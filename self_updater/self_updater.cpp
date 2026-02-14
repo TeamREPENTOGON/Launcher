@@ -663,7 +663,7 @@ std::string Updater::BuildCleanCli(int argc, char** argv, bool addCheckSelfUpdat
 			i++;
 			continue;
 		}
-		cli << " " << argv[i];
+		cli << " \"" << argv[i] << "\"";
 	}
 	if (addCheckSelfUpdate) {
 		cli << " " << CheckSelfUpdateLauncherArg;

@@ -290,7 +290,7 @@ void Launcher::App::RestartForSelfUpdate(const std::string& updateUrl, const std
 		<< " --url " << updateUrl
 		<< " --version " << updateVersion;
 	for (int i = 1; i < argc; ++i) {
-		cli << " " << argv[i];
+		cli << " \"" << argv[i] << "\"";
 	}
 
 	_mainFrame->Hide();

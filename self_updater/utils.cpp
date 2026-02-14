@@ -78,6 +78,8 @@ namespace Updater::Utils {
 				--* len;
 			} else if (*cur == '\\') {
 				escaped = !escaped;
+			} else {
+				escaped = false;
 			}
 
 			++cur;
