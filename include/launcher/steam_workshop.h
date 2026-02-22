@@ -12,5 +12,5 @@ bool CreateSteamEntryDirFile();
 
 bool SubscribeAndDownload(PublishedFileId_t workshopId, std::string& outPath);
 bool SubscribeDownloadAndGetFile(PublishedFileId_t workshopId, const std::string& relativeFilePath, std::string& outFullPath);
-
+bool CanReachSteamWorkshop();
 }

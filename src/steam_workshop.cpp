@@ -9,6 +9,7 @@
 #include "steam_api.h"
 #include "synchapi.h"
 #include "shared/logger.h"
+#include <curl/curl.h>
 
 namespace SteamWorkshop {
 
@@ -18,6 +19,12 @@ const PublishedFileId_t REPENTOGON_WORKSHOP_ID = 3643104060;
 
 bool WaitForWorkshopDownload(PublishedFileId_t fileId, uint32 timeoutMs = 60000) {
 	Logger::Info("Checking download for steam workshop item %llu...\n", fileId);
+
+
+	if (!CanReachSteamWorkshop()) {
+		Logger::Error("Cannot connect to the workshop!.\n");
+		return false;
+	}
 
 	uint32 elapsed = 0;
 	const uint32 step = 100;
@@ -51,6 +58,8 @@ bool SubscribeAndDownload(PublishedFileId_t workshopId, std::string& outPath) {
 		Logger::Error("Steam is not available.\n");
 		return false;
 	}
+
+
 	SteamUGC()->SubscribeItem(workshopId);
 	if (!WaitForWorkshopDownload(workshopId)) {
 		Logger::Error("Failure waiting for workshop download.\n");
@@ -94,6 +103,29 @@ bool SubscribeDownloadAndGetFile(PublishedFileId_t workshopId, const std::string
 	}
 
 	return true;
+}
+
+
+bool CanReachSteamWorkshop()
+{
+	CURL* curl = curl_easy_init();
+	if (!curl)
+		return false;
+
+	curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/");
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);          
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);         //5sec timeout
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);  
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);  
+
+	CURLcode res = curl_easy_perform(curl);
+
+	long response_code = 0;
+	if (res == CURLE_OK)
+		curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &response_code);
+
+	curl_easy_cleanup(curl);
+	return (res == CURLE_OK && response_code >= 200 && response_code < 400);
 }
 
 //this is mainly for the updater to find later kind of hacky, but its the only way I could think of where the updater can use the steam entry when available without the steamapi (wont be able to make it available if it isnt tho)
