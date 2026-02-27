@@ -373,7 +373,10 @@ void Updater::ProgressBarThread(POINT windowPos) {
 		}
 
 		const UpdaterState currentState = GetCurrentUpdaterState();
-		if (currentState != state) {
+		if (currentState == UpdaterState::UPDATER_RUNNING_LAUNCHER || currentState == UpdaterState::UPDATER_SHUTTING_DOWN) {
+			// Progress bar no longer needed. Allow the thread to terminate.
+			break;
+		} else if (currentState != state) {
 			state = currentState;
 
 			if (UpdaterStateProgressBarLabels.find(state) != UpdaterStateProgressBarLabels.end()) {
@@ -396,7 +399,7 @@ void Updater::ProgressBarThread(POINT windowPos) {
 		}
 	}
 
-	Logger::Error("Progress bar thread ended.\n");
+	Logger::Info("Progress bar thread ended.\n");
 }
 
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
