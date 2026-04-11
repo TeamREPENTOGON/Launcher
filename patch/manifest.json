@@ -1,5 +1,7 @@
 {
-  "delete": [],
+  "delete": [
+    "EOSSDK-Win32-Shipping.dll"
+  ],
   "create": {},
   "patch": [
     "OpenAL32.dll",
