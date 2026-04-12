@@ -15,7 +15,7 @@ namespace Updater {
 	public:
 		static constexpr const size_t BUFF_SIZE = 4096;
 
-		SelfUpdateCheckResult CheckSelfUpdateAvailability(bool allowPreRelease, std::string& version, std::string& url);
+		SelfUpdateCheckResult CheckSelfUpdateAvailability(bool allowPreRelease, bool force, std::string& version, std::string& url);
 		bool DownloadUpdate(const std::string& url, std::string& zipFilename);
 
 	private:

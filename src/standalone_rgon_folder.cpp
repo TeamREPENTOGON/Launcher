@@ -1339,7 +1339,7 @@ namespace standalone_rgon {
                      */
                     if (!Filesystem::Exists(sourceStr)) {
                         Logger::Warn("standalone_rgon::CopyFiles: skipping %s as "
-                            "the source file does not exist", sourceStr);
+                            "the source file does not exist\n", sourceStr);
                         continue;
                     }
 

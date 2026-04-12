@@ -470,15 +470,15 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		version = versionGiven;
 	}
 
-	const bool launcherMissing = !std::filesystem::exists(LauncherDllPath);
-	const bool skipConfirmation = urlGiven || launcherMissing;
+	const bool forceUpdate = !std::filesystem::exists(LauncherDllPath);
+	const bool skipConfirmation = urlGiven || forceUpdate;
 
 	if (!urlGiven) {
-		lu::SelfUpdateCheckResult checkResult = updateManager.CheckSelfUpdateAvailability(allowUnstable, version, url);
+		lu::SelfUpdateCheckResult checkResult = updateManager.CheckSelfUpdateAvailability(allowUnstable, forceUpdate, version, url);
 
 		switch (checkResult) {
 		case lu::SELF_UPDATE_CHECK_UP_TO_DATE:
-			if (launcherMissing) {
+			if (forceUpdate) {
 				Logger::Warn("Launcher DLL missing. Forcing update to version: %s (from %s)\n", version.c_str(), url.c_str());
 			} else {
 				Logger::Info("launcher is already up-to-date.\n");

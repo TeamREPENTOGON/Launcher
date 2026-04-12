@@ -213,12 +213,12 @@ namespace Updater {
 		Logger::Info("%s: %s\n", prefix, curl::DownloadAsStringResultToLogString(result));
 	}
 
-	LauncherUpdateManager::SelfUpdateCheckResult LauncherUpdateManager::CheckSelfUpdateAvailability(bool allowPreReleases,
+	LauncherUpdateManager::SelfUpdateCheckResult LauncherUpdateManager::CheckSelfUpdateAvailability(bool allowPreReleases, bool force,
 		std::string& version, std::string& url) {
 		Logger::Info("Checking for availability of launcher updates...\n");
 		curl::DownloadStringResult downloadReleasesResult;
 		Shared::SteamLauncherUpdateStatus steamUpdateStatus;
-		if (_updateChecker.IsSelfUpdateAvailable(allowPreReleases, false, version, url, downloadReleasesResult, steamUpdateStatus)) {
+		if (_updateChecker.IsSelfUpdateAvailable(allowPreReleases, force, version, url, downloadReleasesResult, steamUpdateStatus)) {
 			Logger::Info("...OK\n");
 			Logger::Info("New version of the launcher available: %s (can be downloaded from %s)\n", version.c_str(), url.c_str());
 			return SELF_UPDATE_CHECK_UPDATE_AVAILABLE;

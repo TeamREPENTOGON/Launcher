@@ -357,7 +357,7 @@ static bool RemoveOldPatchFolder()
 		try {
 			fs::remove_all(__patchFolder);
 		} catch (std::filesystem::filesystem_error& err) {
-			Logger::Error("Failed to delete patch folder: %s (attempt #%d)", err.what(), attempts);
+			Logger::Error("Failed to delete patch folder: %s (attempt #%d)\n", err.what(), attempts);
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 	}
@@ -447,7 +447,6 @@ bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
 
 	if (result == HASH_OK) {
 		fs::path fullPath = fs::current_path() / __patchFolder / "exehash.txt";
-		std::string s = fullPath.string();
 		if (fs::exists(fullPath)) {
             // Read the exe hash and compare it.
             std::stringstream buffer;
