@@ -6,6 +6,14 @@
 #include <filesystem>
 #include <regex>
 #include <stdexcept>
+#include <string>
+#include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <ctime>
+#include <cstdio>
+#include <vector>
+#include <curl/curl.h>
 
 #include "launcher/isaac_installation.h"
 #include "launcher/repentogon_installation.h"
@@ -19,22 +27,6 @@
 #include "shared/zip.h"
 #include "launcher/standalone_rgon_folder.h"
 #include "steam_api.h"
-
-
-#include <io.h>
-#include <fstream>
-#include <filesystem>
-#include <string>
-#include <stdexcept>
-#include <curl/curl.h>
-#include <algorithm>
-#include <cctype>
-#include <chrono>
-#include <ctime>
-#include <string>
-#include <cstdio>
-#include <vector>
-#include <curl/curl.h>
 
 static constexpr const char* __versionNeedle = "Binding of Isaac: Repentance+ v";
 static constexpr const char* __launcherDataFolder = "launcher-data";
@@ -358,15 +350,21 @@ static size_t patchwriteresponse(void* contents, size_t size, size_t nmemb, void
 	return fwrite(contents, size, nmemb, fp);
 }
 
-static void RemoveOldPatchFolder()
+static bool RemoveOldPatchFolder()
 {
-	namespace fs = std::filesystem;
-	if (fs::exists(__patchFolder))
-		fs::remove_all(__patchFolder);
+	int attempts = 0;
+	while (fs::exists(__patchFolder) && attempts++ <= 5) {
+		try {
+			fs::remove_all(__patchFolder);
+		} catch (std::filesystem::filesystem_error& err) {
+			Logger::Error("Failed to delete patch folder: %s (attempt #%d)", err.what(), attempts);
+			std::this_thread::sleep_for(std::chrono::milliseconds(200));
+		}
+	}
+	return !fs::exists(__patchFolder);
 }
 
-bool CheckIfAvailableOnlineNGet(const std::string& currexehash,
-	const std::string& targetversion)
+bool CheckIfAvailableOnlineNGet(const std::string& currexehash, const std::string& targetversion)
 {
 	const std::string url =
 		"https://gitlab.com/repentogon/versiontracker/-/raw/main/Patches/_" +
@@ -374,11 +372,15 @@ bool CheckIfAvailableOnlineNGet(const std::string& currexehash,
 
 	CURL* curl = curl_easy_init();
 	if (!curl)
+	{
+		Logger::Error("Failed to initialize curl!!!\n");
 		return false;
+	}
 
 	FILE* fp = fopen(__patchZip, "wb");
 	if (!fp)
 	{
+		Logger::Error("Failed to fopen %s (%d)\n", __patchZip, errno);
 		curl_easy_cleanup(curl);
 		return false;
 	}
@@ -402,24 +404,41 @@ bool CheckIfAvailableOnlineNGet(const std::string& currexehash,
 	curl_slist_free_all(headers);
 	curl_easy_cleanup(curl);
 
-	if (res != CURLE_OK || http_code < 200 || http_code >= 300)
+	bool patchAvailable = false;
+
+	if (res != CURLE_OK)
 	{
-		return false;
+		Logger::Error("Curl error: %d\n", res);
 	}
-	RemoveOldPatchFolder();
-	if (!Zip::ExtractAllToFolder(__patchZip, __launcherDataFolder))
+	else if (http_code < 200 || http_code >= 300)
 	{
+		Logger::Info("Curl HTTP code: %d\n", http_code);
+	}
+	else if (!RemoveOldPatchFolder())
+	{
+		Logger::Error("Failed to remove existing patch folder!\n");
+	}
+	else if (!Zip::ExtractAllToFolder(__patchZip, __launcherDataFolder))
+	{
+		Logger::Error("Failed to extract downloaded patch!\n");
+	}
+	else
+	{
+		// Patch successfully found, downloaded and extracted.
+		patchAvailable = true;
+	}
+
+	try {
 		std::filesystem::remove(__patchZip);
-		return false;
+	} catch (std::filesystem::filesystem_error& err) {
+		Logger::Error("Failed to delete patch zip: %s", err.what());
 	}
-	std::filesystem::remove(__patchZip);
-	return true;
+	return patchAvailable;
 }
 
 
 
 bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
-	namespace fs = std::filesystem;
 	if (_vanillaexeispatchable > 0) {
 		return _vanillaexeispatchable == 1; //so it doesnt do the whole check and we can call this a shitton of times without worrying, the vanilla exe shouldnt change while the launcher is open anyway, since the launcher doesnt update it and...if it does, just fucking restart the launcher, dude
 	}
@@ -430,33 +449,11 @@ bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
 		fs::path fullPath = fs::current_path() / __patchFolder / "exehash.txt";
 		std::string s = fullPath.string();
 		if (fs::exists(fullPath)) {
-			ScopedFile file(fopen(s.c_str(), "r"));
-			if (!file) {
-				Logger::Error("InstallationData::PatchIsAvailable: failed to open patch file %s\n", s.c_str());
-				return false;
-			}
+            // Read the exe hash and compare it.
+            std::stringstream buffer;
+            buffer << std::ifstream(fullPath).rdbuf();
+            std::string currexehash = buffer.str();
 
-			long begin = ftell(file);
-			fseek(file, 0, SEEK_END);
-
-			if (ferror(file)) {
-				Logger::Error("InstallationData::PatchIsAvailable: failed to fseek\n");
-				return false;
-			}
-
-			long end = ftell(file);
-			rewind(file);
-
-			std::unique_ptr<char[]> content = std::make_unique<char[]>(end - begin + 1);
-			if (!content) {
-				Logger::Error("InstallationData::PatchIsAvailable: unable to allocate memory\n");
-				return false;
-			}
-
-			fread(content.get(), end - begin, 1, file);
-			content.get()[end - begin] = '\0';
-
-			std::string currexehash = content.get();
 			std::transform(currexehash.begin(), currexehash.end(), currexehash.begin(),
 				[](unsigned char c) { return std::tolower(c); });
 
