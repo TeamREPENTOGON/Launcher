@@ -79,8 +79,8 @@ int chained_future_f(int a) {
 }
 
 namespace Launcher {
-	static std::tuple<wxFont, wxFont> MakeBoldFont(wxWindow* window);
-	static wxComboBox* CreateLevelsComboBox(wxWindow* window);
+	// static std::tuple<wxFont, wxFont> MakeBoldFont(wxWindow* window);
+	// static wxComboBox* CreateLevelsComboBox(wxWindow* window);
 
 	// Read chunks of 1MB in the zip stream of REPENTOGON.zip
 	static constexpr size_t StreamChunkSize = 1 << 20;
@@ -763,14 +763,14 @@ namespace Launcher {
 		int result = dialog.ShowModal();
 		return result == wxID_OK || result == wxID_YES;
 	}
-
+	/*
 	std::tuple<wxFont, wxFont> MakeBoldFont(wxWindow* window) {
 		wxFont source = window->GetFont();
 		wxFont bold = source;
 		bold.MakeBold();
 		return std::make_tuple(source, bold);
 	}
-
+	
 	wxComboBox* CreateLevelsComboBox(wxWindow* window) {
 		wxComboBox* box = new wxComboBox(window, WINDOW_COMBOBOX_LEVEL, "Start level");
 
@@ -785,7 +785,7 @@ namespace Launcher {
 
 		return box;
 	}
-
+	*/
 	void LauncherMainWindow::InitializeOptions() {
 		SanitizeConfiguration();
 		InitializeGUIFromOptions();

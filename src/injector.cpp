@@ -175,7 +175,7 @@ int UpdateMemory(LauncherConfiguration const* configuration, HANDLE process,
 	return 0;
 }
 // #pragma code_seg(pop, r1)
-
+/*
 static bool SanitizeRepentogonStartup(const char* path) {
 	Logger::Info("Sanitizing Repentogon startup\n");
 
@@ -207,7 +207,7 @@ static bool SanitizeRepentogonStartup(const char* path) {
 		return false;
 	}
 }
-
+*/
 int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const* configuration,
 	HANDLE* outProcess, void** page, size_t* functionOffset, size_t* paramOffset,
 	PROCESS_INFORMATION* processInfo) {
