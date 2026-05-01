@@ -88,7 +88,7 @@ int Updater::ShowMessageBox(HWND window, const char* text, UINT flags) {
 	if (window) {
 		SetForegroundWindow(window);
 	}
-	return MessageBoxA(window, text, UpdaterProcessName, flags);
+	return MessageBoxA(window, text, UpdaterProcessName, flags | MB_TOPMOST | MB_SETFOREGROUND);
 }
 
 bool Updater::HandleMatchesLauncherExe(HANDLE handle) {
@@ -339,12 +339,12 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(POINT wi
 	}
 
 	// Add progress bar to window
-	HWND progressBar = CreateWindowExA(0, PROGRESS_CLASS, "", WS_CHILD | WS_VISIBLE | PBS_MARQUEE, 15, 15, 400, 25, windowHandle, NULL, windowClass.hInstance, NULL);
+	HWND progressBar = CreateWindowExA(0, PROGRESS_CLASS, NULL, WS_CHILD | WS_VISIBLE | PBS_MARQUEE, 15, 15, 400, 25, windowHandle, NULL, windowClass.hInstance, NULL);
 	if (progressBar == NULL) {
 		Logger::Error("Error initializing progress bar (%d)\n", GetLastError());
 		return nullptr;
 	}
-	SendMessageA(progressBar, PBM_SETMARQUEE, 1, NULL);
+	SendMessageA(progressBar, PBM_SETMARQUEE, TRUE, NULL);
 
 	// Finish window init
 	ShowWindow(windowHandle, SW_SHOWDEFAULT);
@@ -387,14 +387,24 @@ void Updater::ProgressBarThread(POINT windowPos) {
 						break;
 					}
 				}
+				// Re-enable the window and resume the marquee if needed.
+				if (EnableWindow(progressBarWindow->GetHandle(), TRUE)) {
+					if (HWND progressBar = FindWindowExA(progressBarWindow->GetHandle(), NULL, PROGRESS_CLASS, NULL)) {
+						SendMessageA(progressBar, PBM_SETSTATE, PBST_NORMAL, 0);
+					}
+				}
 				SetForegroundWindow(progressBarWindow->GetHandle());
-				ShowWindowAsync(progressBarWindow->GetHandle(), SW_SHOWNORMAL);
 				if (!SetWindowTextA(progressBarWindow->GetHandle(), UpdaterStateProgressBarLabels.at(state))) {
 					Logger::Error("Error trying to set text of progress bar window (%d)\n", GetLastError());
 					break;
 				}
 			} else if (progressBarWindow) {
-				ShowWindowAsync(progressBarWindow->GetHandle(), SW_HIDE);
+				// Disable the progress bar window and stop the marquee (most likely the user is being prompted)
+				if (!EnableWindow(progressBarWindow->GetHandle(), FALSE)) {
+					if (HWND progressBar = FindWindowExA(progressBarWindow->GetHandle(), NULL, PROGRESS_CLASS, NULL)) {
+						SendMessageA(progressBar, PBM_SETSTATE, PBST_PAUSED, 0);
+					}
+				}
 			}
 		}
 	}
