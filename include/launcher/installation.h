@@ -20,12 +20,11 @@ namespace Launcher {
 
 		Installation(ILoggableGUI* gui, LauncherConfiguration* launcherConfiguration);
 
-		std::optional<std::string> LocateIsaac(std::optional<std::string> const& isaacPath,
-			bool* standalone);
+		std::optional<std::string> LocateIsaac(std::optional<std::string> const& isaacPath);
 		bool CheckRepentogonInstallation();
 
 		std::tuple<std::optional<std::string>, bool> Initialize(
-			std::optional<std::string> const& isaacPath, bool* standalone);
+			std::optional<std::string> const& isaacPath);
 
 		inline RepentogonInstallation const& GetRepentogonInstallation() const {
 			return _repentogonInstallation;
@@ -43,7 +42,7 @@ namespace Launcher {
 			_gui = gui;
 		}
 
-		int SetIsaacExecutable(std::string const& file, bool* standalone);
+		int SetIsaacExecutable(std::string const& file);
 
 		static void CheckLegalIsaacPath(const std::string& isaacExePath);
 

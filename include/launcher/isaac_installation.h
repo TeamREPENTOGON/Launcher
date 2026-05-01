@@ -54,7 +54,7 @@ public:
         _gui = gui;
     }
 
-    bool Validate(std::string const& path, bool repentogon, bool* standalone);
+    bool Validate(std::string const& path, bool repentogon);
     bool ValidateExecutable(std::string const& path);
     bool DoValidateExecutable(std::string const& path) const;
 
@@ -98,9 +98,9 @@ class IsaacInstallation {
 public:
     IsaacInstallation(ILoggableGUI* gui);
 
-    bool Validate(std::string const& exePath, bool* standalone);
+    bool Validate(std::string const& exePath);
     bool ValidateRepentogon(std::string const& folderPath);
-    std::optional<std::string> AutoDetect(bool* standalone);
+    std::optional<std::string> AutoDetect();
 
     InstallationData const& GetMainInstallation() const {
         return _mainInstallation;

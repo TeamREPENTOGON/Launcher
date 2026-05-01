@@ -30,10 +30,9 @@ namespace Launcher {
 		_launcherConfiguration(configuration) {
 	}
 
-	std::optional<std::string> Installation::LocateIsaac(std::optional<std::string> const& isaacPath,
-		bool* standalone) {
+	std::optional<std::string> Installation::LocateIsaac(std::optional<std::string> const& isaacPath) {
 		if (isaacPath) {
-			if (_isaacInstallation.Validate(*isaacPath, standalone)) {
+			if (_isaacInstallation.Validate(*isaacPath)) {
 				return isaacPath;
 			} else {
 				Logger::Warn("Manually provided Isaac path %s is not a valid Isaac installation, "
@@ -43,7 +42,7 @@ namespace Launcher {
 
 		if (_launcherConfiguration->Loaded()) {
 			std::string result = _launcherConfiguration->IsaacExecutablePath();
-			if (_isaacInstallation.Validate(result, standalone)) {
+			if (_isaacInstallation.Validate(result)) {
 				return result;
 			} else if (_launcherConfiguration->IsaacExecutablePathHasOverride()) {
 				Logger::Warn("Isaac path provided via command-line %s is not a valid Isaac installation\n", result.c_str());
@@ -54,7 +53,7 @@ namespace Launcher {
 			}
 		}
 
-		std::optional<std::string> result = _isaacInstallation.AutoDetect(standalone);
+		std::optional<std::string> result = _isaacInstallation.AutoDetect();
 		if (!result) {
 			Logger::Error("Unable to auto-detect Isaac installation\n");
 		}
@@ -88,8 +87,8 @@ namespace Launcher {
 	}
 
 	std::tuple<std::optional<std::string>, bool> Installation::Initialize(
-		std::optional<std::string> const& isaacPath, bool* standalone) {
-		std::optional<std::string> locatedIsaacPath = LocateIsaac(isaacPath, standalone);
+		std::optional<std::string> const& isaacPath) {
+		std::optional<std::string> locatedIsaacPath = LocateIsaac(isaacPath);
 		if (locatedIsaacPath) {
 			_launcherConfiguration->SetIsaacExecutablePath(
 				_isaacInstallation.GetMainInstallation().GetExePath());
@@ -99,8 +98,8 @@ namespace Launcher {
 		return std::make_tuple(locatedIsaacPath, repentogonOk);
 	}
 
-	int Installation::SetIsaacExecutable(std::string const& file, bool* standalone) {
-		bool ok = _isaacInstallation.Validate(file, standalone);
+	int Installation::SetIsaacExecutable(std::string const& file) {
+		bool ok = _isaacInstallation.Validate(file);
 		if (ok) {
 			_launcherConfiguration->SetIsaacExecutablePath(
 				_isaacInstallation.GetMainInstallation().GetExePath());

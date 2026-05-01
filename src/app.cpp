@@ -214,14 +214,13 @@ bool Launcher::App::OnInit() {
 		Installation::CheckLegalIsaacPath(*providedPath);
 	}
 
-	bool isStandalone = false;
-	auto [isaacPath, repentogonOk] = __installation->Initialize(providedPath, &isStandalone);
+	auto [isaacPath, repentogonOk] = __installation->Initialize(providedPath);
 
 	bool wizardOk = false, wizardRan = false;
 	bool wizardInstalledRepentogon = false;
 	bool isIsaacValid = __installation->GetIsaacInstallation().GetMainInstallation().IsValid();
 	if (!sCLI->SkipWizard() && !__configuration.IsaacExecutablePathHasOverride()) {
-		if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid || isStandalone || !__configuration.RanWizard()) {
+		if (sCLI->ForceWizard() || !configurationOk || !isIsaacValid || !__configuration.RanWizard()) {
 			if (sCLI->ForceWizard()) {
 				Logger::Info("Force starting wizard due to command-line\n");
 			} else if (!isIsaacValid) {

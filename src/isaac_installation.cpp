@@ -169,7 +169,7 @@ std::optional<std::string> LocateSteamIsaacExecutable() {
 	return std::nullopt;
 }
 
-std::optional<std::string> IsaacInstallation::AutoDetect(bool* standalone) {
+std::optional<std::string> IsaacInstallation::AutoDetect() {
 	std::string path;
 	if (Filesystem::Exists("isaac-ng.exe")) {
 		path = Filesystem::GetCurrentDirectory_() + "\\isaac-ng.exe";
@@ -182,15 +182,14 @@ std::optional<std::string> IsaacInstallation::AutoDetect(bool* standalone) {
 		path = *steamIsaacPath;
 	}
 
-	if (Validate(path, standalone)) {
+	if (Validate(path)) {
 		return path;
 	}
 
 	return std::nullopt;
 }
 
-bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
-	bool* standalone) {
+bool InstallationData::Validate(std::string const& sourcePath, bool repentogon) {
 	std::string path = sourcePath;
 	if (path.empty()) {
 		Logger::Error("IsaacInstallation::Validate: received empty path\n");
@@ -244,16 +243,10 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 		}
 	}
 
-	bool isStandalone = srgon::IsStandaloneFolder(sourcePath);
-	if (isStandalone && !repentogon) {
-		_gui->LogWarn("The main Isaac executable is located in a Repentogon installation, this may indicate a broken configuration\n");
-		Logger::Warn("Main Isaac executable %s is located inside a Repentogon installation", path.c_str());
-
-		if (standalone) {
-			*standalone = true;
-		}
-	} else if (standalone) {
-		*standalone = isStandalone;
+	if (srgon::IsStandaloneFolder(sourcePath) && !repentogon) {
+		_gui->LogWarn("The main Isaac executable is located in a Repentogon installation, this likely indicates a broken configuration\n");
+		Logger::Error("Main Isaac executable %s is located inside a Repentogon installation", path.c_str());
+		return false;
 	}
 
 	std::string steamAppidPath = _folderPath + "\\steam_appid.txt";
@@ -269,11 +262,11 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon,
 	return true;
 }
 
-bool IsaacInstallation::Validate(std::string const& sourcePath, bool* standalone) {
+bool IsaacInstallation::Validate(std::string const& sourcePath) {
 	InstallationData data;
 	data.SetGUI(_gui);
 
-	if (!data.Validate(sourcePath, false, standalone)) {
+	if (!data.Validate(sourcePath, false)) {
 		return false;
 	}
 
@@ -288,7 +281,7 @@ bool IsaacInstallation::ValidateRepentogon(std::string const& folder) {
 
 	fs::path exePath(_mainInstallation.GetExePath());
 
-	if (!data.Validate((folder + "\\") + exePath.filename().string(), true, nullptr)) {
+	if (!data.Validate((folder + "\\") + exePath.filename().string(), true)) {
 		return false;
 	}
 

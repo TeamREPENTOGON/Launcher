@@ -4,6 +4,7 @@
 #include "launcher/log_helpers.h"
 #include "launcher/repentogon_installer.h"
 #include "launcher/windows/setup_wizard.h"
+#include "launcher/standalone_rgon_folder.h"
 
 #include "shared/logger.h"
 
@@ -407,24 +408,23 @@ void LauncherWizard::OnIsaacExecutableSelected(std::string const& path) {
         return;
     }
 
-    bool standalone = false;
-    _isaacFound = _installation->SetIsaacExecutable(path, &standalone);
+	if (standalone_rgon::IsStandaloneFolder(path)) {
+		wxString message = "The executable you selected (" + path + ") is from an existing REPENTOGON installation.\n"
+			"Please select the executable from a vanilla Repentance+ installation instead.";
+		wxMessageDialog dialog(this, message, "Invalid executable", wxOK | wxICON_ERROR);
+		dialog.ShowModal();
+		return;
+	}
+	
+    _isaacFound = _installation->SetIsaacExecutable(path);
     if (!_isaacFound) {
-        wxString message = "The executable you selected (" + path + ") is not valid";
+        wxString message = "The executable you selected (" + path + ") is not valid.";
         wxMessageDialog dialog(this, message, "Invalid executable", wxOK | wxICON_ERROR);
         dialog.ShowModal();
         return;
     }
 
     Launcher::Installation::CheckLegalIsaacPath(path);
-
-    if (standalone) {
-        if (wxMessageBox("The executable you selected is a Repentogon-patched specific executable.\n "
-            "Proceeding with this executable is not advised. Continue with it ?",
-            "Warning", wxYES_NO | wxICON_WARNING, this) == wxNO) {
-            return;
-        }
-    }
 
     UpdateIsaacPath(path);
     UpdateIsaacSetupNextButton();
