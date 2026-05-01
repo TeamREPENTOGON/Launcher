@@ -432,6 +432,7 @@ namespace Launcher {
 
 		Github::GenerateGithubHeaders(request);
 
+		Logger::Info("RepentogonInstaller::DownloadRepentogon: Downloading hash from `%s`...\n", request.url.c_str());
 		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> hashDownloadDescriptor =
 			curl::AsyncDownloadFile(request, HashName);
 		std::optional<curl::DownloadFileDescriptor> hashResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
@@ -469,6 +470,7 @@ namespace Launcher {
 
 			Github::GenerateGithubHeaders(request);
 
+			Logger::Info("RepentogonInstaller::DownloadRepentogon: Downloading required launcher version from `%s`...\n", request.url.c_str());
 			std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> ReqLauncherverDownloadDescriptor =
 				curl::AsyncDownloadFile(request, ReqLauncherVersionName);
 			std::optional<curl::DownloadFileDescriptor> reqlauncherResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
@@ -504,6 +506,8 @@ namespace Launcher {
 			}
 		}
 		request.url = _installationState.zipUrl;
+
+		Logger::Info("RepentogonInstaller::DownloadRepentogon: Downloading REPENTOGON zip from `%s`...\n", request.url.c_str());
 		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> zipDownloadDesc =
 			curl::AsyncDownloadFile(request, RepentogonZipName);
 		std::optional<curl::DownloadFileDescriptor> zipResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
@@ -537,6 +541,7 @@ namespace Launcher {
 			return false;
 		}
 
+		Logger::Info("RepentogonInstaller::DownloadRepentogon: Successfully downloaded!\n");
 		return true;
 	}
 

@@ -357,7 +357,13 @@ static bool RemoveOldPatchFolder()
 	return !fs::exists(__patchFolder);
 }
 
-bool CheckIfAvailableOnlineNGet(const std::string& currexehash, const std::string& targetversion)
+enum OnlinePatchCheckResult {
+	ONLINE_PATCH_ERROR,
+	ONLINE_PATCH_SUCCESS,
+	ONLINE_PATCH_NOT_FOUND,
+};
+
+OnlinePatchCheckResult CheckIfAvailableOnlineNGet(const std::string& currexehash, const std::string& targetversion)
 {
 	const std::string url =
 		"https://gitlab.com/repentogon/versiontracker/-/raw/main/Patches/_" +
@@ -367,7 +373,7 @@ bool CheckIfAvailableOnlineNGet(const std::string& currexehash, const std::strin
 	if (!curl)
 	{
 		Logger::Error("Failed to initialize curl!!!\n");
-		return false;
+		return ONLINE_PATCH_ERROR;
 	}
 
 	FILE* fp = fopen(__patchZip, "wb");
@@ -375,7 +381,7 @@ bool CheckIfAvailableOnlineNGet(const std::string& currexehash, const std::strin
 	{
 		Logger::Error("Failed to fopen %s (%d)\n", __patchZip, errno);
 		curl_easy_cleanup(curl);
-		return false;
+		return ONLINE_PATCH_ERROR;
 	}
 
 	struct curl_slist* headers = nullptr;
@@ -386,26 +392,63 @@ bool CheckIfAvailableOnlineNGet(const std::string& currexehash, const std::strin
 	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, patchwriteresponse);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
-	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
 
-	CURLcode res = curl_easy_perform(curl);
+	CURLcode curlresult = curl_easy_perform(curl);
 
 	long http_code = 0;
 	curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
 
 	fclose(fp);
-	curl_slist_free_all(headers);
-	curl_easy_cleanup(curl);
 
-	bool patchAvailable = false;
+	OnlinePatchCheckResult checkresult = ONLINE_PATCH_ERROR;
 
-	if (res != CURLE_OK)
+	if (curlresult != CURLE_OK)
 	{
-		Logger::Error("Curl error: %d\n", res);
+		Logger::Error("Curl error: %d (%s)\n", curlresult, curl_easy_strerror(curlresult));
+		if (curlresult == CURLE_OPERATION_TIMEDOUT)
+		{
+			// Extremely excessive logging on timeout since for some reason we've seen a few people timeout here.
+			// At time of writing we don't have much info on why some people hit the original 10-second timeout.
+			curl_off_t dns, connect, appconnect, pretransfer, starttransfer, totaltime, downloadedbytes, totalbytes, downloadspeed;
+			long numredirects, numconnects;
+
+			curl_easy_getinfo(curl, CURLINFO_NAMELOOKUP_TIME_T, &dns);
+			curl_easy_getinfo(curl, CURLINFO_CONNECT_TIME_T, &connect);
+			curl_easy_getinfo(curl, CURLINFO_APPCONNECT_TIME_T, &appconnect);
+			curl_easy_getinfo(curl, CURLINFO_PRETRANSFER_TIME_T, &pretransfer);
+			curl_easy_getinfo(curl, CURLINFO_STARTTRANSFER_TIME_T, &starttransfer);
+			curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME_T, &totaltime);
+			curl_easy_getinfo(curl, CURLINFO_SIZE_DOWNLOAD_T, &downloadedbytes);
+			curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &totalbytes);
+			curl_easy_getinfo(curl, CURLINFO_SPEED_DOWNLOAD_T, &downloadspeed);
+			curl_easy_getinfo(curl, CURLINFO_REDIRECT_COUNT, &numredirects);
+			curl_easy_getinfo(curl, CURLINFO_NUM_CONNECTS, &numconnects);
+
+			std::stringstream breakdown;
+			breakdown << "Curl timeout breakdown:\n"
+				<< " - CURLINFO_NAMELOOKUP_TIME_T: " << dns << " us\n"
+				<< " - CURLINFO_CONNECT_TIME_T: " << connect << " us\n"
+				<< " - CURLINFO_APPCONNECT_TIME_T: " << appconnect << " us\n"
+				<< " - CURLINFO_PRETRANSFER_TIME_T: " << pretransfer << " us\n"
+				<< " - CURLINFO_STARTTRANSFER_TIME_T: " << starttransfer << " us\n"
+				<< " - CURLINFO_TOTAL_TIME_T: " << totaltime << " us\n"
+				<< " - CURLINFO_SIZE_DOWNLOAD_T: " << downloadedbytes << " bytes\n"
+				<< " - CURLINFO_CONTENT_LENGTH_DOWNLOAD_T: " << totalbytes << " bytes\n"
+				<< " - CURLINFO_SPEED_DOWNLOAD_T: " << downloadspeed << " bytes/s\n"
+				<< " - CURLINFO_REDIRECT_COUNT: " << numredirects << "\n"
+				<< " - CURLINFO_NUM_CONNECTS: " << numconnects << "\n";
+			Logger::Error("%s", breakdown.str().c_str());
+		}
+	}
+	else if (http_code == 404)
+	{
+		Logger::Info("No patch found\n");
+		checkresult = ONLINE_PATCH_NOT_FOUND;
 	}
 	else if (http_code < 200 || http_code >= 300)
 	{
-		Logger::Info("Curl HTTP code: %d\n", http_code);
+		Logger::Error("Non-success HTTP code from Curl: %d\n", http_code);
 	}
 	else if (!RemoveOldPatchFolder())
 	{
@@ -418,15 +461,18 @@ bool CheckIfAvailableOnlineNGet(const std::string& currexehash, const std::strin
 	else
 	{
 		// Patch successfully found, downloaded and extracted.
-		patchAvailable = true;
+		checkresult = ONLINE_PATCH_SUCCESS;
 	}
+
+	curl_slist_free_all(headers);
+	curl_easy_cleanup(curl);
 
 	try {
 		std::filesystem::remove(__patchZip);
 	} catch (std::filesystem::filesystem_error& err) {
 		Logger::Error("Failed to delete patch zip: %s", err.what());
 	}
-	return patchAvailable;
+	return checkresult;
 }
 
 
@@ -437,7 +483,7 @@ bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
 	}
 	std::string vanillaexehash;
 	HashResult result = Sha256::Sha256F(this->GetExePath().c_str(), vanillaexehash);
-
+	
 	if (result == HASH_OK) {
 		fs::path fullPath = fs::current_path() / __patchFolder / "exehash.txt";
 		if (fs::exists(fullPath)) {
@@ -463,12 +509,15 @@ bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
 		} else {
 			std::transform(vanillaexehash.begin(), vanillaexehash.end(), vanillaexehash.begin(),
 				[](unsigned char c) { return std::toupper(c); });
-			Logger::Info("InstallationData::PatchIsAvailable: Checking for patches online...\n");
-			if (CheckIfAvailableOnlineNGet(vanillaexehash, patchtargetversion)) {
+			Logger::Info("InstallationData::PatchIsAvailable: Looking online for a patch for \"%s\"...\n", vanillaexehash.c_str());
+			const OnlinePatchCheckResult onlineCheckResult = CheckIfAvailableOnlineNGet(vanillaexehash, patchtargetversion);
+			if (onlineCheckResult == ONLINE_PATCH_SUCCESS) {
 				Logger::Info("InstallationData::PatchIsAvailable: Potentially found usable patch online. Retrying...\n");
 				return PatchIsAvailable(/*skipOnlineCheck=*/true);
-			} else {
+			} else if (onlineCheckResult == ONLINE_PATCH_NOT_FOUND) {
 				Logger::Info("InstallationData::PatchIsAvailable: No online patch found.\n");
+			} else {
+				MessageBoxA(NULL, "Failed to download patch files. This may cause the vanilla executable to be considered incompatible with REPENTOGON.\n\nSee launcher.log for more details.", "REPENTOGON Launcher", MB_ICONERROR);
 			}
 		}
 	}
