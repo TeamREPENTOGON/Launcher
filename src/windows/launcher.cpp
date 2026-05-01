@@ -148,6 +148,7 @@ namespace Launcher {
 		SetSizerAndFit(_verticalSizer);
 
 		SetBackgroundColour(wxColour(237, 237, 237));
+		SetIcon(wxICON(IDI_ICON1));
 		CenterOnScreen();
 	}
 

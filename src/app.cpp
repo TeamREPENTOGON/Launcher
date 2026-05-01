@@ -142,10 +142,6 @@ bool Launcher::App::OnInit() {
 	_mainFrame = CreateMainWindow();
 	_mainFrame->EnableInterface(false);
 
-	wxIcon icon;
-	icon.CopyFromBitmap(wxBitmap(wxICON(IDI_ICON1)));
-	_mainFrame->SetIcon(icon);
-
 	if (sCLI->CheckSelfUpdate()) {
 		Logger::Info("Self-update startup check requested...\n");
 		HandleSelfUpdate(_mainFrame, sCLI->UnstableLauncher(), true);
