@@ -131,8 +131,10 @@ private:
     bool ParseMetadata(const fs::path& metadataPath, std::string& outName, std::string& outVersion) {
         try {
             std::ifstream file(metadataPath, std::ios::binary);
-            if (!file)
-                return false;
+			if (!file) {
+				Logger::Error("[MODUPDATER::ParseMetadata] Failed to open `%s`: %s\n", metadataPath.string().c_str(), std::strerror(errno));
+				return false;
+			}
             rapidxml::file<> xmlFile(file);
             rapidxml::xml_document<> doc;
             doc.parse<0>(xmlFile.data());
@@ -140,16 +142,18 @@ private:
                 auto* nodeName = root->first_node("directory");
                 auto* nodeVersion = root->first_node("version");
                 outName = nodeName ? nodeName->value() : "";
-                if ((nodeVersion == nullptr) ||(nodeVersion == 0)) { //fuck you minecraft explosions mod, you degenerate fuck!
-                    outVersion = "";
-                }
-                else {
-                    outVersion = nodeVersion ? nodeVersion->value() : "";
-                }
+				// Shoutout to minecraft explosions mod and Sacrilege (on its initial release)
+				outVersion = nodeVersion ? nodeVersion->value() : "0";
+				if (outVersion.empty()) {
+					outVersion = "0";
+				}
                 return true;
-            }
+			} else {
+				Logger::Error("[MODUPDATER::ParseMetadata] Failed to parse metadata from `%s`\n", metadataPath.string().c_str());
+			}
         }
-        catch (const rapidxml::parse_error&) {
+        catch (const rapidxml::parse_error& err) {
+			Logger::Error("[MODUPDATER::ParseMetadata] XML parse error parsing `%s`: %s\n", metadataPath.string().c_str(), err.what());
         }
         return false;
     }
@@ -158,14 +162,19 @@ private:
     bool ParseMetadataId(const fs::path& xmlPath, uint64_t& outId) {
         try {
             std::ifstream file(xmlPath, std::ios::binary);
-            if (!file)
-                return false;
+			if (!file) {
+				Logger::Error("[MODUPDATER::ParseMetadataId] Failed to open `%s`: %s\n", xmlPath.string().c_str(), std::strerror(errno));
+				return false;
+			}
             rapidxml::file<> xmlFile(file);
             rapidxml::xml_document<> doc;
             doc.parse<0>(xmlFile.data());
 
             auto* root = doc.first_node("metadata");
-            if (!root) return false;
+			if (!root) {
+				Logger::Error("[MODUPDATER::ParseMetadataId] Failed to parse metadata from `%s`\n", xmlPath.string().c_str());
+				return false;
+			}
 
             auto* idNode = root->first_node("id");
             if (!idNode || !idNode->value()) return false;
@@ -173,9 +182,10 @@ private:
             outId = std::stoull(idNode->value());
             return true;
         }
-        catch (...) {
-            return false;
+		catch (const std::exception& err) {
+			Logger::Error("[MODUPDATER::ParseMetadataId] Caught exception while parsing `%s`: %s\n", xmlPath.string().c_str(), err.what());
         }
+		return false;
     }
 
     void CopyDir(const fs::path& src, const fs::path& dst) {
@@ -226,9 +236,9 @@ private:
             }
         }
         catch (...) {
-                if (a != b) {
-                    return -2;
-                }
+            if (a != b) {
+                return -2;
+            }
         }
         return 0;
     }
@@ -319,18 +329,40 @@ private:
             fs::path installedFolder = targetModsDir / (cacheName + "_" + std::to_string(id));
             std::string installedVersion = "0";
             fs::path installedMetadata = installedFolder / "metadata.xml";
-            if (fs::exists(installedMetadata)) {
+
+			bool installationExists = fs::exists(installedMetadata);
+			bool shouldUpdate = !installationExists;
+
+			if (installationExists) {
                 std::string inName, inVersion;
                 if (ParseMetadata(installedMetadata, inName, inVersion))
-                    installedVersion = inVersion.empty() ? "0" : inVersion;
+                    installedVersion = inVersion;
+				int cmp = CompareVersions(installedVersion, cacheVersion);
+				if (cmp < 0) {
+					if (cmp == -2) {
+						PostProgressEvent(overallPct, "ERROR Nonnumeric Mod Version for " + cacheName + " assuming outdated...");
+					}
+					shouldUpdate = true;
+				}
+
+				if (!shouldUpdate) {
+					if (fs::exists(installedFolder / "Unfinished.it")) {
+						Logger::Info("[MODUPDATER] Updating `%s` due to presence of `Unfinished.it`\n", cacheName.c_str());
+						shouldUpdate = true;
+					} else if (fs::exists(installedFolder / "Update.it")) {
+						Logger::Info("[MODUPDATER] Updating `%s` due to presence of `Update.it`\n", cacheName.c_str());
+						shouldUpdate = true;
+					}
+				}
             }
 
-            int cmp = CompareVersions(installedVersion, cacheVersion);
-            if ((cmp < 0) || (fs::exists(installedFolder / "Unfinished.it") || fs::exists(installedFolder / "Update.it"))) {
-                if (cmp == -2) {
-                    PostProgressEvent(overallPct, "ERROR Nonnumeric Mod Version for " + cacheName + " assuming outdated...");
-                }
-                PostProgressEvent(overallPct,"Updating " + cacheName + " (" + installedVersion + " -> " + cacheVersion + ")...");
+            if (shouldUpdate) {
+				if (!installationExists) {
+					PostProgressEvent(overallPct, "Installing " + cacheName + " (version " + cacheVersion + ")...");
+				} else {
+					PostProgressEvent(overallPct, "Updating " + cacheName + " (" + installedVersion + " -> " + cacheVersion + ")...");
+				}
+                
                 try {
                     std::ofstream(installedFolder / "Unfinished.it"); //there was some oddc ase of going back and forth between vanilla and rgon with unfinished mods so I still need to use this :(
                     CopyDir(cachePath, installedFolder);
@@ -338,9 +370,10 @@ private:
                     fs::remove(installedFolder / "Update.it"); //vanilla can still shove this shit in if interrumpted, we dont even use this here since we just copy the updated metadata.xml last....which makes unfinished.it pointless.
                     PostProgressEvent(overallPct,"DONE: Updated " + cacheName + " to version " + cacheVersion);
                 }
-                catch (...) {
-                    PostProgressEvent(overallPct,"ERROR copying " + cacheName);
-                }
+				catch (const std::exception& err) {
+					Logger::Error("[MODUPDATER] Caught exception while updating `%s`: %s\n", cacheName.c_str(), err.what());
+					PostProgressEvent(overallPct, "ERROR copying " + cacheName);
+				}
             }
 
             //SteamAPI_RunCallbacks(); //Not needed anymore but leaving it here if I ever rework this shit to use it again (this is needed here if you are getting mod info from steam, because the steamapi needs this to be called in order to actually run the fucking steam callbacks, it's mental)
