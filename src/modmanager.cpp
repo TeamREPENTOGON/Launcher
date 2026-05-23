@@ -647,6 +647,14 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
+    if (selectedMod.extradata.Challenges) {
+        style.SetBackgroundColour(wxColor(0, 146, 255)); //that part of an eraser that supposedly deletes ink but doesnt actually do shit
+        extraInfoCtrl->BeginStyle(style);
+        extraInfoCtrl->WriteText(wxString::FromUTF8("<Challng>"));
+        extraInfoCtrl->EndStyle();
+        style.SetBackgroundColour(wxColor("White"));
+        extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
+    }
     if (selectedMod.extradata.Music) {
         style.SetBackgroundColour(wxColor(173, 101, 240)); //parpel
         extraInfoCtrl->BeginStyle(style);
