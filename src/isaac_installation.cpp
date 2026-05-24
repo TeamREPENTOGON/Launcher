@@ -13,6 +13,8 @@
 #include <ctime>
 #include <cstdio>
 #include <vector>
+#include <thread>
+
 #include <curl/curl.h>
 
 #include "launcher/isaac_installation.h"
@@ -346,7 +348,7 @@ static size_t patchwriteresponse(void* contents, size_t size, size_t nmemb, void
 static bool RemoveOldPatchFolder()
 {
 	int attempts = 0;
-	while (fs::exists(__patchFolder) && attempts++ <= 5) {
+	while (Filesystem::SafeExists(__patchFolder) && attempts++ <= 5) {
 		try {
 			fs::remove_all(__patchFolder);
 		} catch (std::filesystem::filesystem_error& err) {
@@ -354,7 +356,7 @@ static bool RemoveOldPatchFolder()
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 	}
-	return !fs::exists(__patchFolder);
+	return !Filesystem::SafeExists(__patchFolder);
 }
 
 enum OnlinePatchCheckResult {
@@ -483,10 +485,10 @@ bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
 	}
 	std::string vanillaexehash;
 	HashResult result = Sha256::Sha256F(this->GetExePath().c_str(), vanillaexehash);
-	
+
 	if (result == HASH_OK) {
 		fs::path fullPath = fs::current_path() / __patchFolder / "exehash.txt";
-		if (fs::exists(fullPath)) {
+		if (Filesystem::SafeExists(fullPath)) {
             // Read the exe hash and compare it.
             std::stringstream buffer;
             buffer << std::ifstream(fullPath).rdbuf();

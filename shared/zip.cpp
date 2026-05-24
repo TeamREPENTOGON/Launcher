@@ -2,6 +2,7 @@
 
 #include "shared/zip.h"
 #include "zip.h"
+#include "shared/filesystem.h"
 #include "shared/scoped_file.h"
 #include "shared/logger.h"
 
@@ -46,7 +47,7 @@ namespace Zip {
 
 		const std::filesystem::path outputPath(outputDir);
 
-		if (std::filesystem::exists(outputPath)) {
+		if (Filesystem::SafeExists(outputPath)) {
 			if (!std::filesystem::is_directory(outputPath)) {
 				Logger::Error("[Zip::ExtractAllToFolder] Output directory already exists, but it is not a directory!\n");
 				return false;
@@ -97,7 +98,7 @@ namespace Zip {
 					continue;
 				}
 				// Create parent directories as needed.
-				if (filePath.has_parent_path() && !std::filesystem::exists(filePath.parent_path())) {
+				if (filePath.has_parent_path() && !Filesystem::SafeExists(filePath.parent_path())) {
 					Logger::Info("[Zip::ExtractAllToFolder] Creating sub-directory: %s\n", filePath.parent_path().string().c_str());
 					try {
 						if (!std::filesystem::create_directories(filePath.parent_path())) {

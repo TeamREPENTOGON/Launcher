@@ -771,7 +771,7 @@ namespace Launcher {
 		bold.MakeBold();
 		return std::make_tuple(source, bold);
 	}
-	
+
 	wxComboBox* CreateLevelsComboBox(wxWindow* window) {
 		wxComboBox* box = new wxComboBox(window, WINDOW_COMBOBOX_LEVEL, "Start level");
 
@@ -897,10 +897,10 @@ namespace Launcher {
 			if ((!attemptedpatchfix) && (((launchability == ISAAC_LAUNCH_REPENTOGON_INCOMPATIBLE) || (launchability == ISAAC_LAUNCH_REPENTOGON_INVALID)) && (_installation->GetIsaacInstallation().GetMainInstallation().IsCompatibleWithRepentogon()))) { // if the rgon exe is fucked but it seems fixable....try to fix it?
 				attemptedpatchfix = true;
 				_logWindow.LogWarn("Attempting to fix by forcing a rgon update/copy/patch!");
-				if (std::filesystem::exists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe.bak")) {
+				if (Filesystem::SafeExists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe.bak")) {
 					std::filesystem::remove(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe.bak");
 				}
-				if (std::filesystem::exists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe")) {
+				if (Filesystem::SafeExists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe")) {
 					std::filesystem::rename(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe", _installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe.bak");
 					std::filesystem::remove(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon\\Isaac-ng.exe");
 				}
@@ -987,7 +987,7 @@ namespace Launcher {
 			break;
 		case ADVANCED_EVENT_REINSTALL:
 			_logWindow.Log("Attempting Repair...");
-			if (!fs::exists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon") || fs::remove_all(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon")) {
+			if (!Filesystem::SafeExists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon") || fs::remove_all(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon")) {
 				ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
 			}
 			else {

@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 
+#include <filesystem>
 #include <sstream>
 
 #include "shared/externals.h"
@@ -70,6 +71,22 @@ namespace Filesystem {
 		} else {
 			return GetFileAttributesA(name) != INVALID_FILE_ATTRIBUTES;
 		}
+	}
+
+	bool SafeExists(std::filesystem::path const& path, std::error_code* ec) {
+		try {
+			std::error_code err;
+			if (!ec)
+				ec = &err;
+
+			return std::filesystem::exists(path, *ec);
+		} catch (std::filesystem::filesystem_error&) {
+			return false;
+		}
+	}
+
+	bool SafeExists(const char* name, std::error_code* ec) {
+		return SafeExists(std::filesystem::path(name), ec);
 	}
 
 	std::string GetCurrentDirectory_() {

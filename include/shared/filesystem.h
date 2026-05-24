@@ -3,6 +3,7 @@
 #include <WinSock2.h>
 #include <Windows.h>
 
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -30,6 +31,12 @@ namespace Filesystem {
 	 * false on failure.
 	 */
 	bool Exists(const char* filename, HANDLE transaction = NULL);
+
+	/* Safe wrapper around std::filesystem::exists that handles the exceptions
+	 * the function may raise.
+	 */
+	bool SafeExists(const char* filename, std::error_code* ec = nullptr);
+	bool SafeExists(std::filesystem::path const& path, std::error_code* ec = nullptr);
 
 	std::string GetCurrentDirectory_();
 

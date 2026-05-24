@@ -4,6 +4,7 @@
 #include "rapidjson/prettywriter.h"
 
 #include "shared/github.h"
+#include "shared/filesystem.h"
 #include "shared/launcher_update_checker.h"
 #include "shared/logger.h"
 #include "shared/gitlab_versionchecker.h"
@@ -69,7 +70,7 @@ namespace Shared {
 				return false;
 			}
 			Logger::Warn("Failed to fetch releases from GitHub. Trying Steam...\n");
-			if (!std::filesystem::exists("steamentrydir.txt")) {
+			if (!Filesystem::SafeExists("steamentrydir.txt")) {
 				Logger::Warn("steamentrydir.txt does not exist. Cannot proceed.\n");
 				steamUpdateStatus = STEAM_LAUNCHER_UPDATE_FAILED;
 				return false;
@@ -78,7 +79,7 @@ namespace Shared {
 			std::ostringstream ss;
 			ss << in.rdbuf();
 			url = ss.str(); //yes, I use url for the local dir, sue me
-			if (!std::filesystem::exists(url + "/versiontracker/versionlauncher.txt")) {
+			if (!Filesystem::SafeExists(url + "/versiontracker/versionlauncher.txt")) {
 				Logger::Error("versionlauncher.txt does not exist. Cannot proceed.\n");
 				steamUpdateStatus = STEAM_LAUNCHER_UPDATE_FAILED;
 				return false;

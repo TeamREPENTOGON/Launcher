@@ -11,6 +11,7 @@
 #include <wx/statline.h>
 #include <wx/mstream.h>
 #include <steam_api.h>
+#include "shared/filesystem.h"
 
 namespace fs = std::filesystem;
 
@@ -236,7 +237,7 @@ void ModManagerFrame::LoadModsFromFolder() {
 
             try {
                 fs::path metadataPath = entry.path() / "metadata.xml";
-                if (fs::exists(metadataPath)) {
+                if (Filesystem::SafeExists(metadataPath)) {
                     rapidxml::file<> xmlFile(metadataPath.string().c_str());
                     rapidxml::xml_document<> doc;
                     doc.parse<0>(xmlFile.data());
@@ -286,7 +287,7 @@ void ModManagerFrame::RefreshLists() {
 }
 
 bool ModManagerFrame::IsDisabled(const std::wstring& modFolder) {
-    return fs::exists(_modspath / modFolder / "disable.it");
+    return Filesystem::SafeExists(_modspath / modFolder / "disable.it");
 }
 
 void ModManagerFrame::EnableMod(const std::wstring& modFolder) {
@@ -439,7 +440,7 @@ bool LoadImageQuietly(const std::wstring& path, wxImage& img) {
 
 bool HasChildNodesFromXML(fs::path xml, const std::string& daddy, const std::string& child = "") {
     try {
-    if (fs::exists(xml)) {
+    if (Filesystem::SafeExists(xml)) {
         rapidxml::file<> xmlFile(xml.string().c_str());
         rapidxml::xml_document<> doc;
         doc.parse<0>(xmlFile.data());
@@ -472,7 +473,7 @@ bool HasChildNodesFromXML(fs::path xml, const std::string& daddy, const std::str
 
 bool HasAnm2File(fs::path folder)
 {
-    if (!fs::exists(folder) || !fs::is_directory(folder))
+    if (!Filesystem::SafeExists(folder) || !fs::is_directory(folder))
         return false;
     for (const auto& entry : fs::recursive_directory_iterator(folder))
     {
@@ -484,7 +485,7 @@ bool HasAnm2File(fs::path folder)
 
 bool HasFile(fs::path folder, std::string ext)
 {
-    if (!fs::exists(folder) || !fs::is_directory(folder))
+    if (!Filesystem::SafeExists(folder) || !fs::is_directory(folder))
         return false;
     for (const auto& entry : fs::recursive_directory_iterator(folder))
     {
@@ -504,7 +505,7 @@ void ModManagerFrame::LoadModExtraData() {
         std::string contents[] = { "content","content-dlc3" };
         std::string resources[] = { "resources","resources-dlc3" };
         int checks = 0;
-        if (fs::exists(fs::path(_modspath / selectedMod.folderName / "content-dlc3"))) {
+        if (Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / "content-dlc3"))) {
             checks++;
         }
 
@@ -520,30 +521,30 @@ void ModManagerFrame::LoadModExtraData() {
             selectedMod.extradata.Cards        = selectedMod.extradata.Cards      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems","card");
             selectedMod.extradata.Pills        = selectedMod.extradata.Pills      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems","pill");
         }
-        selectedMod.extradata.lua = fs::exists(fs::path(_modspath / selectedMod.folderName / "main.lua"));
+        selectedMod.extradata.lua = Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / "main.lua"));
 
         checks = 0;
-        if (fs::exists(fs::path(_modspath / selectedMod.folderName / "resources-dlc3"))) {
+        if (Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / "resources-dlc3"))) {
             checks++;
         }
         for (int i = 0; i <= checks; i++) {
-            selectedMod.extradata.resourceItems        = selectedMod.extradata.resourceItems      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
-            selectedMod.extradata.resourceTrinkets     = selectedMod.extradata.resourceTrinkets   || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
-            selectedMod.extradata.resourceCharacters   = selectedMod.extradata.resourceCharacters || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "players.xml"));
-            selectedMod.extradata.resourceMusic        = selectedMod.extradata.resourceMusic      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music.xml")) ;
-            selectedMod.extradata.resourceSounds       = selectedMod.extradata.resourceSounds     || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sounds.xml"));
-            selectedMod.extradata.resourceItemPools    = selectedMod.extradata.resourceItemPools  || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "itempools.xml"));
-            selectedMod.extradata.resourceShaders      = selectedMod.extradata.resourceShaders    || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "shaders.xml"));
-            selectedMod.extradata.resourceChallenges   = selectedMod.extradata.resourceChallenges || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "challenges.xml"));
-            selectedMod.extradata.resourceCards        = selectedMod.extradata.resourceCards      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
-            selectedMod.extradata.resourcePills        = selectedMod.extradata.resourcePills      || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
+            selectedMod.extradata.resourceItems        = selectedMod.extradata.resourceItems      || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
+            selectedMod.extradata.resourceTrinkets     = selectedMod.extradata.resourceTrinkets   || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
+            selectedMod.extradata.resourceCharacters   = selectedMod.extradata.resourceCharacters || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "players.xml"));
+            selectedMod.extradata.resourceMusic        = selectedMod.extradata.resourceMusic      || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music.xml")) ;
+            selectedMod.extradata.resourceSounds       = selectedMod.extradata.resourceSounds     || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sounds.xml"));
+            selectedMod.extradata.resourceItemPools    = selectedMod.extradata.resourceItemPools  || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "itempools.xml"));
+            selectedMod.extradata.resourceShaders      = selectedMod.extradata.resourceShaders    || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "shaders.xml"));
+            selectedMod.extradata.resourceChallenges   = selectedMod.extradata.resourceChallenges || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "challenges.xml"));
+            selectedMod.extradata.resourceCards        = selectedMod.extradata.resourceCards      || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
+            selectedMod.extradata.resourcePills        = selectedMod.extradata.resourcePills      || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
             selectedMod.extradata.anm2                 = selectedMod.extradata.anm2               || HasAnm2File(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"));
             selectedMod.extradata.sprites              = selectedMod.extradata.sprites            || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"), ".png");
             selectedMod.extradata.resourceMinor        = selectedMod.extradata.resourceMinor      || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i]), ".xml");
 
-            selectedMod.extradata.cutscenes        = selectedMod.extradata.cutscenes || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx" / "cutscenes"));
-            selectedMod.extradata.Sounds = selectedMod.extradata.Sounds || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sfx"));
-            selectedMod.extradata.Music = selectedMod.extradata.Music || fs::exists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music"));
+            selectedMod.extradata.cutscenes        = selectedMod.extradata.cutscenes || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx" / "cutscenes"));
+            selectedMod.extradata.Sounds = selectedMod.extradata.Sounds || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sfx"));
+            selectedMod.extradata.Music = selectedMod.extradata.Music || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music"));
         }
     }
     extraInfoCtrl->SetValue("");
@@ -843,7 +844,7 @@ void ModManagerFrame::OnSelectMod(ModInfo mod) {
             ParseBBCode(descriptionCtrl, mod.description.empty() ? "(No description)" : mod.description);
 
             fs::path imagePath = _modspath / mod.folderName / "thumb.png";
-            if (fs::exists(imagePath) && fs::file_size(imagePath) > 0) {
+            if (Filesystem::SafeExists(imagePath) && fs::file_size(imagePath) > 0) {
                 wxImage img;
                 if (LoadImageQuietly(imagePath.wstring(), img)) {
                     img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
@@ -907,7 +908,7 @@ void ModManagerFrame::OnModFolder(wxCommandEvent&) {
 
 void ModManagerFrame::OnModSaveFolder(wxCommandEvent&) {
     fs::path savepath = fs::absolute(_modspath.parent_path() / "data" / selectedMod.directory);
-    if (!fs::exists(savepath)) {
+    if (!Filesystem::SafeExists(savepath)) {
         fs::create_directories(savepath); //Why?, because theres the case where someone may want to share a savefile with some dude that has none
     }
 
@@ -979,7 +980,7 @@ void ModManagerFrame::OnLoad(wxCommandEvent&) {
             if (result == wxID_YES || result == wxID_OK) {
                 std::unordered_set<int> justsubbed;
                 for (const auto& modfolder : enabledSet) {
-                    if (!fs::exists(_modspath / modfolder)) {
+                    if (!Filesystem::SafeExists(_modspath / modfolder)) {
                         uint64_t id = 0;
                         if (ExtractWorkshopId(modfolder, id)) {
                           SteamUGC()->SubscribeItem(id);

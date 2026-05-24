@@ -1,5 +1,4 @@
-#include "launcher/steam_workshop.h"
-
+#include <WinSock2.h>
 #include <Windows.h>
 #include <WinBase.h>
 #include <string>
@@ -8,6 +7,8 @@
 
 #include "steam_api.h"
 #include "synchapi.h"
+#include "launcher/steam_workshop.h"
+#include "shared/filesystem.h"
 #include "shared/logger.h"
 #include <curl/curl.h>
 
@@ -82,7 +83,7 @@ bool SubscribeAndDownload(PublishedFileId_t workshopId, std::string& outPath) {
 
 	outPath = std::string(installPath);
 
-	if (workshopId == REPENTOGON_WORKSHOP_ID && !std::filesystem::exists(outPath + "/disable.it")) {
+	if (workshopId == REPENTOGON_WORKSHOP_ID && !Filesystem::SafeExists(outPath + "/disable.it")) {
 		std::ofstream(outPath + "/disable.it");
 	}
 
@@ -113,10 +114,10 @@ bool CanReachSteamWorkshop()
 		return false;
 
 	curl_easy_setopt(curl, CURLOPT_URL, "https://steamcommunity.com/");
-	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);          
+	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 	curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);         //5sec timeout
-	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);  
-	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);  
+	curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+	curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
 	CURLcode res = curl_easy_perform(curl);
 

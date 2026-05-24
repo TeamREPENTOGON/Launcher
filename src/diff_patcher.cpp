@@ -15,6 +15,7 @@
 #include <compat.h>
 
 #include "launcher/diff_patcher.h"
+#include "shared/filesystem.h"
 #include "shared/logger.h"
 #include "shared/pe32.h"
 #include "shared/scoped_file.h"
@@ -29,6 +30,10 @@ static constexpr size_t BUF_SIZE = 4096;
 
 /* Taken from bsdifflib.c */
 #define HEADER_SIZE 32
+
+#ifdef GetObject
+#undef GetObject
+#endif
 
 class ScopedBZ2 {
 public:
@@ -342,13 +347,13 @@ namespace diff_patcher {
                 }
 
                 if (ok) {
-                    if (fs::exists(temporary)) {
-                        if (fs::exists(original)) {
+                    if (Filesystem::SafeExists(temporary)) {
+                        if (Filesystem::SafeExists(original)) {
                             fs::remove(original);
                         }
                         fs::rename(temporary, original);
                     }
-                } else if (fs::exists(temporary)) {
+                } else if (Filesystem::SafeExists(temporary)) {
                     fs::remove(temporary);
                 }
             }

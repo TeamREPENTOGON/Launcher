@@ -1,3 +1,6 @@
+#pragma once
+
+#include <WinSock2.h>
 #include <wx/wx.h>
 #include <wx/thread.h>
 #include <filesystem>
@@ -13,6 +16,7 @@
 #include "rapidxml/rapidxml_utils.hpp"
 #include <unordered_set>
 #include "widgets/text_ctrl_log_widget.h"
+#include "shared/filesystem.h"
 #include "shared/logger.h"
 
 namespace fs = std::filesystem;
@@ -55,11 +59,11 @@ public:
     }
 
 private:
-    fs::path targetModsDir;        
+    fs::path targetModsDir;
     uint32 appid = 250900;
 
     wxListBox* statuslog;
-    wxStaticText* progresstxt; 
+    wxStaticText* progresstxt;
     wxGauge* loadbar;
     wxButton* cancelbtn;
 
@@ -282,7 +286,7 @@ private:
         PostProgressEvent(overallPct, "Checking mod versions for updating...");
         for (auto pfid : subscribed) {
             subscribedIds.insert(pfid);
-            if (cancelrequest){ 
+            if (cancelrequest){
                 PostProgressEvent(overallPct, "FINISH: Updating canceled!");
                 return;
             }
@@ -300,10 +304,10 @@ private:
                 PostProgressEvent(overallPct,"Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
                 continue;
             }
-            
+
 
             fs::path cachePath = fs::path(folderBuf);
-            if (!fs::exists(cachePath) || !fs::is_directory(cachePath)) {
+            if (!Filesystem::SafeExists(cachePath) || !fs::is_directory(cachePath)) {
                 PostProgressEvent(overallPct,"Install folder missing for " + std::to_string(id));
                 overallPct = (idx * 100) / totalToProcess;
                 PostProgressEvent(overallPct,"Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
@@ -311,7 +315,7 @@ private:
             }
 
             fs::path metadataPath = cachePath / "metadata.xml";
-            if (!fs::exists(metadataPath)) {
+            if (!Filesystem::SafeExists(metadataPath)) {
                 PostProgressEvent(overallPct,"Skipping " + std::to_string(id) + ": metadata.xml not found.");
                 overallPct = (idx * 100) / totalToProcess;
                 PostProgressEvent(overallPct,"Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
@@ -330,7 +334,7 @@ private:
             std::string installedVersion = "0";
             fs::path installedMetadata = installedFolder / "metadata.xml";
 
-			bool installationExists = fs::exists(installedMetadata);
+			bool installationExists = Filesystem::SafeExists(installedMetadata);
 			bool shouldUpdate = !installationExists;
 
 			if (installationExists) {
@@ -346,10 +350,10 @@ private:
 				}
 
 				if (!shouldUpdate) {
-					if (fs::exists(installedFolder / "Unfinished.it")) {
+					if (Filesystem::SafeExists(installedFolder / "Unfinished.it")) {
 						Logger::Info("[MODUPDATER] Updating `%s` due to presence of `Unfinished.it`\n", cacheName.c_str());
 						shouldUpdate = true;
-					} else if (fs::exists(installedFolder / "Update.it")) {
+					} else if (Filesystem::SafeExists(installedFolder / "Update.it")) {
 						Logger::Info("[MODUPDATER] Updating `%s` due to presence of `Update.it`\n", cacheName.c_str());
 						shouldUpdate = true;
 					}
@@ -362,11 +366,11 @@ private:
 				} else {
 					PostProgressEvent(overallPct, "Updating " + cacheName + " (" + installedVersion + " -> " + cacheVersion + ")...");
 				}
-                
+
                 try {
                     std::ofstream(installedFolder / "Unfinished.it"); //there was some oddc ase of going back and forth between vanilla and rgon with unfinished mods so I still need to use this :(
                     CopyDir(cachePath, installedFolder);
-                    fs::remove(installedFolder / "Unfinished.it"); 
+                    fs::remove(installedFolder / "Unfinished.it");
                     fs::remove(installedFolder / "Update.it"); //vanilla can still shove this shit in if interrumpted, we dont even use this here since we just copy the updated metadata.xml last....which makes unfinished.it pointless.
                     PostProgressEvent(overallPct,"DONE: Updated " + cacheName + " to version " + cacheVersion);
                 }
@@ -399,7 +403,7 @@ private:
                 if (!subscribedIds.count(id)) {
                     fs::path metadataPath = entry.path() / "metadata.xml";
                     uint64_t metaId = 0;
-                    if (!fs::exists(metadataPath) || !ParseMetadataId(metadataPath, metaId) || (metaId != id)) {
+                    if (!Filesystem::SafeExists(metadataPath) || !ParseMetadataId(metadataPath, metaId) || (metaId != id)) {
                         continue;
                     }
                     std::error_code ec;

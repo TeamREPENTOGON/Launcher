@@ -61,7 +61,7 @@ namespace Launcher {
 		return result;
 	}
 
-	
+
 
 	bool Installation::CheckRepentogonInstallation() {
 		if (!_isaacInstallation.GetMainInstallation().IsValid()) {
@@ -114,12 +114,12 @@ namespace Launcher {
 	}
 
 	void Installation::CheckLegalIsaacPath(const std::string& isaacExePath) {
-		if (!isaacExePath.empty() && std::filesystem::exists(isaacExePath)) {
+		if (!isaacExePath.empty() && Filesystem::SafeExists(isaacExePath)) {
 			const std::filesystem::path launcherDir = std::filesystem::current_path();
 			const std::filesystem::path isaacDir = std::filesystem::path(isaacExePath).parent_path();
 			const std::filesystem::path rgonDir = isaacDir / "Repentogon";
 			try {
-				if (std::filesystem::equivalent(launcherDir, isaacDir) || (std::filesystem::exists(rgonDir) && std::filesystem::equivalent(launcherDir, rgonDir))) {
+				if (std::filesystem::equivalent(launcherDir, isaacDir) || (Filesystem::SafeExists(rgonDir) && std::filesystem::equivalent(launcherDir, rgonDir))) {
 					MessageBoxA(NULL, "The REPENTOGON Launcher is in an invalid location!"
 						"\n\nIt cannot be placed directly into Isaac's installation folder, nor in a subfolder named \"Repentogon\", as that directory is required for the installation of REPENTOGON."
 						"\n\nPlease extract the REPENTOGON Launcher files to a different location (such as in a folder called \"REPENTOGONLauncher\") instead.",

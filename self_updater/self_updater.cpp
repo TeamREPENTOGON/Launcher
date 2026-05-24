@@ -1,3 +1,4 @@
+#include <WinSock2.h>
 #include <Windows.h>
 #include <WinBase.h>
 #include <filesystem>
@@ -8,6 +9,7 @@
 #include <set>
 
 #include "shared/github_executor.h"
+#include "shared/filesystem.h"
 #include "shared/logger.h"
 #include "self_updater/self_updater.h"
 #include "self_updater/utils.h"
@@ -66,7 +68,7 @@ namespace Updater {
 	}
 
 	bool UnfinishedUpdateMarkerExists() {
-		return std::filesystem::exists(UnfinishedUpdateMarker);
+		return Filesystem::SafeExists(UnfinishedUpdateMarker);
 	}
 
 	void DeleteUnfinishedUpdateMarker() {
@@ -159,7 +161,7 @@ HANDLE Updater::TryOpenLauncherProcessHandle(int argc, char** argv) {
 
 bool Updater::TryDeleteOldRenamedUpdaterExe(HWND mainWindow) {
 	int attempts = 0;
-	while (std::filesystem::exists(RenamedUpdaterExeFilename) && !DeleteFileA(RenamedUpdaterExeFilename)) {
+	while (Filesystem::SafeExists(RenamedUpdaterExeFilename) && !DeleteFileA(RenamedUpdaterExeFilename)) {
 		attempts++;
 		if (attempts == 1) {
 			Logger::Error("Error trying to delete %s from previous update (%d)\n", RenamedUpdaterExeFilename, GetLastError());
@@ -208,7 +210,7 @@ bool Updater::VerifyLauncherNotRunning(HWND mainWindow) {
 }
 
 bool Updater::CheckInstallationIntegrity() {
-	return !UnfinishedUpdateMarkerExists() && std::filesystem::exists(LauncherDllPath);
+	return !UnfinishedUpdateMarkerExists() && Filesystem::SafeExists(LauncherDllPath);
 }
 
 void Updater::CleanInstallation() {
@@ -217,24 +219,24 @@ void Updater::CleanInstallation() {
 		return;
 	}
 	try {
-		if (std::filesystem::exists(LauncherBinBackupFilename)) {
+		if (Filesystem::SafeExists(LauncherBinBackupFilename)) {
 			Logger::Info("Deleting bin backup...\n");
 			std::filesystem::remove(LauncherBinBackupFilename);
 		}
-		if (std::filesystem::exists(LauncherDataBackupFolder)) {
+		if (Filesystem::SafeExists(LauncherDataBackupFolder)) {
 			Logger::Info("Deleting backup folder...\n");
 			std::filesystem::remove_all(LauncherDataBackupFolder);
 		}
-		if (std::filesystem::exists(UpdateStagingFolder)) {
+		if (Filesystem::SafeExists(UpdateStagingFolder)) {
 			Logger::Info("Deleting staging folder...\n");
 			std::filesystem::remove_all(UpdateStagingFolder);
 		}
-		if (std::filesystem::exists(RenamedUpdaterExeFilename) && !Utils::FileLocked(RenamedUpdaterExeFilename)) {
+		if (Filesystem::SafeExists(RenamedUpdaterExeFilename) && !Utils::FileLocked(RenamedUpdaterExeFilename)) {
 			Logger::Info("Deleting old exe...\n");
 			std::filesystem::remove(RenamedUpdaterExeFilename);
 		}
 		for (const std::string& filename : Updater::LegacyCleanupFiles) {
-			if (std::filesystem::exists(filename)) {
+			if (Filesystem::SafeExists(filename)) {
 				Logger::Info("Deleting legacy file %s...\n", filename.c_str());
 				std::filesystem::remove(filename);
 			}
@@ -256,9 +258,9 @@ void Updater::TryRepairInstallation(HWND mainWindow) {
 				"If needed, you may also manually download the latest version of the launcher from `REPENTOGON.COM`.\n", MB_ICONERROR);
 
 			// Check for a backup of the bin file from before the update attempt.
-			if (std::filesystem::exists(LauncherBinBackupFilename)) {
+			if (Filesystem::SafeExists(LauncherBinBackupFilename)) {
 				Logger::Info("Restoring %s...\n", LauncherBinBackupFilename);
-				if (std::filesystem::exists(LauncherBinFilename)) {
+				if (Filesystem::SafeExists(LauncherBinFilename)) {
 					std::filesystem::remove(LauncherBinFilename);
 				}
 				std::filesystem::rename(LauncherBinBackupFilename, LauncherBinFilename);
@@ -271,7 +273,7 @@ void Updater::TryRepairInstallation(HWND mainWindow) {
 		std::filesystem::remove_all(LauncherDataFolder);
 
 		// Try extracting files from the bin.
-		if (std::filesystem::exists(LauncherBinFilename)) {
+		if (Filesystem::SafeExists(LauncherBinFilename)) {
 			Logger::Info("Extracting %s...\n", LauncherBinFilename);
 			std::filesystem::create_directories(LauncherDataFolder);
 			CreateUnfinishedUpdateMarker();
@@ -286,7 +288,7 @@ void Updater::TryRepairInstallation(HWND mainWindow) {
 		}
 
 		// Try restoring a backup folder.
-		if (std::filesystem::exists(LauncherDataBackupFolder)) {
+		if (Filesystem::SafeExists(LauncherDataBackupFolder)) {
 			Logger::Info("Restoring backup installation folder...\n");
 			std::filesystem::rename(LauncherDataBackupFolder, LauncherDataFolder);
 			Logger::Info("Successfully restored backup folder!\n");
@@ -297,7 +299,7 @@ void Updater::TryRepairInstallation(HWND mainWindow) {
 }
 
 void Updater::CheckSteamAppIdTxt() {
-	if (!std::filesystem::exists("steam_appid.txt")) {
+	if (!Filesystem::SafeExists("steam_appid.txt")) {
 		Logger::Warn("steam_appid.txt is missing. Generating one...\n");
 		std::ofstream outFile("steam_appid.txt");
 		if (outFile) {
@@ -480,7 +482,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		version = versionGiven;
 	}
 
-	const bool forceUpdate = !std::filesystem::exists(LauncherDllPath);
+	const bool forceUpdate = !Filesystem::SafeExists(LauncherDllPath);
 	const bool skipConfirmation = urlGiven || forceUpdate;
 
 	if (!urlGiven) {
@@ -569,15 +571,15 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		return UPDATE_ERROR;
 	}
 
-	if (std::filesystem::exists(LauncherDataBackupFolder)) {
+	if (Filesystem::SafeExists(LauncherDataBackupFolder)) {
 		Logger::Info("Deleting backup of previous version...\n");
 		std::filesystem::remove_all(LauncherDataBackupFolder);
 	}
-	if (std::filesystem::exists(LauncherDataFolder)) {
+	if (Filesystem::SafeExists(LauncherDataFolder)) {
 		Logger::Info("Backing up current version...\n");
 		std::filesystem::rename(LauncherDataFolder, LauncherDataBackupFolder);
 	}
-	if (std::filesystem::exists(LauncherBinFilename)) {
+	if (Filesystem::SafeExists(LauncherBinFilename)) {
 		Logger::Info("Backing up current bin...\n");
 		std::filesystem::copy(LauncherBinFilename, LauncherBinBackupFilename, std::filesystem::copy_options::overwrite_existing);
 	}
@@ -591,7 +593,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	//   2. Make a copy of the existing exe under the original name, just in case we encounter an error during unpacking and can't write the new exe.
 	// So the result of this is that the running exe has been renamed as `exe.bak` (and is still locked by windows),
 	// AND we have a copy under the original name (which is not locked and can be overwritten).
-	if (std::filesystem::exists(UpdaterExeFilename)) {
+	if (Filesystem::SafeExists(UpdaterExeFilename)) {
 		Logger::Info("Renaming exe...\n");
 		std::filesystem::rename(UpdaterExeFilename, RenamedUpdaterExeFilename);
 		Logger::Info("Copying exe...\n");
@@ -607,7 +609,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	}
 
 	// Initialize the staging folder.
-	if (std::filesystem::exists(UpdateStagingFolder)) {
+	if (Filesystem::SafeExists(UpdateStagingFolder)) {
 		Logger::Warn("Deleting an existing staging folder...\n");
 		std::filesystem::remove_all(UpdateStagingFolder);
 	}
@@ -638,7 +640,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 			std::filesystem::copy(entry, std::filesystem::current_path(), std::filesystem::copy_options::overwrite_existing);
 		}
 	}
-	if (newExe && std::filesystem::exists(*newExe)) {
+	if (newExe && Filesystem::SafeExists(*newExe)) {
 		Logger::Info("Copying exe: %s\n", newExe->path().string().c_str());
 		std::filesystem::copy(*newExe, std::filesystem::current_path(), std::filesystem::copy_options::overwrite_existing);
 	} else {
@@ -779,7 +781,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 
 	// Create a dummy window to use as a parent for popups.
 	Updater::UniqueWindow mainWindow(NULL, "STATIC", NULL, NULL, CW_USEDEFAULT, CW_USEDEFAULT, 1, 1, hInstance);
-	
+
 	// Get the center of the appropriate monitor.
 	HMONITOR monitor = MonitorFromWindow(mainWindow, MONITOR_DEFAULTTONEAREST);
 	MONITORINFO monitorInfo{ sizeof(monitorInfo) };

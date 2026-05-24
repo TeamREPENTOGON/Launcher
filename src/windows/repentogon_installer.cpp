@@ -7,8 +7,8 @@
 #include "launcher/windows/launcher.h"
 #include "launcher/windows/repentogon_installer.h"
 #include "launcher/log_helpers.h"
+#include "shared/filesystem.h"
 #include "shared/logger.h"
-#include <filesystem>
 
 wxBEGIN_EVENT_TABLE(RepentogonInstallerFrame, wxFrame)
 EVT_CLOSE(RepentogonInstallerFrame::OnClose)
@@ -73,7 +73,7 @@ void RepentogonInstallerFrame::OnClose(wxCloseEvent& event) {
 
 void RepentogonInstallerFrame::InstallRepentogon() {
 	std::unique_lock<std::mutex> lck(_installerMutex);
-	_wasinstalled = std::filesystem::exists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon");
+	_wasinstalled = Filesystem::SafeExists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon");
 	_helper = std::make_unique<RepentogonInstallerHelper>(this, _installation,
 		_allowUnstable, _forceUpdate, _logWindow);
 	_helper->Install(std::bind_front(&RepentogonInstallerFrame::OnRepentogonInstalled, this));
