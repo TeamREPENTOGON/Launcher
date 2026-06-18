@@ -194,6 +194,12 @@ private:
 
     void CopyDir(const fs::path& src, const fs::path& dst) {
         fs::create_directories(dst);
+        for (auto& p : fs::directory_iterator(dst)) { //clear out mod contents before copying over the steam shit to avoid keeping deleted files
+            const auto& path = p.path();
+            if ((path.filename() == "metadata.xml") || (path.extension() == ".it"))
+                continue;
+            fs::remove_all(path);
+        }
         for (auto& p : fs::recursive_directory_iterator(src)) {
             const auto rel = fs::relative(p.path(), src);
             const auto dstPath = dst / rel;
