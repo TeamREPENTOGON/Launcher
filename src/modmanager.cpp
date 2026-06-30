@@ -924,7 +924,7 @@ void ModManagerFrame::OnSearch(wxCommandEvent&) {
 void ModManagerFrame::OnSave(wxCommandEvent&) {
     wxFileDialog dlg(this, "Save Enabled Mods", "", "", "Text files (*.txt)|*.txt", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
     if (dlg.ShowModal() == wxID_OK) {
-        std::ofstream out(dlg.GetPath().ToUTF8());
+        std::ofstream out(fs::path(dlg.GetPath().ToStdWstring()));
         for (const auto& mod : allMods) {
             if (!IsDisabled(mod.folderName)) {
                 out << wxString(mod.folderName).ToUTF8() << "\n";
@@ -956,7 +956,7 @@ bool ExtractWorkshopId(const std::wstring& input, uint64_t& outId)
 void ModManagerFrame::OnLoad(wxCommandEvent&) {
     wxFileDialog dlg(this, "Load Enabled Mods", "", "", "Text files (*.txt)|*.txt", wxFD_OPEN | wxFD_FILE_MUST_EXIST);
     if (dlg.ShowModal() == wxID_OK) {
-        std::ifstream in(dlg.GetPath().ToUTF8());
+        std::ifstream in(fs::path(dlg.GetPath().ToStdWstring()));
         std::unordered_set<std::wstring> enabledSet;
         std::string line;
 

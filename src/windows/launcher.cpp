@@ -1008,10 +1008,17 @@ namespace Launcher {
 		window.luaDebug->Enable(!_configuration->LuaDebugHasOverride());
 	}
 
-	void ShowFileInExplorer(const std::string& filePath) { //played around a few alternatives I found online, most suggested executing shell scripts....but those are slow as sin and if the user does anything before they execute, the fileexplorer window may not be on focus anymore....so its not ideal
-		std::wstring stemp = std::wstring(filePath.begin(), filePath.end());
+	std::wstring GetFileAddress(const std::filesystem::path& filePath) {
+		return L"file:///" + fs::absolute(filePath).lexically_normal().wstring();
+	}
+
+	void OpenFile(const std::filesystem::path& filePath) {
+		wxLaunchDefaultBrowser(GetFileAddress(filePath));
+	}
+
+	void ShowFileInExplorer(const std::filesystem::path& filePath) { //played around a few alternatives I found online, most suggested executing shell scripts....but those are slow as sin and if the user does anything before they execute, the fileexplorer window may not be on focus anymore....so its not ideal
 		PIDLIST_ABSOLUTE pidl = nullptr;
-		HRESULT hr = SHParseDisplayName(stemp.c_str(), nullptr, &pidl, 0, nullptr);
+		HRESULT hr = SHParseDisplayName(GetFileAddress(filePath).c_str(), nullptr, &pidl, 0, nullptr);
 		if (SUCCEEDED(hr)) {
 			SHOpenFolderAndSelectItems(pidl, 0, nullptr, 0);
 			CoTaskMemFree(pidl);
@@ -1029,29 +1036,29 @@ namespace Launcher {
 			break;
 
 		case CHECKLOGS_EVENT_LAUNCHERLOG:
-			wxLaunchDefaultBrowser("file:///" + fs::absolute("launcher.log").string());
+			OpenFile("launcher.log");
 			break;
 
 		case CHECKLOGS_EVENT_RGONLOG:
-			wxLaunchDefaultBrowser("file:///" + fs::absolute(_installation->GetIsaacInstallation()
-				.GetRepentogonInstallation().GetExePath()).parent_path().string() + "/repentogon.log");
+			OpenFile(_installation->GetIsaacInstallation()
+				.GetRepentogonInstallation().GetFolderPath() + "/repentogon.log");
 			break;
 
 		case CHECKLOGS_EVENT_GAMELOG:
-			wxLaunchDefaultBrowser("file:///" + _installation->GetIsaacInstallation().GetLogFilePath());
+			OpenFile(_installation->GetIsaacInstallation().GetLogFilePath());
 			break;
 
 		case CHECKLOGS_EVENT_LAUNCHERLOG_LOCATE:
-			ShowFileInExplorer("file:///" + fs::absolute("launcher.log").string());
+			ShowFileInExplorer("launcher.log");
 			break;
 
 		case CHECKLOGS_EVENT_RGONLOG_LOCATE:
-			ShowFileInExplorer("file:///" + fs::absolute(_installation->GetIsaacInstallation()
-				.GetRepentogonInstallation().GetExePath()).parent_path().string() + "/repentogon.log");
+			ShowFileInExplorer(_installation->GetIsaacInstallation()
+				.GetRepentogonInstallation().GetFolderPath() + "/repentogon.log");
 			break;
 
 		case CHECKLOGS_EVENT_GAMELOG_LOCATE:
-			ShowFileInExplorer("file:///" + _installation->GetIsaacInstallation().GetLogFilePath());
+			ShowFileInExplorer(_installation->GetIsaacInstallation().GetLogFilePath());
 			break;
 
 
