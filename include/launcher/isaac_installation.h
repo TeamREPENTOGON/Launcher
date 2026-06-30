@@ -101,6 +101,9 @@ public:
     bool Validate(std::string const& exePath);
     bool ValidateRepentogon(std::string const& folderPath);
     std::optional<std::string> AutoDetect();
+	std::string GetSaveDataFolderPath() const;
+	std::string GetLogFilePath() const;
+	std::string GetOptionsIniPath() const;
 
     InstallationData const& GetMainInstallation() const {
         return _mainInstallation;

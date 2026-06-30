@@ -1,5 +1,10 @@
-#include "shared/status_codes.h"
 #include "shared/utils.h"
+
+#include <filesystem>
+
+#include "shared/status_codes.h"
+#include "shared/logger.h"
+#include "userenv.h"
 
 namespace utils {
     void Tokenize(const char* src, const char* delim, std::vector<std::string>& tokens) {
@@ -18,7 +23,7 @@ namespace utils {
 		}
     }
 
-	void ErrorCodeToString(DWORD code, std::string& str) {
+	void ErrorCodeToString(unsigned long code, std::string& str) {
 		switch (code) {
 		case 0:
 			break;
@@ -198,5 +203,64 @@ namespace utils {
 			str = "unknown error code";
 			break;
 		}
+	}
+
+	std::string ConvertToUTF8(std::wstring_view wstr) {
+		if (wstr.empty()) return "";
+
+		const int len = WideCharToMultiByte(CP_UTF8, 0, wstr.data(), wstr.length(), NULL, 0, NULL, NULL);
+		if (len == 0) return "";
+
+		std::string utf8Str(len, '\0');
+
+		if (!WideCharToMultiByte(CP_UTF8, 0, wstr.data(), wstr.length(), utf8Str.data(), len, NULL, NULL)) {
+			return "";
+		}
+
+		return utf8Str;
+	}
+
+	std::filesystem::path GetUserProfileDir() {
+		HANDLE token = GetCurrentProcessToken();
+
+		DWORD len = 0;
+		GetUserProfileDirectoryW(token, NULL, &len);
+		if (len > 0) {
+			std::wstring path(len, '\0');
+			if (GetUserProfileDirectoryW(token, path.data(), &len)) {
+				path.pop_back();  // Remove excess null terminator
+				return path;
+			}
+		}
+		Logger::Error("GetUserProfileDirectoryW failed: %d\n", GetLastError());
+
+		len = GetEnvironmentVariableW(L"USERPROFILE", NULL, 0);
+		if (len > 0) {
+			std::wstring path(len, '\0');
+			if (GetEnvironmentVariableW(L"USERPROFILE", path.data(), len) > 0) {
+				path.pop_back();  // Remove excess null terminator
+				return path;
+			}
+		}
+		Logger::Error("GetEnvironmentVariableW failed: %d\n", GetLastError());
+
+		return "";
+	}
+
+	std::filesystem::path GetUserMyGamesDir() {
+		std::filesystem::path path = GetUserProfileDir();
+		if (path.empty()) {
+			return "";
+		}
+		path /= "Documents/My Games/";
+		try {
+			if (!std::filesystem::exists(path)) {
+				std::filesystem::create_directories(path);
+			}
+		} catch (std::filesystem::filesystem_error& err) {
+			Logger::Error("Caught exception while trying to initialize 'My Games' folder: %s\n", err.what());
+			return "";
+		}
+		return path;
 	}
 }

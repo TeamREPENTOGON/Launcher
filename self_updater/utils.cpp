@@ -1,6 +1,7 @@
 #include "shared/logger.h"
 #include "self_updater/self_updater.h"
 #include "self_updater/utils.h"
+#include "shared/utils.h"
 
 #include <UserEnv.h>
 #include <stdexcept>
@@ -9,8 +10,8 @@ namespace Updater::Utils {
 	static const char* LockFileBasePath = "Documents\\My Games";
 	static const char* LockFileName = "repentogon_launcher_updater.lock";
 
-	static char* GetUserProfileDir();
 	static bool FileExists(const char* path);
+	static bool FileExists(const wchar_t* path);
 	static bool HasFlag(int argc, char** argv, const char* name);
 	static void ReplaceQuotes(char* str, size_t* len);
 	static char** PushCLIArg(char** array, int* arraySize, int* arrayCapacity, const char* start, const char* end);
@@ -40,6 +41,10 @@ namespace Updater::Utils {
 
 	bool FileExists(const char* path) {
 		return GetFileAttributesA(path) != -1;
+	}
+
+	bool FileExists(const wchar_t* path) {
+		return GetFileAttributesW(path) != -1;
 	}
 
 	bool IsForced(int argc, char** argv) {
@@ -106,8 +111,8 @@ namespace Updater::Utils {
 
 		size_t len = end - start + 1;
 		memcpy(param, start, end - start + 1);
-		ReplaceQuotes(param, &len);
 		param[len] = '\0';
+		ReplaceQuotes(param, &len);
 
 		result[*arraySize] = param;
 		++* arraySize;
@@ -189,15 +194,14 @@ namespace Updater::Utils {
 	}
 
 	LockUpdaterResult LockUpdater(HANDLE* result) {
-		char* lockFilePath = NULL;
-		if (!GetLockFilePath(&lockFilePath)) {
-			free(lockFilePath);
-			Logger::Error("LockUpdater: error in call to GetLockFilePath\n");
+		std::filesystem::path lockFilePath = utils::GetUserMyGamesDir();
+		if (lockFilePath.empty()) {
+			Logger::Error("LockUpdater: Failed to obtain user profile directory\n");
 			return LOCK_UPDATER_ERR_INTERNAL;
 		}
+		lockFilePath /= LockFileName;
 
-		HANDLE file = CreateFileA(lockFilePath, GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
-		free(lockFilePath);
+		HANDLE file = CreateFileW(lockFilePath.wstring().c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, NULL);
 
 		if (file == INVALID_HANDLE_VALUE) {
 			DWORD lastError = GetLastError();
@@ -214,81 +218,12 @@ namespace Updater::Utils {
 		return LOCK_UPDATER_SUCCESS;
 	}
 
-	bool GetLockFilePath(char** path) {
-		char* profilePath = GetUserProfileDir();
-		if (!profilePath) {
-			Logger::Error("GetLockFilePath: error in call to GetUserProfileDir\n");
-			return false;
-		}
-
-		std::string pathStr(profilePath);
-		free(profilePath);
-
-		if (!FileExists(pathStr.c_str())) {
-			Logger::Error("GetLockFilePath: user profile directory %s does not exist\n", pathStr.c_str());
-			return false;
-		}
-
-		pathStr += std::string("\\") + LockFileBasePath;
-		if (!FileExists(pathStr.c_str())) {
-			Logger::Info("GetLockFilePath: Target folder %s does not exist, creating it\n", pathStr.c_str());
-			if (!CreateDirectoryA(pathStr.c_str(), NULL)) {
-				DWORD lastError = GetLastError();
-				Logger::Error("GetLockFilePath: Error while creating folder %s (%d)\n", pathStr.c_str(), lastError);
-				return false;
-			}
-		}
-
-		pathStr += std::string("\\") + LockFileName;
-		*path = (char*)malloc(pathStr.size() + 1);
-		if (!*path) {
-			Logger::Error("GetLockFilePath: unable to allocate memory to store path\n");
-			return false;
-		}
-
-		strcpy(*path, pathStr.c_str());
-		return true;
-	}
-
 	bool FileLocked(const char* path) {
 		return FileExists(path) && ScopedHandle(CreateFileA(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE;
 	}
 
-	char* GetUserProfileDir() {
-		char buffer[4096];
-		DWORD len = 4096;
-		HANDLE token = GetCurrentProcessToken();
-		char* path = NULL;
-
-		if (!GetUserProfileDirectoryA(token, buffer, &len)) {
-			if (len != 4096) {
-				path = (char*)malloc(len);
-				if (!path) {
-					Logger::Error("GetUserProfileDir: unable to allocate memory for path\n");
-					return NULL;
-				}
-
-				if (!GetUserProfileDirectoryA(token, path, &len)) {
-					Logger::Error("GetUserProfileDir: GetUserProfileDirectoryA on malloced buffer failed (%d)\n", GetLastError());
-					free(path);
-					return NULL;
-				}
-
-				return path;
-			} else {
-				Logger::Error("GetUserProfileDir: GetUserProfileDirectoryA failed (%d)\n", GetLastError());
-				return NULL;
-			}
-		}
-
-		path = (char*)malloc(strlen(buffer) + 1);
-		if (!path) {
-			Logger::Error("GetUserProfileDir: unable to allocate memory for path\n");
-			return NULL;
-		}
-
-		strcpy(path, buffer);
-		return path;
+	bool FileLocked(const wchar_t* path) {
+		return FileExists(path) && ScopedHandle(CreateFileW(path, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE;
 	}
 
 	ScopedHandle::ScopedHandle(HANDLE handle) : _handle(handle) { }

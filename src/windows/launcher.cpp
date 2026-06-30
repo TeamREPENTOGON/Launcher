@@ -324,7 +324,7 @@ namespace Launcher {
 
 	void LauncherMainWindow::OnChangeOptions(wxCommandEvent&) {
 		GameOptions opts;
-		opts.Load(fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/options.ini");
+		opts.Load(_installation->GetIsaacInstallation().GetOptionsIniPath());
 
 		OptionsDialog dlg(this, opts);
 		dlg.ShowModal(); // modal; handles save internally
@@ -592,7 +592,7 @@ namespace Launcher {
 				_logWindow.LogWarn("Game exited with error code %#lx (%s)\n", exitCode, desc.c_str());
 				_logWindow.LogWarn("Last few lines of the log.txt: \n");
 				_logWindow.LogWarn("-- START -- \n");
-				_logWindow.LogWarn(GetLastLinesOLog(fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt", 10).c_str());
+				_logWindow.LogWarn(GetLastLinesOLog(_installation->GetIsaacInstallation().GetLogFilePath(), 10).c_str());
 				_logWindow.LogWarn("--  END  -- \n");
 				_logWindow.LogWarn("Check log.txt and launcher.log for more details! \n");
 			}
@@ -737,12 +737,9 @@ namespace Launcher {
 		LogWarn("Running an unstable version of the launcher");
 #endif */
 		_logWindow.Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::LAUNCHER_VERSION);
-		std::string currentDir = Filesystem::GetCurrentDirectory_();
-		_logWindow.Log("Current directory is: %s", currentDir.c_str());
-		_logWindow.Log("Using configuration file %s\n", LauncherConfiguration::GetConfigurationPath());
-
-		LPSTR cli = GetCommandLineA();
-		_logWindow.Log("Command line: %s", cli);
+		_logWindow.Log("Current directory is: %s", std::filesystem::current_path().u8string().c_str());
+		_logWindow.Log("Using configuration file %s\n", LauncherConfiguration::GetConfigurationPathUTF8().c_str());
+		_logWindow.Log("Command line: %s", utils::ConvertToUTF8(GetCommandLineW()).c_str());
 
 		OneTimeIsaacPathInitialization();
 		InitializeOptions();
@@ -1041,7 +1038,7 @@ namespace Launcher {
 			break;
 
 		case CHECKLOGS_EVENT_GAMELOG:
-			wxLaunchDefaultBrowser("file:///" + fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt");
+			wxLaunchDefaultBrowser("file:///" + _installation->GetIsaacInstallation().GetLogFilePath());
 			break;
 
 		case CHECKLOGS_EVENT_LAUNCHERLOG_LOCATE:
@@ -1054,7 +1051,7 @@ namespace Launcher {
 			break;
 
 		case CHECKLOGS_EVENT_GAMELOG_LOCATE:
-			ShowFileInExplorer("file:///" + fs::absolute(_configuration->GetConfigurationPath()).parent_path().string() + "/Binding of Isaac Repentance+/log.txt");
+			ShowFileInExplorer("file:///" + _installation->GetIsaacInstallation().GetLogFilePath());
 			break;
 
 

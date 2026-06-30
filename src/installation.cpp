@@ -16,7 +16,6 @@
 #include "inih/cpp/INIReader.h"
 #include "launcher/installation.h"
 #include "launcher/standalone_rgon_folder.h"
-#include "shared/externals.h"
 #include "shared/logger.h"
 #include "shared/filesystem.h"
 #include "shared/scoped_file.h"

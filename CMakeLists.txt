@@ -90,7 +90,7 @@ if (CMAKE_LAUNCHER_FORCE_UNSTABLE)
   target_compile_definitions (REPENTOGONLauncher PRIVATE LAUNCHER_FORCE_UNSTABLE)
 endif()
 
-target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch steamapi Winhttp)
+target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch steamapi Winhttp userenv)
 add_custom_command(
     TARGET REPENTOGONLauncher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS

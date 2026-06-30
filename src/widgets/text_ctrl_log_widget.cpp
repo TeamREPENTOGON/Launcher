@@ -24,7 +24,7 @@ void wxTextCtrlLog::Log(const char* prefix, bool nl, const char* fmt, ...) {
 	if (count <= 0)
 		return;
 
-	wxString text(buffer);
+	wxString text = wxString::FromUTF8(buffer);
 	if (buffer[count - 1] != '\n' && nl)
 		text += '\n';
 
@@ -42,7 +42,7 @@ void wxTextCtrlLog::Log(const char* fmt, ...) {
 	if (count <= 0)
 		return;
 
-	wxString text(buffer);
+	wxString text = wxString::FromUTF8(buffer);
 	if (buffer[count - 1] != '\n')
 		text += '\n';
 
@@ -60,7 +60,7 @@ void wxTextCtrlLog::LogNoNL(const char* fmt, ...) {
 	if (count <= 0)
 		return;
 
-	wxString text(buffer);
+	wxString text = wxString::FromUTF8(buffer);
 	std::unique_lock<std::mutex> lck(_logMutex);
 	_control->AppendText(text);
 }
@@ -75,7 +75,7 @@ void wxTextCtrlLog::LogInfo(const char* fmt, ...) {
 	if (count <= 0)
 		return;
 
-	wxString text(buffer);
+	wxString text = wxString::FromUTF8(buffer);
 	text.Prepend("[INFO] ");
 	if (buffer[count - 1] != '\n')
 		text += '\n';
@@ -94,7 +94,7 @@ void wxTextCtrlLog::LogWarn(const char* fmt, ...) {
 	if (count <= 0)
 		return;
 
-	wxString text(buffer);
+	wxString text = wxString::FromUTF8(buffer);
 	text.Prepend("[WARN] ");
 	if (buffer[count - 1] != '\n')
 		text += '\n';
@@ -119,7 +119,7 @@ void wxTextCtrlLog::LogError(const char* fmt, ...) {
 	if (count <= 0)
 		return;
 
-	wxString text(buffer);
+	wxString text = wxString::FromUTF8(buffer);
 	text.Prepend("[ERROR] ");
 	if (buffer[count - 1] != '\n')
 		text += '\n';

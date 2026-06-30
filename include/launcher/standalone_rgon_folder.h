@@ -7,8 +7,8 @@
 namespace standalone_rgon {
     bool CopyFiles(const std::string& basePath,
         const std::string& destination);
-    bool Patch(const std::string& repentogonFolder,
-        const std::string& patchPath);
+    bool Patch(const std::filesystem::path& repentogonFolder,
+        const std::filesystem::path& patchPath);
     bool CreateSteamAppIDFile(const std::string& repentogonFolder);
 
     bool GenerateRepentogonPath(const std::string& base,

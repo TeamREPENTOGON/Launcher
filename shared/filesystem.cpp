@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <sstream>
 
-#include "shared/externals.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
 #include "shared/utils.h"
@@ -87,20 +86,6 @@ namespace Filesystem {
 
 	bool SafeExists(const char* name, std::error_code* ec) {
 		return SafeExists(std::filesystem::path(name), ec);
-	}
-
-	std::string GetCurrentDirectory_() {
-		DWORD count = GetCurrentDirectoryA(0, NULL);
-		char* buffer = (char*)malloc(count + 1);
-		if (!buffer) {
-			Logger::Error("GetCurrentDirectory_: unable to allocate string\n");
-			return std::string();
-		}
-
-		GetCurrentDirectoryA(count, buffer);
-		std::string result(buffer);
-		free(buffer);
-		return result;
 	}
 
 	bool RemoveFile(const char* filename, HANDLE transaction) {

@@ -38,8 +38,6 @@ namespace Filesystem {
 	bool SafeExists(const char* filename, std::error_code* ec = nullptr);
 	bool SafeExists(std::filesystem::path const& path, std::error_code* ec = nullptr);
 
-	std::string GetCurrentDirectory_();
-
 	/* Remove a file. Return false on failure, true on success.
 	 *
 	 * If the function fails, and a transaction was given, the transaction is

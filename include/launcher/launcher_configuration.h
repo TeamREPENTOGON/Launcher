@@ -6,13 +6,7 @@
 #include "steam_api.h"
 #include "inih/cpp/INIReader.h"
 #include "shared/loggable_gui.h"
-
-enum LauncherConfigurationInitialize {
-	LAUNCHER_CONFIGURATION_INIT_NO_USERPROFILE,
-	LAUNCHER_CONFIGURATION_INIT_GET_USER_DIRECTORY,
-	LAUNCHER_CONFIGURATION_INIT_HIERARCHY,
-	LAUNCHER_CONFIGURATION_INIT_INVALID_PATH
-};
+#include "shared/utils.h"
 
 enum LauncherConfigurationLoad {
 	LAUNCHER_CONFIGURATION_LOAD_OPEN,
@@ -155,15 +149,18 @@ class LauncherConfiguration {
 public:
 	LauncherConfiguration();
 
-	static bool InitializeConfigurationPath(LauncherConfigurationInitialize* result,
-		std::optional<std::string> const& hint);
+	static bool InitializeConfigurationPath(std::optional<std::string> const& hint);
 
 	static inline bool WasConfigurationPathInitialized() {
 		return !_configurationPath.empty();
 	}
 
-	static inline const char* GetConfigurationPath() {
-		return _configurationPath.c_str();
+	static inline const std::wstring& GetConfigurationPathUTF16() {
+		return _configurationPath;
+	}
+
+	static inline const std::string GetConfigurationPathUTF8() {
+		return utils::ConvertToUTF8(_configurationPath);
 	}
 
 	inline bool Loaded() const {
@@ -214,14 +211,13 @@ public:
 private:
 	bool Search(LauncherConfigurationLoad* result);
 	bool Process(LauncherConfigurationLoad* result);
-	bool CheckConfigurationFileExists();
 	void Load(INIReader const& reader);
 	void LoadFromFile(INIReader const& reader);
 	void LoadFromCLI();
 
 
 	/* Path to the folder containing the configuration of the launcher. */
-	static std::string _configurationPath;
+	static std::wstring _configurationPath;
 	/* Eventual line in the launcher configuration file that resulted
 	 * in a parse error.
 	 */

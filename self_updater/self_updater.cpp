@@ -11,6 +11,7 @@
 #include "shared/github_executor.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
+#include "shared/utils.h"
 #include "self_updater/self_updater.h"
 #include "self_updater/utils.h"
 #include "self_updater/launcher_update_manager.h"
@@ -661,10 +662,10 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 }
 
 void SetWorkingDirToExe() {
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	wchar_t exePath[MAX_PATH];
+	GetModuleFileNameW(NULL, exePath, MAX_PATH);
 	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-	SetCurrentDirectoryA(exeDir.string().c_str());
+	SetCurrentDirectoryW(exeDir.wstring().c_str());
 }
 
 std::string Updater::BuildCleanCli(int argc, char** argv, bool addCheckSelfUpdate) {
@@ -704,7 +705,7 @@ int Updater::RunLauncher(HWND mainWindow, int argc, char** argv, bool checkUpdat
 		return -1;
 	}
 
-	HINSTANCE launcher = LoadLibraryExA(launcherDllFullPath.string().c_str(), NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
+	HINSTANCE launcher = LoadLibraryExW(launcherDllFullPath.wstring().c_str(), NULL, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
 	if (launcher == NULL) {
 		std::string err = "Failed to load REPENTOGONLauncherApp.dll: " + std::to_string(GetLastError()) + "\n";
 		ShowMessageBox(mainWindow, err.c_str(), MB_ICONERROR);
@@ -761,6 +762,7 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 	SetWorkingDirToExe();
 	Logger::Init("updater.log", true);
 	Logger::Info("Updater started with command-line args: %s\n", cli);
+	Logger::Info("Current Directory: %s\n", std::filesystem::current_path().u8string().c_str());
 
 	int argc = 0;
 	char** argv = Updater::Utils::CommandLineToArgvA(cli, &argc);

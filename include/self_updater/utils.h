@@ -53,4 +53,5 @@ namespace Updater::Utils {
 	const char* GetUpdateVersion(int argc, char** argv);
 	bool GetLockFilePath(char** path);
 	bool FileLocked(const char* path);
+	bool FileLocked(const wchar_t* path);
 }

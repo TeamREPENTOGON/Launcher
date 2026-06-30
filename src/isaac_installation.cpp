@@ -1,6 +1,7 @@
 #include <WinSock2.h>
 #include <Windows.h>
 #include <io.h>
+#include "userenv.h"
 
 #include <fstream>
 #include <filesystem>
@@ -172,23 +173,83 @@ std::optional<std::string> LocateSteamIsaacExecutable() {
 }
 
 std::optional<std::string> IsaacInstallation::AutoDetect() {
-	std::string path;
-	if (Filesystem::Exists("isaac-ng.exe")) {
-		path = Filesystem::GetCurrentDirectory_() + "\\isaac-ng.exe";
-	} else {
-		std::optional<std::string> steamIsaacPath = LocateSteamIsaacExecutable();
-		if (!steamIsaacPath) {
-			return std::nullopt;
-		}
-
-		path = *steamIsaacPath;
+	std::optional<std::string> steamIsaacPath = LocateSteamIsaacExecutable();
+	if (!steamIsaacPath) {
+		return std::nullopt;
 	}
-
-	if (Validate(path)) {
-		return path;
+	if (Validate(*steamIsaacPath)) {
+		return *steamIsaacPath;
 	}
-
 	return std::nullopt;
+}
+
+static bool IsWritableDirectory(const std::string& path) {
+	DWORD attr = GetFileAttributesA(path.c_str());
+	if (attr == INVALID_FILE_ATTRIBUTES) {
+		return false;
+	}
+	const bool isDirectory = (attr & FILE_ATTRIBUTE_DIRECTORY);
+	const bool isReadOnly = (attr & FILE_ATTRIBUTE_READONLY);
+	return isDirectory && !isReadOnly;
+}
+
+std::string IsaacInstallation::GetSaveDataFolderPath() const {
+	// This function is a recreation of how the vanilla game decides where to put its local save data,
+	// for better accuracy finding the log file on more cursed setups.
+	HANDLE token = GetCurrentProcessToken();
+	DWORD size = 0;
+
+	// We intentionally use the -A version of this function since the game also uses it to determine its save folder.
+	// If the path contains unsupported characters, the IsWritableDirectory check will fail.
+	GetUserProfileDirectoryA(token, NULL, &size);
+	if (size > 0) {
+		std::string path(size, '\0');
+		if (GetUserProfileDirectoryA(token, path.data(), &size)) {
+			path.back() = '\\';  // Replace excess null terminator with a backslash
+			if (IsWritableDirectory(path)) {
+				return path;
+			}
+		}
+	}
+
+	const char* userprofile = std::getenv("USERPROFILE");
+	if (userprofile) {
+		const std::string path = std::string(userprofile) + "\\";
+		if (IsWritableDirectory(path)) {
+			return path;
+		}
+	}
+
+	const char* homedrive = std::getenv("HOMEDRIVE");
+	const char* homepath = std::getenv("HOMEPATH");
+	if (homedrive && homepath) {
+		const std::string path = std::string(homedrive) + std::string(homepath) + "\\";
+		if (IsWritableDirectory(path)) {
+			return path;
+		}
+	}
+
+	if (_mainInstallation.GetFolderPath().empty()) {
+		return "";
+	}
+	// If it can't access the user's profile folder the game will fall back to creating a Documents folder (and subfolders) in its own installation.
+	return _mainInstallation.GetFolderPath() + "Documents\\My Games\\Binding of Isaac Repentance+\\";
+}
+
+std::string IsaacInstallation::GetLogFilePath() const {
+	std::string path = GetSaveDataFolderPath();
+	if (!path.empty()) {
+		path += "log.txt";
+	}
+	return path;
+}
+
+std::string IsaacInstallation::GetOptionsIniPath() const {
+	std::string path = GetSaveDataFolderPath();
+	if (!path.empty()) {
+		path += "options.ini";
+	}
+	return path;
 }
 
 bool InstallationData::Validate(std::string const& sourcePath, bool repentogon) {
@@ -226,8 +287,9 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon) 
 	 *
 	 * Existing Repentogon installations should not need patching.
 	 */
-	_needsPatch = !repentogon && PatchIsAvailable();
-	_isCompatibleWithRepentogon = _needsPatch || RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
+	const bool alreadyCompatible = RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
+	_needsPatch = !repentogon && !alreadyCompatible && PatchIsAvailable();
+	_isCompatibleWithRepentogon = alreadyCompatible || _needsPatch;
 	if (_isCompatibleWithRepentogon) {
 		if (_needsPatch) {
 			_CompatReason = "Will work, the launcher has a patch to adapt it to a compatible version.";

@@ -1,18 +1,19 @@
 #include <WinSock2.h>
 #include <Windows.h>
+#include <fstream>
 
 #include "launcher/cli.h"
 
-#include "shared/externals.h"
 #include "shared/filesystem.h"
 #include "shared/logger.h"
+#include "shared/utils.h"
 
 #include "launcher/launcher_configuration.h"
 
 using namespace Configuration;
 
 static constexpr const char* launcherConfigFile = "repentogon_launcher.ini";
-std::string LauncherConfiguration::_configurationPath;
+std::wstring LauncherConfiguration::_configurationPath;
 
 template<typename T>
 using ConfigurationTuple = std::tuple<std::string, std::string, T>;
@@ -84,65 +85,30 @@ static int ReadInteger(INIReader const& reader, ConfigurationTuple<int>(*fn)()) 
 	return reader.GetInteger(section, key, def);
 }
 
-bool LauncherConfiguration::InitializeConfigurationPath(
-	LauncherConfigurationInitialize* outResult, std::optional<std::string> const& hint) {
-	std::string tentativePath;
+bool LauncherConfiguration::InitializeConfigurationPath(std::optional<std::string> const& hint) {
+	std::filesystem::path tentativePath;
 	if (hint) {
 		tentativePath = *hint;
 	} else {
-		char homeDirectory[4096];
-		DWORD homeLen = 4096;
-		HANDLE token = GetCurrentProcessToken();
+		std::filesystem::path path = utils::GetUserMyGamesDir();
 
-		if (!Externals::pGetUserProfileDirectoryA) {
-			DWORD result = GetEnvironmentVariableA("USERPROFILE", homeDirectory, 4096);
-			if (result < 0) {
-				Logger::Error("Installation::GetIsaacSaveFolder: no GetUserProfileDirectoryA and no %USERPROFILE\n");
-
-				if (outResult)
-					*outResult = LAUNCHER_CONFIGURATION_INIT_NO_USERPROFILE;
-				return false;
-			}
-		} else {
-			BOOL result = Externals::pGetUserProfileDirectoryA(token, homeDirectory, &homeLen);
-
-			if (!result) {
-				result = GetEnvironmentVariableA("USERPROFILE", homeDirectory, 4096);
-				if (result < 0) {
-					Logger::Error("Installation::GetIsaacSaveFolder: unable to find user profile directory: %d\n", GetLastError());
-
-					if (outResult)
-						*outResult = LAUNCHER_CONFIGURATION_INIT_GET_USER_DIRECTORY;
-					return false;
-				}
-			}
+		if (path.empty()) {
+			Logger::Error("LauncherConfiguration::InitializeConfigurationPath: Unable to find user profile directory.\n");
+			return false;
 		}
+		path /= launcherConfigFile;
 
-		std::string path(homeDirectory);
-		path += "\\Documents\\My Games\\";
-		if (!Filesystem::IsFolder(path.c_str())) {
-			if (!Filesystem::CreateFileHierarchy(path.c_str(), "\\")) {
-
-				if (outResult)
-					*outResult = LAUNCHER_CONFIGURATION_INIT_HIERARCHY;
-				return false;
-			}
-		}
-		path += launcherConfigFile;
-
-		tentativePath = std::move(path);
+		tentativePath = path;
 	}
 
-	FILE* file = fopen(tentativePath.c_str(), "a");
+	FILE* file = _wfopen(tentativePath.wstring().c_str(), L"a");
 	if (!file) {
-		if (outResult)
-			*outResult = LAUNCHER_CONFIGURATION_INIT_INVALID_PATH;
+		Logger::Error("LauncherConfiguration::InitializeConfigurationPath: Failed to open/initialize %s\n", tentativePath.u8string().c_str());
 		return false;
 	}
-
 	fclose(file);
 
-	_configurationPath = std::move(tentativePath);
+	_configurationPath = tentativePath.wstring();
 	return true;
 }
 
@@ -159,14 +125,9 @@ bool LauncherConfiguration::AutoLaunch() const {
 }
 
 bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult) {
-	if (_configurationPath.empty()) {
-		Logger::Fatal("Attempting to load configuration when none was found");
-		std::terminate();
-	}
-
-	if (!CheckConfigurationFileExists()) {
+	if (!std::filesystem::exists(_configurationPath)) {
 		// Fatal: the file should exist. Worst case scenario, it's empty.
-		Logger::Fatal("Configuration file %s does not exist\n", _configurationPath.c_str());
+		Logger::Fatal("Configuration file %s does not exist\n", GetConfigurationPathUTF8().c_str());
 		std::terminate();
 	}
 
@@ -179,11 +140,13 @@ bool LauncherConfiguration::Load(LauncherConfigurationLoad* outResult) {
 }
 
 bool LauncherConfiguration::Process(LauncherConfigurationLoad* outResult) {
-	INIReader reader(_configurationPath);
+	std::ifstream file(_configurationPath);
+	std::string buffer((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	INIReader reader(buffer.c_str(), buffer.size());
 	if (int error = reader.ParseError(); error != 0) {
 		switch (error) {
 		case -1:
-			Logger::Error("Unable to open launcher configuration file %s\n", _configurationPath.c_str());
+			Logger::Error("Unable to open launcher configuration file %s\n", GetConfigurationPathUTF8().c_str());
 
 			if (outResult)
 				*outResult = LAUNCHER_CONFIGURATION_LOAD_OPEN;
@@ -191,7 +154,7 @@ bool LauncherConfiguration::Process(LauncherConfigurationLoad* outResult) {
 
 		default:
 			_configFileParseErrorLine = error;
-			Logger::Error("INI parse error on line %d of configuration file %s\n", error, _configurationPath.c_str());
+			Logger::Error("INI parse error on line %d of configuration file %s\n", error, GetConfigurationPathUTF8().c_str());
 
 			if (outResult)
 				*outResult = LAUNCHER_CONFIGURATION_LOAD_PARSE_ERROR;
@@ -199,22 +162,12 @@ bool LauncherConfiguration::Process(LauncherConfigurationLoad* outResult) {
 		}
 	}
 
-	Logger::Info("Successfully opened and parsed launcher configuration file %s\n", _configurationPath.c_str());
+	Logger::Info("Successfully opened and parsed launcher configuration file %s\n", GetConfigurationPathUTF8().c_str());
 	Load(reader);
 
 	if (IsaacExecutablePathIgnoreOverride().empty()) {
 		if (outResult)
 			*outResult = LAUNCHER_CONFIGURATION_LOAD_NO_ISAAC;
-		return false;
-	}
-
-	return true;
-}
-
-bool LauncherConfiguration::CheckConfigurationFileExists() {
-	const char* path = GetConfigurationPath();
-	if (!Filesystem::Exists(path)) {
-		Logger::Info("Launcher configuration file %s does not exist\n", path);
 		return false;
 	}
 
@@ -290,16 +243,14 @@ void LauncherConfiguration::LoadFromCLI() {
 }
 
 void LauncherConfiguration::Write() {
-	if (_configurationPath.empty()) {
-		// gui->LogError("No launcher configuration file found previously, cannot save settings\n");
+	if (!std::filesystem::exists(_configurationPath)) {
 		Logger::Error("No launcher configuration file found previously, cannot save settings\n");
 		return;
 	}
 
-	FILE* f = fopen(_configurationPath.c_str(), "w");
+	FILE* f = _wfopen(_configurationPath.c_str(), L"w");
 	if (!f) {
-		// gui->LogError("Unable to open launcher configuration file %s\n", _configurationPath.c_str());
-		Logger::Error("Unable to open launcher configuration file %s\n", _configurationPath.c_str());
+		Logger::Error("Unable to open launcher configuration file %s\n", GetConfigurationPathUTF8().c_str());
 		return;
 	}
 

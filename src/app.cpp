@@ -6,7 +6,6 @@
 
 #include "chained_future/chained_future.h"
 
-#include "shared/externals.h"
 #include "launcher/app.h"
 #include "launcher/cli.h"
 #include "launcher/installation.h"
@@ -61,10 +60,10 @@ Launcher::LauncherMainWindow* Launcher::App::CreateMainWindow() {
 }
 
 void SetWorkingDirToExe() {//stupid shit to make menu shortcuts work
-	char exePath[MAX_PATH];
-	GetModuleFileNameA(NULL, exePath, MAX_PATH);
+	wchar_t exePath[MAX_PATH];
+	GetModuleFileNameW(NULL, exePath, MAX_PATH);
 	std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
-	SetCurrentDirectoryA(exeDir.string().c_str());
+	SetCurrentDirectoryW(exeDir.wstring().c_str());
 }
 
 void Launcher::App::CheckLauncherUniqueness() {
@@ -118,9 +117,8 @@ void Launcher::App::ReleaseLockFile() {
 bool Launcher::App::OnInit() {
 	SetWorkingDirToExe();
 	Logger::Init("launcher.log", "w");
-	Externals::Init();
-
 	Logger::Info("Launcher started, version %s\n", LAUNCHER_VERSION);
+	Logger::Info("Current Directory: %s\n", std::filesystem::current_path().u8string().c_str());
 
 	// Log the command line
 	std::ostringstream cli;
@@ -147,10 +145,8 @@ bool Launcher::App::OnInit() {
 		HandleSelfUpdate(_mainFrame, sCLI->UnstableLauncher(), true);
 	}
 
-	LauncherConfigurationInitialize initializationResult;
 	std::optional<std::string> const& configurationHint = sCLI->ConfigurationPath();
-	bool configurationPathOk = LauncherConfiguration::InitializeConfigurationPath(
-		&initializationResult, configurationHint);
+	bool configurationPathOk = LauncherConfiguration::InitializeConfigurationPath(configurationHint);
 
 	if (!configurationPathOk) {
 		std::ostringstream stream;
@@ -177,11 +173,11 @@ bool Launcher::App::OnInit() {
 
 		if (!configurationOk) {
 			if (loadResult != LAUNCHER_CONFIGURATION_LOAD_NO_ISAAC) {
-				std::ostringstream stream;
-				stream << "The launcher was unable to process the configuration file " <<
-					LauncherConfiguration::GetConfigurationPath() << ". It will run "
-					"the setup wizard again." << std::endl;
-				MessageBoxA(NULL, stream.str().c_str(), "REPENTOGON Launcher", MB_ICONERROR);
+				std::wostringstream stream;
+				stream << L"The launcher was unable to process the configuration file " <<
+					LauncherConfiguration::GetConfigurationPathUTF16() <<
+					L". It will run the setup wizard again." << std::endl;
+				MessageBoxW(NULL, stream.str().c_str(), L"REPENTOGON Launcher", MB_ICONERROR);
 				Logger::Warn("Unable to load configuration file, starting wizard\n");
 			} else {
 				Logger::Info("No Isaac path specified in the configuration file, "
@@ -274,7 +270,6 @@ bool Launcher::App::OnInit() {
 int Launcher::App::OnExit() {
 	ReleaseLockFile();
 	delete __installation;
-	Externals::End();
 	return 0;
 }
 

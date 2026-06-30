@@ -18,7 +18,6 @@
 #include "launcher/launcher_configuration.h"
 #include "launcher/loader.h"
 
-#include "shared/externals.h"
 #include "shared/logger.h"
 #include "shared/pe32.h"
 

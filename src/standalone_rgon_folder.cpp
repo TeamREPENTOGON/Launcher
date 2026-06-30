@@ -1301,7 +1301,7 @@ namespace standalone_rgon {
         return true;
     }
 
-    bool Patch(const std::string& repentogonFolder, const std::string& patchPath) {
+    bool Patch(const fs::path& repentogonFolder, const fs::path& patchPath) {
         return diff_patcher::PatchFolder(repentogonFolder, patchPath, nullptr) == diff_patcher::PATCH_OK;
     }
 
