@@ -4,7 +4,6 @@
   ],
   "create": {},
   "patch": [
-    "OpenAL32.dll",
     "isaac-ng.exe",
     "resources\\packed\\afterbirthp.a",
     "resources\\scripts\\enums.lua",
