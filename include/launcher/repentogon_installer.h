@@ -73,12 +73,12 @@ namespace Launcher {
 		RepentogonInstallationPhase phase = REPENTOGON_INSTALLATION_PHASE_CHECK_ASSETS;
 		bool zipOk = false; /* zip is present in assets. */
 		bool hashOk = false; /* hash is present in assets. */
-		bool launcherversionlock = false;
+		bool launcherversionlock = false; /* (optional) minimum launcher version is present in assets. */
 		std::string launcherversionreqUrl; /* URL to check launcher version. */
 		std::string hashUrl; /* URL to download the hash. */
 		std::string zipUrl; /* URL to download the archive. */
 		ScopedFile hashFile; /* Pointer to the file in which we write the hash. */
-		ScopedFile ReqVersionFile; /* Pointer to the file in which we write the hash. */
+		ScopedFile ReqVersionFile; /* Pointer to the file in which we write the minimum required launcher version. */
 		ScopedFile zipFile; /* Pointer to the file in which we write the zip. */
 		std::string hash; /* Expected hash of the zip file. */
 		std::string zipHash; /* Hash of the zip file. */

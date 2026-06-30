@@ -25,6 +25,10 @@ namespace Launcher {
 	static const char* RepentogonZipName = "REPENTOGON.zip";
 	static const char* HashName = "hash.txt";
 	static const char* ReqLauncherVersionName = "launcher.txt";
+	static const std::string DownloadedFileBasePath = "./launcher-data/";
+	static const std::string DownloadedRepentogonZipPath = DownloadedFileBasePath + RepentogonZipName;
+	static const std::string DownloadedHashPath = DownloadedFileBasePath + HashName;
+	static const std::string DownloadedReqLauncherVersionPath = DownloadedFileBasePath + ReqLauncherVersionName;
 
 	RepentogonInstallationState::RepentogonInstallationState() {
 
@@ -38,6 +42,18 @@ namespace Launcher {
 			_repentogonVersion = repentogon.GetRepentogonVersion();
 		} else {
 			_zhlVersion = _loaderVersion = _repentogonVersion = "none";
+		}
+
+		// Downloaded assets were moved from the launcher root to the "launcher-data" folder
+		// because a couple of people confused launcher.txt with launcher.log
+		try {
+			if (fs::exists(ReqLauncherVersionName)) {
+				fs::remove(RepentogonZipName);
+				fs::remove(HashName);
+				fs::remove(ReqLauncherVersionName);
+			}
+		} catch (fs::filesystem_error& e) {
+			Logger::Error("RepentogonInstaller: Failed to clean up legacy files: %s\n", e.what());
 		}
 	}
 
@@ -166,8 +182,6 @@ namespace Launcher {
 		}
 
 		PushNotification(false, "Sucessfully installed Repentogon\n");
-
-
 		Logger::Info("RepentogonInstaller::InstallRepentogonThread: successfully installed Repentogon\n");
 
 		_installationState.phase = REPENTOGON_INSTALLATION_PHASE_DONE;
@@ -239,7 +253,6 @@ namespace Launcher {
 			this, std::ref(document), allowPreReleases, force), &_monitor);
 	}
 
-
 	RepentogonInstaller::CheckRepentogonUpdatesResult
 		RepentogonInstaller::CheckRepentogonUpdatesThread(rapidjson::Document& document,
 			bool allowPreReleases, bool force) {
@@ -254,10 +267,9 @@ namespace Launcher {
 			}
 		}
 		//Gitlab Filter END
+
 		Github::VersionCheckResult result = CheckRepentogonUpdatesThread_Updater(document,
 			allowPreReleases);
-
-
 
 		if (result == Github::VERSION_CHECK_NEW)
 			return CHECK_REPENTOGON_UPDATES_NEW;
@@ -434,7 +446,7 @@ namespace Launcher {
 
 		Logger::Info("RepentogonInstaller::DownloadRepentogon: Downloading hash from `%s`...\n", request.url.c_str());
 		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> hashDownloadDescriptor =
-			curl::AsyncDownloadFile(request, HashName);
+			curl::AsyncDownloadFile(request, DownloadedHashPath);
 		std::optional<curl::DownloadFileDescriptor> hashResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
 			&hashDownloadDescriptor->base.monitor, hashDownloadDescriptor->result);
 
@@ -457,7 +469,7 @@ namespace Launcher {
 			}
 		}
 		else {
-			_installationState.hashFile = fopen(HashName, "r");
+			_installationState.hashFile = fopen(DownloadedHashPath.c_str(), "r");
 		}
 
 		if (!_installationState.hashFile) {
@@ -472,7 +484,7 @@ namespace Launcher {
 
 			Logger::Info("RepentogonInstaller::DownloadRepentogon: Downloading required launcher version from `%s`...\n", request.url.c_str());
 			std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> ReqLauncherverDownloadDescriptor =
-				curl::AsyncDownloadFile(request, ReqLauncherVersionName);
+				curl::AsyncDownloadFile(request, DownloadedReqLauncherVersionPath);
 			std::optional<curl::DownloadFileDescriptor> reqlauncherResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
 				&ReqLauncherverDownloadDescriptor->base.monitor, ReqLauncherverDownloadDescriptor->result);
 
@@ -497,7 +509,7 @@ namespace Launcher {
 				}
 			}
 			else {
-				_installationState.ReqVersionFile = fopen(ReqLauncherVersionName, "r");
+				_installationState.ReqVersionFile = fopen(DownloadedReqLauncherVersionPath.c_str(), "r");
 			}
 			
 			if (!_installationState.ReqVersionFile) {
@@ -509,7 +521,7 @@ namespace Launcher {
 
 		Logger::Info("RepentogonInstaller::DownloadRepentogon: Downloading REPENTOGON zip from `%s`...\n", request.url.c_str());
 		std::shared_ptr<curl::AsynchronousDownloadFileDescriptor> zipDownloadDesc =
-			curl::AsyncDownloadFile(request, RepentogonZipName);
+			curl::AsyncDownloadFile(request, DownloadedRepentogonZipPath);
 		std::optional<curl::DownloadFileDescriptor> zipResult = GithubToRepInstall<curl::DownloadFileDescriptor>(
 			&zipDownloadDesc->base.monitor, zipDownloadDesc->result);
 
@@ -525,7 +537,7 @@ namespace Launcher {
 			Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading zip, trying steam\n");
 			if (SteamWorkshop::SubscribeDownloadAndGetFile(SteamWorkshop::REPENTOGON_WORKSHOP_ID, "REPENTOGON/" + relpath, filePath)) {
 				_installationState.zipFile = fopen(filePath.c_str(), "r");
-				fs::copy_file(filePath,fs::current_path() / RepentogonZipName,fs::copy_options::overwrite_existing); //needed for hashing later
+				fs::copy_file(filePath, DownloadedRepentogonZipPath, fs::copy_options::overwrite_existing); //needed for hashing later
 			}
 			else {
 				Logger::Error("RepentogonUpdater::DownloadRepentogon: error while downloading zip from steam\n");
@@ -533,7 +545,7 @@ namespace Launcher {
 			}
 		}
 		else {
-			_installationState.zipFile = fopen(RepentogonZipName, "r");
+			_installationState.zipFile = fopen(DownloadedRepentogonZipPath.c_str(), "r");
 		}
 
 		if (!_installationState.zipFile) {
@@ -579,7 +591,7 @@ namespace Launcher {
 		}
 
 		std::string zipHash;
-		HashResult hashResult = Sha256::Sha256F(RepentogonZipName, zipHash);
+		HashResult hashResult = Sha256::Sha256F(DownloadedRepentogonZipPath.c_str(), zipHash);
 
 		if (hashResult != HASH_OK) {
 			Logger::Fatal("RepentogonUpdater::CheckRepentogonIntegrity: unable "
@@ -627,7 +639,7 @@ namespace Launcher {
 
 		std::vector<std::tuple<std::string, bool>>& filesState = _installationState.unzipedFiles;
 		int zipError;
-		zip_t* zip = zip_open(RepentogonZipName, ZIP_RDONLY | ZIP_CHECKCONS, &zipError);
+		zip_t* zip = zip_open(DownloadedRepentogonZipPath.c_str(), ZIP_RDONLY | ZIP_CHECKCONS, &zipError);
 		if (!zip) {
 			Logger::Error("RepentogonUpdater::ExtractRepentogon: error %d while opening %s\n", zipError, RepentogonZipName);
 			return false;
