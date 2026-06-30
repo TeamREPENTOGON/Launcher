@@ -196,6 +196,7 @@ static bool IsWritableDirectory(const std::string& path) {
 std::string IsaacInstallation::GetSaveDataFolderPath() const {
 	// This function is a recreation of how the vanilla game decides where to put its local save data,
 	// for better accuracy finding the log file on more cursed setups.
+	constexpr char saveDataPathExcludingRoot[] = "Documents\\My Games\\Binding of Isaac Repentance+\\";
 	HANDLE token = GetCurrentProcessToken();
 	DWORD size = 0;
 
@@ -207,7 +208,7 @@ std::string IsaacInstallation::GetSaveDataFolderPath() const {
 		if (GetUserProfileDirectoryA(token, path.data(), &size)) {
 			path.back() = '\\';  // Replace excess null terminator with a backslash
 			if (IsWritableDirectory(path)) {
-				return path;
+				return path + saveDataPathExcludingRoot;
 			}
 		}
 	}
@@ -216,7 +217,7 @@ std::string IsaacInstallation::GetSaveDataFolderPath() const {
 	if (userprofile) {
 		const std::string path = std::string(userprofile) + "\\";
 		if (IsWritableDirectory(path)) {
-			return path;
+			return path + saveDataPathExcludingRoot;
 		}
 	}
 
@@ -225,7 +226,7 @@ std::string IsaacInstallation::GetSaveDataFolderPath() const {
 	if (homedrive && homepath) {
 		const std::string path = std::string(homedrive) + std::string(homepath) + "\\";
 		if (IsWritableDirectory(path)) {
-			return path;
+			return path + saveDataPathExcludingRoot;
 		}
 	}
 
@@ -233,7 +234,7 @@ std::string IsaacInstallation::GetSaveDataFolderPath() const {
 		return "";
 	}
 	// If it can't access the user's profile folder the game will fall back to creating a Documents folder (and subfolders) in its own installation.
-	return _mainInstallation.GetFolderPath() + "Documents\\My Games\\Binding of Isaac Repentance+\\";
+	return _mainInstallation.GetFolderPath() + saveDataPathExcludingRoot;
 }
 
 std::string IsaacInstallation::GetLogFilePath() const {
