@@ -461,7 +461,7 @@ namespace Launcher {
 	bool LauncherMainWindow::LaunchIsaac(bool relaunch) {
 		if (!relaunch && SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //No point in running the updater if nonsteam....for now?, lol
 			_logWindow.Log("Checking for mod updates on Steam's folder:");
-			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "Mods", &_logWindow);
+			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "mods", &_logWindow);
 			dlg.ShowModal();
 		}
 
