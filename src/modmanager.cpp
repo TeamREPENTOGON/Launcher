@@ -215,7 +215,19 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     topSizer->Add(rightPanel, 1, wxEXPAND | wxALL, 5);
 
     panel->SetSizer(topSizer);
-    LoadModsFromFolder();
+
+	try {
+		if (!fs::exists(_modspath)) {
+			fs::create_directories(_modspath);
+		}
+		LoadModsFromFolder();
+	} catch (fs::filesystem_error& err) {
+		const wxString errMessage = wxString::Format("Failed to initialize/read mods folder: %s", err.what());
+		wxMessageDialog(this, errMessage, "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
+		Destroy();
+		return;
+	}
+
     RefreshLists();
 
     Bind(wxEVT_THREAD, &ModManagerFrame::OnThreadUpdate, this);
