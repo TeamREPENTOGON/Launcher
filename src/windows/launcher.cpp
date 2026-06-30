@@ -324,10 +324,14 @@ namespace Launcher {
 
 	void LauncherMainWindow::OnChangeOptions(wxCommandEvent&) {
 		GameOptions opts;
-		opts.Load(_installation->GetIsaacInstallation().GetOptionsIniPath());
-
-		OptionsDialog dlg(this, opts);
-		dlg.ShowModal(); // modal; handles save internally
+		const std::string optionsIniPath = _installation->GetIsaacInstallation().GetOptionsIniPath();
+		if (opts.Load(optionsIniPath)) {
+			OptionsDialog dlg(this, opts);
+			dlg.ShowModal(); // modal; handles save internally
+		} else {
+			const wxString errMessage = wxString::Format("Failed to open %s (%s)\n\nYou may need to launch the game first!", optionsIniPath.c_str(), std::strerror(errno));
+			wxMessageDialog(this, errMessage, "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
+		}
 	}
 
 	void LauncherMainWindow::OnFileSelected(std::string const& path, wxColor const& emptyColor, wxTextCtrl* ctrl,
