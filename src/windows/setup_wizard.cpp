@@ -319,8 +319,8 @@ void LauncherWizard::OnPageChanged(wxWizardEvent& event) {
 
 void LauncherWizard::UpdateIsaacSetupNextButton() {
     wxWindow* button = FindWindowById(wxID_FORWARD, this);
-    if (button) {
-        button->Enable(_isaacFound);
+    if (button) { 
+        button->Enable(_isaacFound && _installation->GetIsaacInstallation().GetRepentogonInstallation().IsCompatibleWithRepentogon());
     }
 }
 

@@ -707,7 +707,7 @@ namespace Launcher {
 			.GetRepentogonInstallation().GetExePath();
 		if (repentogonPath.empty()) {
 			_repentogonFileText->SetForegroundColour(*wxRED);
-			_repentogonFileText->SetValue("No executable found");
+			_repentogonFileText->SetValue("Didnt install properly! (Incompatible?)");
 		} else {
 			_repentogonFileText->SetForegroundColour(*wxBLACK);
 			_repentogonFileText->SetValue(repentogonPath);
@@ -988,7 +988,13 @@ namespace Launcher {
 			break;
 		case ADVANCED_EVENT_REINSTALL:
 			_logWindow.Log("Attempting Repair...");
-			if (!Filesystem::SafeExists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon") || fs::remove_all(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon")) {
+			if (!_installation->GetIsaacInstallation().GetRepentogonInstallation().IsCompatibleWithRepentogon()) {
+				std::string reason = _installation->GetIsaacInstallation().GetRepentogonInstallation().GetUpdatedReason();
+				_logWindow.LogError("Repair Failed!, Not compatible!. Reason: %s", reason);
+				wxMessageDialog dialog(this, "Repair Failed!, your Isaac instalation is not compatible with repentogon.\nReason: " + reason, "Incompatible Isaac Instalation!", wxOK);
+				int result = dialog.ShowModal();
+			}
+			else if (!Filesystem::SafeExists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon") || fs::remove_all(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon")) {
 				ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
 			}
 			else {
@@ -996,6 +1002,9 @@ namespace Launcher {
 			}
 			break;
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE:
+			if (!_installation->GetIsaacInstallation().GetRepentogonInstallation().IsCompatibleWithRepentogon()) {
+				_logWindow.LogWarn("Update may Fail!, Vanilla not compatible!. Reason: %s", _installation->GetIsaacInstallation().GetRepentogonInstallation().GetUpdatedReason());
+			}
 			ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
 			break;
 

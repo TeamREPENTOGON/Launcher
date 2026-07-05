@@ -291,23 +291,7 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon) 
 	const bool alreadyCompatible = RepentogonInstallation::IsIsaacVersionCompatible(GetVersion());
 	_needsPatch = !repentogon && !alreadyCompatible && PatchIsAvailable();
 	_isCompatibleWithRepentogon = alreadyCompatible || _needsPatch;
-	if (_isCompatibleWithRepentogon) {
-		if (_needsPatch) {
-			_CompatReason = "Will work, the launcher has a patch to adapt it to a compatible version.";
-		}
-		else {
-			_CompatReason = "Should just work.";
-		}
-	}
-	else {
-		if (!strncmp(GetVersion(), "v1.7", strlen("v1.7"))) {
-			_CompatReason = "You need the Repentance+ dlc, you currently only have Repentance installed.";
-		}
-		else {
-			_CompatReason = "You dont have a proper version or your exe is corrupted/cracked (verify your files with steam or download the specific version rgon uses)";
-		}
-	}
-
+	UpdateReason();
 	if (srgon::IsStandaloneFolder(sourcePath) && !repentogon) {
 		_gui->LogWarn("The main Isaac executable is located in a Repentogon installation, this likely indicates a broken configuration\n");
 		Logger::Error("Main Isaac executable %s is located inside a Repentogon installation", path.c_str());

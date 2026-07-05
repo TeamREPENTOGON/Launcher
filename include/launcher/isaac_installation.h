@@ -69,6 +69,32 @@ public:
     inline bool IsValid() const {
         return _isValid;
     }
+
+    inline std::string GetUpdatedReason() const { //instalationdata is a const in a lot of places and I dont think this alone justifies changing it(or maybe Im just too lazy to do it rn)...so, here goes nothing.
+        if (_isCompatibleWithRepentogon) {
+            if (_needsPatch) {
+                return "Will work, the launcher has a patch to adapt it to a compatible version.";
+            }
+            else {
+                return "Should just work.";
+            }
+        }
+        else {
+            if (!strncmp(GetVersion(), "v1.7", strlen("v1.7"))) {
+                return "You need the Repentance+ dlc, you currently only have Repentance installed (WHICH IS NOT THE SAME).";
+            }
+            else {
+                return "You dont have a proper version or your exe is corrupted/cracked \n(verify your files with steam or download the specific version rgon uses)";
+            }
+        }
+        return _CompatReason;
+    }
+
+    inline std::string UpdateReason() {
+        _CompatReason = GetUpdatedReason();
+        return _CompatReason;
+    }
+
     inline std::string GetReason() const {
         return _CompatReason;
     }
