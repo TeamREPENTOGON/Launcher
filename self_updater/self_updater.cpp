@@ -777,7 +777,7 @@ bool RunningFromAppData()
 			return true; //at this point, assume copying to appdata is not possible and run normally....I guess?
 		std::filesystem::path appdatadir(path);
 
-		auto appDir = appdatadir / "RepentogonLauncher";
+		auto appDir = appdatadir / "REPENTOGONLauncher";
 		if (std::filesystem::exists(appDir) && std::filesystem::equivalent(currentDir, appDir))
 			return true;
 		std::filesystem::create_directories(appDir);
