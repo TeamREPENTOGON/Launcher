@@ -282,6 +282,9 @@ void ModManagerFrame::LoadModsFromFolder() {
 }
 
 void ModManagerFrame::RefreshLists() {
+    int topdisabled = _disabledlist->GetTopItem();
+    int topenabled = _enabledlist->GetTopItem();    
+
     wxString filter = _searchctrl->GetValue().Lower();
     _enabledlist->Clear();
     _disabledlist->Clear();
@@ -296,6 +299,18 @@ void ModManagerFrame::RefreshLists() {
             _enabledlist->Append(name, new ModInfo(mod));
         }
     }
+
+    if (_disabledlist->GetCount() > 0)
+    {
+        topdisabled = std::min(topdisabled, (int)_disabledlist->GetCount() - 1);
+        _disabledlist->SetFirstItem(topdisabled);
+    }
+    if (_enabledlist->GetCount() > 0)
+    {
+        topenabled = std::min(topenabled, (int)_enabledlist->GetCount() - 1);
+        _enabledlist->SetFirstItem(topenabled);
+    }
+
 }
 
 bool ModManagerFrame::IsDisabled(const std::wstring& modFolder) {
@@ -844,11 +859,13 @@ void ParseBBCode(wxRichTextCtrl* field, const std::string& bbcode) {
 void ModManagerFrame::OnSelectModEnabled(wxCommandEvent& evt) {
     ModInfo* mod = static_cast<ModInfo*>(_enabledlist->GetClientData(evt.GetSelection()));
     ModManagerFrame::OnSelectMod(*mod);
+    _disabledlist->DeselectAll();
 }
 
 void ModManagerFrame::OnSelectModDisabled(wxCommandEvent& evt) {
     ModInfo* mod = static_cast<ModInfo*>(_disabledlist->GetClientData(evt.GetSelection()));
     ModManagerFrame::OnSelectMod(*mod);
+    _enabledlist->DeselectAll();
 }
 
 
