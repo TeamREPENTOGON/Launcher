@@ -214,6 +214,7 @@ private:
             }
             if (cancelrequest) {
                 PostProgressEvent(0, "Copying interrupted");
+                fs::remove_all(dst);
                 return;
             }
         }
@@ -376,6 +377,11 @@ private:
                 try {
                     std::ofstream(installedFolder / "Unfinished.it"); //there was some oddc ase of going back and forth between vanilla and rgon with unfinished mods so I still need to use this :(
                     CopyDir(cachePath, installedFolder);
+                    if (cancelrequest) {
+                        PostProgressEvent(overallPct, "FINISH: Updating canceled!");
+                        Logger::Warn("[MODUPDATER] Canceled mid-copy folder discarded! \n");
+                        return;
+                    }
                     fs::remove(installedFolder / "Unfinished.it");
                     fs::remove(installedFolder / "Update.it"); //vanilla can still shove this shit in if interrumpted, we dont even use this here since we just copy the updated metadata.xml last....which makes unfinished.it pointless.
                     PostProgressEvent(overallPct,"DONE: Updated " + cacheName + " to version " + cacheVersion);
