@@ -109,6 +109,11 @@ bool SubscribeDownloadAndGetFile(PublishedFileId_t workshopId, const std::string
 
 bool CanReachSteamWorkshop()
 {
+	if (!SteamUser()->BLoggedOn()) {
+		Logger::Error("Steam is not connected to the Steam servers.\n");
+		return false;
+	}
+
 	CURL* curl = curl_easy_init();
 	if (!curl)
 		return false;

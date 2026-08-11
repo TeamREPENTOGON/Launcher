@@ -266,6 +266,12 @@ private:
             PostProgressEvent(0, "FINISH: update process finished.");
             return;
         }
+		if (!SteamUGC()) {
+			PostProgressEvent(0, "ERROR: Failed to connect to the Steam Workshop");
+			PostProgressEvent(0, "FINISH: update process finished.");
+			return;
+		}
+
         int overallPct = 0;
 
         uint32 num = SteamUGC()->GetNumSubscribedItems();
