@@ -42,6 +42,7 @@ LauncherWizard::LauncherWizard(Launcher::LauncherMainWindow* mainWindow,
     wxWizard(mainWindow, LAUNCHER_WIZARD_CONTROL_WIZARD, "REPENTOGON Launcher Setup") {
     _questionMarkBitmap.CopyFromIcon(_questionMark);
     wxBitmap::Rescale(_questionMarkBitmap, wxSize(16, 16));
+	SetIcon(wxICON(IDI_ICON1));
 }
 
 bool LauncherWizard::Run() {

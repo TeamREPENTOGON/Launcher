@@ -48,6 +48,8 @@ void RepentogonInstallerFrame::Initialize() {
 	CentreOnScreen();
 
 	_logWindow = logWindow;
+
+	SetIcon(wxICON(IDI_ICON1));
 }
 
 void RepentogonInstallerFrame::OnClose(wxCloseEvent& event) {

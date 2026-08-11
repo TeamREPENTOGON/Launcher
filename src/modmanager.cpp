@@ -241,6 +241,8 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     RefreshLists();
 
     Bind(wxEVT_THREAD, &ModManagerFrame::OnThreadUpdate, this);
+
+	SetIcon(wxICON(IDI_ICON1));
 }
 
 void ModManagerFrame::LoadModsFromFolder() {

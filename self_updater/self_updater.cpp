@@ -328,6 +328,9 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(POINT wi
 		windowClass.hInstance = hInstance;
 		windowClass.style = windowClass.style | CS_NOCLOSE;
 
+		windowClass.hIconSm = (HICON)LoadImageA(hInstance, "IDI_ICON1", IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
+		windowClass.hIcon = (HICON)LoadImageA( hInstance, "IDI_ICON1", IMAGE_ICON, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR);
+		
 		if (!RegisterClassExA(&windowClass)) {
 			Logger::Error("Error registering progress bar window class (%d)\n", GetLastError());
 			return nullptr;
