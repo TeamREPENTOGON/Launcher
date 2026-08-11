@@ -1,14 +1,15 @@
 #pragma once
 
-#include <wx/wx.h>
-#include <wx/listbox.h>
-#include <wx/textctrl.h>
 #include <vector>
 #include <string>
 #include <filesystem>
 #include <unordered_map>
-#include <launcher/windows/launcher.h>
-#include <wx/richtext/richtextctrl.h>
+
+#include "launcher/windows/launcher.h"
+#include "wx/wx.h"
+#include "wx/listbox.h"
+#include "wx/textctrl.h"
+#include "wx/richtext/richtextctrl.h"
 
 namespace fs = std::filesystem;
 
@@ -100,6 +101,8 @@ private:
     void OnWorkshopPage(wxCommandEvent& event);
     void OnModFolder(wxCommandEvent& event);
     void OnModSaveFolder(wxCommandEvent& event);
+	void OnReinstall(wxCommandEvent& event);
+
     void OnHover(wxMouseEvent& event);
 
     void EnableMod(const std::wstring& modfolder);
@@ -109,4 +112,22 @@ private:
     wxDECLARE_EVENT_TABLE();
 };
 
+class ModManagerReinstallDialog : public wxDialog {
+public:
+	ModManagerReinstallDialog(wxWindow* parent, const uint64_t workshopid, const std::wstring& modname);
 
+	void OnCancel(wxCommandEvent&);
+	void OnTimer(wxTimerEvent& event);
+	void OnThreadUpdate(wxThreadEvent& evt);
+	void TryReinstallMod();
+	void MainProc();
+
+private:
+	const uint64_t workshopid_;
+
+	wxStaticText* statusLabel_ = nullptr;
+	wxGauge* progressBar_ = nullptr;
+	std::unique_ptr<wxTimer> timer_ = nullptr;
+	wxButton* cancelButton_ = nullptr;
+	std::atomic<bool> cancelRequested_ = false;
+};

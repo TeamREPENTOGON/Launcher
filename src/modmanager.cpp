@@ -1,17 +1,23 @@
 #include "launcher/modmanager.h"
-#include <wx/filedlg.h>
-#include <wx/msgdlg.h>
+
 #include <fstream>
 #include <sstream>
-#include <rapidxml/rapidxml.hpp>
-#include <rapidxml/rapidxml_utils.hpp>
+#include <regex>
 #include <filesystem>
 #include <unordered_set>
-#include "launcher/installation.h"
-#include <wx/statline.h>
-#include <wx/mstream.h>
-#include <steam_api.h>
+
+#include "steam_api.h"
+#include "curl/curl.h"
+#include "shared/curl_request.h"
 #include "shared/filesystem.h"
+#include "shared/logger.h"
+#include "rapidxml/rapidxml.hpp"
+#include "rapidxml/rapidxml_utils.hpp"
+#include "launcher/installation.h"
+#include "wx/statline.h"
+#include "wx/mstream.h"
+#include "wx/filedlg.h"
+#include "wx/msgdlg.h"
 
 namespace fs = std::filesystem;
 
@@ -22,12 +28,14 @@ enum {
     WINDOW_BUTTON_MODMAN_SAVE,
     WINDOW_BUTTON_MODMAN_LOAD,
     WINDOW_BUTTON_MODMAN_CLOSE,
+
     WINDOW_LIST_MODMAN_ENABLED,
     WINDOW_LIST_MODMAN_DISABLED,
 
     WINDOW_BUTTON_MODMAN_WORKSHOP,
     WINDOW_BUTTON_MODMAN_MODFOLDER,
-    WINDOW_BUTTON_MODMAN_SAVEFOLDER
+    WINDOW_BUTTON_MODMAN_SAVEFOLDER,
+	WINDOW_BUTTON_MODMAN_REINSTALL,
 };
 
 wxBEGIN_EVENT_TABLE(ModManagerFrame, wxFrame)
@@ -43,6 +51,7 @@ EVT_BUTTON(WINDOW_BUTTON_MODMAN_CLOSE, ModManagerFrame::OnClose)
 EVT_BUTTON(WINDOW_BUTTON_MODMAN_WORKSHOP, ModManagerFrame::OnWorkshopPage)
 EVT_BUTTON(WINDOW_BUTTON_MODMAN_MODFOLDER, ModManagerFrame::OnModFolder)
 EVT_BUTTON(WINDOW_BUTTON_MODMAN_SAVEFOLDER, ModManagerFrame::OnModSaveFolder)
+EVT_BUTTON(WINDOW_BUTTON_MODMAN_REINSTALL, ModManagerFrame::OnReinstall)
 
 EVT_LISTBOX(WINDOW_LIST_MODMAN_ENABLED, ModManagerFrame::OnSelectModEnabled)
 EVT_LISTBOX(WINDOW_LIST_MODMAN_DISABLED, ModManagerFrame::OnSelectModDisabled)
@@ -136,9 +145,10 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     thumbnbuttons->Add(thumbnailCtrl, 0, wxALL | wxALIGN_CENTER, 5);
     thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
 
-    thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_WORKSHOP, "Workshop Page"), 0, wxEXPAND | wxALL, 3);
-    thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_MODFOLDER, "Mod Folder"), 0, wxEXPAND | wxALL, 3);
-    thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_SAVEFOLDER, "Mod Save Data"), 0, wxEXPAND | wxALL, 3);
+    thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_WORKSHOP, "Workshop Page"), 0, wxEXPAND | wxALL, 2);
+    thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_MODFOLDER, "Mod Folder"), 0, wxEXPAND | wxALL, 2);
+    thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_SAVEFOLDER, "Mod Save Data"), 0, wxEXPAND | wxALL, 2);
+	thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_REINSTALL, "Reinstall"), 0, wxEXPAND | wxALL, 2);
     leftPanel->Add(thumbnbuttons, 0, wxALL | wxALIGN_CENTER, 0);
 
 
@@ -1022,6 +1032,173 @@ void ModManagerFrame::OnLoad(wxCommandEvent&) {
     }
 }
 
+void ModManagerFrame::OnReinstall(wxCommandEvent&) {
+	if (!selectedMod.id.empty()) {
+		int res = wxMessageDialog(this, wxString::Format("Would you like to reinstall \"%s?\"\n\nThis will delete the mod files and attempt to redownload the latest version from the Steam workshop.", selectedMod.displayName), "REPENTOGON Launcher", wxYES_NO).ShowModal();
+		
+		if (res != wxID_YES) {
+			return;
+		}
+		
+		uint64_t id;
+		if (!ExtractWorkshopId(selectedMod.id, id)) {
+			wxMessageDialog(this, wxString::Format("Cannot reinstall %s - not a workshop mod!", selectedMod.displayName), "REPENTOGON Launcher", wxOK).ShowModal();
+			return;
+		}
+		ModManagerReinstallDialog(this, id, selectedMod.displayName).ShowModal();
+	}
+}
+
 void ModManagerFrame::OnClose(wxCommandEvent&) {
     Close();
+}
+
+// Reinstaller Dialog
+ModManagerReinstallDialog::ModManagerReinstallDialog(wxWindow* parent, const uint64_t workshopid, const std::wstring& modname)
+	: wxDialog(parent, wxID_ANY, L"Reinstalling " + modname + L"...",
+		wxDefaultPosition, wxSize(600, 130)), workshopid_(workshopid) {
+	Logger::Info("[ModManager] Reinstalling %ls...\n", modname.c_str());
+
+	wxBoxSizer* v = new wxBoxSizer(wxVERTICAL);
+
+	statusLabel_ = new wxStaticText(this, wxID_ANY, "Deleting current installation...");
+	v->Add(statusLabel_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
+
+	progressBar_ = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(-1, 24));
+	v->Add(progressBar_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
+
+	wxBoxSizer* h = new wxBoxSizer(wxHORIZONTAL);
+	cancelButton_ = new wxButton(this, wxID_CANCEL, "Dismiss");
+	h->AddStretchSpacer();
+	h->Add(cancelButton_, 0, wxALL, 5);
+	v->Add(h, 0, wxEXPAND);
+	SetSizer(v);
+	Centre();
+
+	timer_ = std::make_unique<wxTimer>(this, wxID_ANY);
+	timer_->Start(100);
+
+	Bind(wxEVT_BUTTON, &ModManagerReinstallDialog::OnCancel, this, cancelButton_->GetId());
+	Bind(wxEVT_THREAD, &ModManagerReinstallDialog::OnThreadUpdate, this);
+	Bind(wxEVT_TIMER, &ModManagerReinstallDialog::OnTimer, this);
+
+	if (!SteamAPI_Init() || !SteamAPI_IsSteamRunning() || !SteamUGC()) {
+		wxMessageDialog(this, "Cannot reinstall mod - Steam is not available!", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
+		EndModal(wxID_OK);
+	} else {
+		std::thread(&ModManagerReinstallDialog::MainProc, this).detach();
+	}
+}
+
+void ModManagerReinstallDialog::OnCancel(wxCommandEvent&) {
+	cancelRequested_ = true;
+	cancelButton_->Disable();
+}
+
+void ModManagerReinstallDialog::OnTimer(wxTimerEvent&) {
+	if (progressBar_->GetValue() == 0 || progressBar_->GetValue() == 100) {
+		progressBar_->Pulse();
+	}
+}
+
+void ModManagerReinstallDialog::OnThreadUpdate(wxThreadEvent& evt) {
+	int current = evt.GetInt();
+
+	if (current == -1) {
+		EndModal(wxID_OK);
+		return;
+	}
+
+	if (current != progressBar_->GetValue()) {
+		progressBar_->SetValue(current);
+	}
+
+	if (current > 0 && current < 100) {
+		statusLabel_->SetLabel("Downloading mod...");
+	} else if (current >= 100) {
+		statusLabel_->SetLabel("Installing (check Steam for exact progress)...");
+	} else {
+		statusLabel_->SetLabel("Preparing to download...");
+	}
+}
+
+void ModManagerReinstallDialog::TryReinstallMod() {
+	const uint32_t initialState = SteamUGC()->GetItemState(workshopid_);
+
+	if (!(initialState & k_EItemStateSubscribed)) {
+		wxMessageDialog(this, "Cannot reinstall mod - you are not subscribed to it!", "REPENTOGON Launcher", wxOK | wxICON_WARNING).ShowModal();
+		return;
+	}
+
+	if ((initialState & k_EItemStateDownloading) || (initialState & k_EItemStateDownloadPending)) {
+		Logger::Info("[ModManager] Reinstall was requested, but Steam is already downloading the mod.\n");
+	} else {
+		char folderPath[1024];
+		uint64 sizeOnDisk = 0;
+		uint32 timeStamp = 0;
+		Logger::Info("[ModManager] Getting current installation info...\n");
+		if (SteamUGC()->GetItemInstallInfo(workshopid_, &sizeOnDisk, folderPath, sizeof(folderPath), &timeStamp)) {
+			Logger::Info("[ModManager] Deleting existing installation from `%s`...\n", folderPath);
+			// We CAN continue if this fails.
+			std::error_code err;
+			std::filesystem::remove_all(folderPath, err);
+			if (err) {
+				Logger::Error("[ModManager] Failed to delete mod files for reinstall: %s (%s:%d)\n", err.message().c_str(), err.category().name(), err.value());
+			}
+		} else {
+			Logger::Info("[ModManager] ...No current installation found.\n");
+		}
+
+		Logger::Info("[ModManager] Requesting download from Steam...\n");
+		if (!SteamUGC()->DownloadItem(workshopid_, false)) {
+			Logger::Info("[ModManager] ...Failed!\n");
+			wxMessageDialog(this, "Reinstall failed - could not request download from Steam.", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
+			return;
+		}
+	}
+
+	do {
+		const uint32 state = SteamUGC()->GetItemState(workshopid_);
+
+		if (state & k_EItemStateDownloading) {
+			uint64_t bytesDownloaded = 0;
+			uint64_t bytesTotal = 0;
+
+			if (SteamUGC()->GetItemDownloadInfo(workshopid_, &bytesDownloaded, &bytesTotal)) {
+				int pct = 0;
+				if (bytesTotal > 0) {
+					pct = static_cast<int>((bytesDownloaded * 100) / bytesTotal);
+				}
+
+				wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
+				evt->SetInt(pct);
+				if (!IsBeingDeleted()) {
+					wxQueueEvent(this, evt);
+				}
+			} else {
+				break;
+			}
+		} else if ((state & k_EItemStateDownloadPending) == 0) {
+			break;
+		}
+
+		std::this_thread::sleep_for(std::chrono::microseconds(1000));
+	} while (!cancelRequested_);
+
+	if (cancelRequested_) {
+		Logger::Info("[ModManager] Dialog was dismissed by user.\n");
+	} else {
+		Logger::Info("[ModManager] Reinstallation complete!\n");
+	}
+}
+
+void ModManagerReinstallDialog::MainProc() {
+	TryReinstallMod();
+
+	// Send the signal that we're done.
+	wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
+	evt->SetInt(-1);
+	if (!IsBeingDeleted()) {
+		wxQueueEvent(this, evt);
+	}
 }
