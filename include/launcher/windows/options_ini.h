@@ -263,8 +263,8 @@ public:
         AddFloatCtrl(ROW4, "Gamma", &optionss.Gamma,              gammaTxt,0,2);
         AddFloatCtrl(ROW4, "Hud Offset", &optionss.HudOffset,          hudOffsetTxt, 0, 1);
         AddIntCtrl(ROW3, "Online Player Volume", &optionss.OnlinePlayerVolume,  onlinePlayerVolumeTxt,0,10);
-        AddIntCtrl(ROW4, "Max Scale", &optionss.MaxScale,           maxScaleTxt);
-        AddIntCtrl(ROW4, "Max Render Scale", &optionss.MaxRenderScale,     maxRenderScaleTxt);
+        AddIntCtrl(ROW4, "Max Scale", &optionss.MaxScale,           maxScaleTxt,1);
+        AddIntCtrl(ROW4, "Max Render Scale", &optionss.MaxRenderScale,     maxRenderScaleTxt,1);
 
         AddIntCtrl(ROW4, "Window Width", &optionss.WindowWidth,        windowWidthTxt);
         AddIntCtrl(ROW4, "Window Height", &optionss.WindowHeight,       windowHeightTxt);
@@ -378,6 +378,8 @@ private:
         wxIntegerValidator<int> rules(value);
         rules.SetRange(min, max);
 
+		*value = std::clamp(*value, rules.GetMin(), rules.GetMax());
+
         wxBoxSizer* row = new wxBoxSizer(wxHORIZONTAL);
         wxStaticText* txt = new wxStaticText(this, wxID_ANY, label);
 
@@ -395,6 +397,8 @@ private:
     void AddFloatCtrl(wxSizer* sizer, const wxString& label, float* value, wxTextCtrl*& outCtrl,float min = -99999, float max = 99999) {
         wxFloatingPointValidator<float> rules(4,value);
         rules.SetRange(min, max);
+
+		*value = std::clamp(*value, rules.GetMin(), rules.GetMax());
 
         wxBoxSizer* row = new wxBoxSizer(wxHORIZONTAL);
         wxStaticText* txt = new wxStaticText(this, wxID_ANY, label);
