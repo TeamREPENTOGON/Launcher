@@ -493,11 +493,13 @@ namespace Launcher {
 			_logWindow.Log("\t\tEnable REPENTOGON console window: %s", _configuration->RepentogonConsole() ? "yes" : "no");
 		}
 		_logWindow.Log("\tVanilla:");
+		/*
 		if (_configuration->Stage() > 0) {
 			_logWindow.Log("\t\tStarting stage: %d.%d", _configuration->Stage(), _configuration->StageType());
 		} else {
 			_logWindow.Log("\t\tStarting stage: not selected");
 		}
+		*/
 		_logWindow.Log("\t\tLua debug: %s", _configuration->LuaDebug() ? "yes" : "no");
 		if (!_configuration->LuaHeapSize().empty()) {
 			_logWindow.Log("\t\tLua heap size: %s", _configuration->LuaHeapSize().c_str());
@@ -988,10 +990,10 @@ namespace Launcher {
 			break;
 		case ADVANCED_EVENT_REINSTALL:
 			_logWindow.Log("Attempting Repair...");
-			if (!_installation->GetIsaacInstallation().GetRepentogonInstallation().IsCompatibleWithRepentogon()) {
-				std::string reason = _installation->GetIsaacInstallation().GetRepentogonInstallation().GetUpdatedReason();
-				_logWindow.LogError("Repair Failed!, Not compatible!. Reason: %s", reason);
-				wxMessageDialog dialog(this, "Repair Failed!, your Isaac instalation is not compatible with repentogon.\nReason: " + reason, "Incompatible Isaac Instalation!", wxOK);
+			if (!_installation->GetIsaacInstallation().GetMainInstallation().IsCompatibleWithRepentogon()) {
+				std::string reason = _installation->GetIsaacInstallation().GetMainInstallation().GetUpdatedReason();
+				_logWindow.LogError("Cannot Repair - Vanilla installation is not compatible! Reason: %s", reason.c_str());
+				wxMessageDialog dialog(this, "Cannot Repair - Your Isaac installation is not compatible with REPENTOGON!\n\nReason: " + reason, "Incompatible Isaac Installation!", wxOK);
 				int result = dialog.ShowModal();
 			}
 			else if (!Filesystem::SafeExists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon") || fs::remove_all(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "Repentogon")) {
@@ -1002,8 +1004,8 @@ namespace Launcher {
 			}
 			break;
 		case ADVANCED_EVENT_FORCE_REPENTOGON_UPDATE:
-			if (!_installation->GetIsaacInstallation().GetRepentogonInstallation().IsCompatibleWithRepentogon()) {
-				_logWindow.LogWarn("Update may Fail!, Vanilla not compatible!. Reason: %s", _installation->GetIsaacInstallation().GetRepentogonInstallation().GetUpdatedReason());
+			if (!_installation->GetIsaacInstallation().GetMainInstallation().IsCompatibleWithRepentogon()) {
+				_logWindow.LogWarn("Update may Fail!, Vanilla not compatible!. Reason: %s", _installation->GetIsaacInstallation().GetMainInstallation().GetUpdatedReason().c_str());
 			}
 			ForceRepentogonUpdate(GetRepentogonUnstableUpdatesState());
 			break;
