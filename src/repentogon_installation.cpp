@@ -27,6 +27,7 @@ void RepentogonInstallation::ClearInstallation() {
 	_installationState = REPENTOGON_INSTALLATION_STATUS_NONE;
 	_repentogonVersion.clear();
 	_zhlVersion.clear();
+	_zhlLoaderVersion.clear();
 	_repentogonZHLVersionMatch = false;
 	_dllHash.reset();
 	_repentogonFiles.clear();
@@ -169,21 +170,18 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	}
 
 	if (!loaderMissing && !dsoundFound) {
-		if (!ValidateVersionSymbol(loader, Libraries::loader, Symbols::loaderVersion,
-			loaderVersion, _zhlLoaderVersion, _sZhlLoaderVersion)) {
+		if (!ValidateVersionSymbol(loader, Libraries::loader, Symbols::loaderVersion, loaderVersion, _zhlLoaderVersion)) {
 			_gui->LogError("[DANGER] No valid Repentogon installation found: the ZHL loader DLL is malformed\n");
 			return false;
 		}
 	}
 
-	if (!ValidateVersionSymbol(zhl, Libraries::zhl, Symbols::zhlVersion,
-		zhlVersion, _zhlVersion, _sZhlVersion)) {
+	if (!ValidateVersionSymbol(zhl, Libraries::zhl, Symbols::zhlVersion, zhlVersion, _zhlVersion)) {
 		_gui->LogError("[DANGER] No valid Repentogon installation found: the ZHL DLL is malformed\n");
 		return false;
 	}
 
-	if (!ValidateVersionSymbol(repentogon, Libraries::repentogon, Symbols::repentogonVersion,
-		repentogonVersion, _repentogonVersion, _sRepentogonVersion)) {
+	if (!ValidateVersionSymbol(repentogon, Libraries::repentogon, Symbols::repentogonVersion, repentogonVersion, _repentogonVersion)) {
 		_gui->LogError("[DANGER] No valid Repentogon installation found: the Repentogon DLL is malformed\n");
 		return false;
 	}
@@ -237,8 +235,8 @@ FARPROC RepentogonInstallation::RetrieveSymbol(HMODULE module, const char* libna
 }
 
 bool RepentogonInstallation::ValidateVersionSymbol(HMODULE module, const char* libname, const char* symbolName,
-	FARPROC symbol, std::string& target, std::string& shadowTarget) {
-	shadowTarget = target;
+	FARPROC symbol, std::string& target) {
+
 	if (symbol) {
 		Module::ValidateStringSymbolResult validateResult;
 		std::string localTarget;
@@ -256,7 +254,6 @@ bool RepentogonInstallation::ValidateVersionSymbol(HMODULE module, const char* l
 				MB_ICONEXCLAMATION);
 			return false;
 		} else {
-			shadowTarget = target;
 			target = localTarget;
 			Logger::Info("Identified %s version %s\n", libname, target.c_str());
 		}

@@ -38,6 +38,10 @@ namespace Launcher {
 			return _launcherConfiguration;
 		}
 
+		inline void UpdateShadowVersions() {
+			_repentogonInstallation.UpdateShadowVersions();
+		}
+
 		inline void SetGUI(ILoggableGUI* gui) {
 			_gui = gui;
 			_repentogonInstallation.SetGUI(gui);

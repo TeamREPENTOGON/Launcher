@@ -76,6 +76,7 @@ void RepentogonInstallerFrame::OnClose(wxCloseEvent& event) {
 void RepentogonInstallerFrame::InstallRepentogon() {
 	std::unique_lock<std::mutex> lck(_installerMutex);
 	_wasinstalled = Filesystem::SafeExists(_installation->GetIsaacInstallation().GetMainInstallation().GetFolderPath() + "\\Repentogon");
+	_installation->UpdateShadowVersions();  // Record what versions we had before the update.
 	_helper = std::make_unique<RepentogonInstallerHelper>(this, _installation,
 		_allowUnstable, _forceUpdate, _logWindow);
 	_helper->Install(std::bind_front(&RepentogonInstallerFrame::OnRepentogonInstalled, this));

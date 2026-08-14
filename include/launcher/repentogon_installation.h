@@ -125,6 +125,12 @@ public:
 		return _sRepentogonVersion;
 	}
 
+	inline void UpdateShadowVersions() {
+		_sZhlVersion = _zhlVersion;
+		_sZhlLoaderVersion = _zhlLoaderVersion;
+		_sRepentogonVersion = _repentogonVersion;
+	}
+
 	static bool IsIsaacVersionCompatible(const char* version);
 
 	inline void SetGUI(ILoggableGUI* gui) {
@@ -148,7 +154,7 @@ private:
 	ScopedModule LoadModule(const char* shortName, const char* path, LoadableDlls dll);
 	FARPROC RetrieveSymbol(HMODULE module, const char* libname, const char* symbol);
 	bool ValidateVersionSymbol(HMODULE module, const char* libname, const char* symbolName,
-		FARPROC versionSymbol, std::string& target, std::string& shadowTarget);
+		FARPROC versionSymbol, std::string& target);
 
 	void ClearInstallation();
 
