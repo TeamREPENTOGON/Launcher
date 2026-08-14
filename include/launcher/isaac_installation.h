@@ -25,6 +25,13 @@ enum ReadVersionStringResult {
     READ_VERSION_STRING_ERR_NO_VERSION
 };
 
+enum IsaacPatchAvailability {
+	ISAAC_PATCH_NOT_CHECKED,
+	ISAAC_PATCH_NOT_AVAILABLE,
+	ISAAC_PATCH_AVAILABLE,
+	ISAAC_PATCH_ONLINE_CHECK_FAILED,
+};
+
 /* Global array of all known versions of the game. */
 extern Version const knownVersions[];
 
@@ -37,7 +44,7 @@ private:
     std::string _CompatReason = "Maybe it works?, probably not tho, try it!";
     bool _isValid = false;
     bool _needsPatch = false;
-    int _vanillaexeispatchable = -1; //-1 not checked, 0 not pachable, 1 pachable
+	IsaacPatchAvailability _patchAvailability = ISAAC_PATCH_NOT_CHECKED;
 
     mutable ILoggableGUI* _gui = nullptr;
 
@@ -138,6 +145,10 @@ public:
     InstallationData const& GetRepentogonInstallation() const {
         return _repentogonInstallation;
     }
+
+	inline void SetGUI(ILoggableGUI* gui) {
+		_gui = gui;
+	}
 
 private:
     mutable ILoggableGUI* _gui;

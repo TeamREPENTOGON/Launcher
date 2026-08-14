@@ -47,6 +47,39 @@ namespace Shared {
 	bool SelectTargetRelease(rapidjson::Document const& releases, bool allowPreRelease,
 		bool force, std::string& version, std::string& url);
 
+	bool LauncherUpdateChecker::IsSteamSelfUpdateAvailable(std::string& version, std::string& url, SteamLauncherUpdateStatus& steamUpdateStatus) {
+		if (!Filesystem::SafeExists("steamentrydir.txt")) {
+			Logger::Warn("steamentrydir.txt does not exist. Cannot proceed.\n");
+			steamUpdateStatus = STEAM_LAUNCHER_UPDATE_FAILED;
+			return false;
+		}
+		std::ifstream in("steamentrydir.txt");
+		std::ostringstream ss;
+		ss << in.rdbuf();
+		url = ss.str(); //yes, I use url for the local dir, sue me
+		if (!Filesystem::SafeExists(url + "/versiontracker/versionlauncher.txt")) {
+			Logger::Error("versionlauncher.txt does not exist. Cannot proceed.\n");
+			steamUpdateStatus = STEAM_LAUNCHER_UPDATE_FAILED;
+			return false;
+		}
+		std::ifstream in2(url + "/versiontracker/versionlauncher.txt");
+		std::ostringstream ss2;
+		ss2 << in2.rdbuf();
+		std::string availableversion = ss2.str();
+		std::string currversion = ::Launcher::LAUNCHER_VERSION;
+		version = availableversion;
+		_hasRelease = true;
+		Logger::Info("Comparing current version `%s` with steam version `%s`...\n", currversion.c_str(), availableversion.c_str());
+		if (LauncherVersion(currversion) < LauncherVersion(availableversion)) {
+			Logger::Info("Steam version is newer. Considering it as an available update...\n");
+			steamUpdateStatus = STEAM_LAUNCHER_UPDATE_AVAILABLE;
+			return true;
+		}
+		Logger::Info("Could not identify the steam version as being newer. Ignoring.\n");
+		steamUpdateStatus = STEAM_LAUNCHER_UPDATE_UP_TO_DATE;
+		return false;
+	}
+
 	bool LauncherUpdateChecker::IsSelfUpdateAvailable(bool allowPreRelease, bool force,
 		std::string& version, std::string& url, curl::DownloadStringResult& fetchReleasesResult, SteamLauncherUpdateStatus& steamUpdateStatus) {
 
@@ -70,36 +103,7 @@ namespace Shared {
 				return false;
 			}
 			Logger::Warn("Failed to fetch releases from GitHub. Trying Steam...\n");
-			if (!Filesystem::SafeExists("steamentrydir.txt")) {
-				Logger::Warn("steamentrydir.txt does not exist. Cannot proceed.\n");
-				steamUpdateStatus = STEAM_LAUNCHER_UPDATE_FAILED;
-				return false;
-			}
-			std::ifstream in("steamentrydir.txt");
-			std::ostringstream ss;
-			ss << in.rdbuf();
-			url = ss.str(); //yes, I use url for the local dir, sue me
-			if (!Filesystem::SafeExists(url + "/versiontracker/versionlauncher.txt")) {
-				Logger::Error("versionlauncher.txt does not exist. Cannot proceed.\n");
-				steamUpdateStatus = STEAM_LAUNCHER_UPDATE_FAILED;
-				return false;
-			}
-			std::ifstream in2(url + "/versiontracker/versionlauncher.txt");
-			std::ostringstream ss2;
-			ss2 << in2.rdbuf();
-			std::string availableversion = ss2.str();
-			std::string currversion = ::Launcher::LAUNCHER_VERSION;
-			version = availableversion;
-			_hasRelease = true;
-			Logger::Info("Comparing current version `%s` with steam version `%s`...\n", currversion.c_str(), availableversion.c_str());
-			if (LauncherVersion(currversion) < LauncherVersion(availableversion)) {
-				Logger::Info("Steam version is newer. Considering it as an available update...\n");
-				steamUpdateStatus = STEAM_LAUNCHER_UPDATE_AVAILABLE;
-				return true;
-			}
-			Logger::Info("Could not identify the steam version as being newer. Ignoring.\n");
-			steamUpdateStatus = STEAM_LAUNCHER_UPDATE_UP_TO_DATE;
-			return false;
+			return IsSteamSelfUpdateAvailable(version, url, steamUpdateStatus);
 		}
 
 		_hasRelease = true;

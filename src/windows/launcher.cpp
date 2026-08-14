@@ -150,6 +150,11 @@ namespace Launcher {
 		SetBackgroundColour(wxColour(237, 237, 237));
 		SetIcon(wxICON(IDI_ICON1));
 		CenterOnScreen();
+
+		_logWindow.Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::LAUNCHER_VERSION);
+		_logWindow.Log("Current directory is: %s", std::filesystem::current_path().u8string().c_str());
+		_logWindow.Log("Using configuration file %s\n", LauncherConfiguration::GetConfigurationPathUTF8().c_str());
+		_logWindow.Log("Command line: %s", utils::ConvertToUTF8(GetCommandLineW()).c_str());
 	}
 
 	LauncherMainWindow::~LauncherMainWindow() {
@@ -742,10 +747,6 @@ namespace Launcher {
 			"Unstable launcher version", wxCENTER | wxICON_WARNING);
 		LogWarn("Running an unstable version of the launcher");
 #endif */
-		_logWindow.Log("Welcome to the REPENTOGON Launcher (version %s)", Launcher::LAUNCHER_VERSION);
-		_logWindow.Log("Current directory is: %s", std::filesystem::current_path().u8string().c_str());
-		_logWindow.Log("Using configuration file %s\n", LauncherConfiguration::GetConfigurationPathUTF8().c_str());
-		_logWindow.Log("Command line: %s", utils::ConvertToUTF8(GetCommandLineW()).c_str());
 
 		OneTimeIsaacPathInitialization();
 		InitializeOptions();
@@ -953,7 +954,7 @@ namespace Launcher {
 	void LauncherMainWindow::ForceLauncherUpdate(bool allowUnstable) {
 		_logWindow.Log("Performing self-update (forcibly triggered)...");
 		EnableInterface(false);
-		Launcher::HandleSelfUpdate(this, allowUnstable, true);
+		Launcher::HandleSelfUpdate(this, allowUnstable, true, false);
 		EnableInterface(true);
 	}
 

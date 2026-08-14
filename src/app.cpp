@@ -139,10 +139,12 @@ bool Launcher::App::OnInit() {
 	__installation = new Installation(&__nopLogGUI, &__configuration);
 	_mainFrame = CreateMainWindow();
 	_mainFrame->EnableInterface(false);
+	__installation->SetGUI(_mainFrame->GetLogWindow());
 
 	if (sCLI->CheckSelfUpdate()) {
 		Logger::Info("Self-update startup check requested...\n");
-		HandleSelfUpdate(_mainFrame, sCLI->UnstableLauncher(), true);
+		HandleSelfUpdate(_mainFrame, sCLI->UnstableLauncher(), true, true);
+		Logger::Info("Self-update startup check completed.\n");
 	}
 
 	std::optional<std::string> const& configurationHint = sCLI->ConfigurationPath();

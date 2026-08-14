@@ -58,13 +58,15 @@ namespace Updater {
 	const char* CheckSelfUpdateLauncherArg = "--check-self-update";
 
 	const std::unordered_map<UpdaterState, const char*> UpdaterStateProgressBarLabels = {
-		{ UPDATER_CHECKING_FOR_UPDATE, "REPENTOGON Launcher Updater: Checking for update..." },
-		{ UPDATER_DOWNLOADING_UPDATE, "REPENTOGON Launcher Updater: Downloading update..." },
-		{ UPDATER_INSTALLING_UPDATE, "REPENTOGON Launcher Updater: Installing update..." },
-		{ UPDATER_STARTING_LAUNCHER, "REPENTOGON Launcher Updater: Starting launcher..." },
+		{ UPDATER_CHECKING_FOR_UPDATE, "Checking for update..." },
+		{ UPDATER_DOWNLOADING_UPDATE, "Downloading update..." },
+		{ UPDATER_INSTALLING_UPDATE, "Installing update..." },
+		{ UPDATER_STARTING_LAUNCHER, "Starting launcher..." },
 	};
 
 	std::atomic<UpdaterState> _currentState = UPDATER_STARTUP;
+
+	std::atomic<bool> _cancelRequested = false;
 
 	void CreateUnfinishedUpdateMarker() {
 		std::ofstream file(UnfinishedUpdateMarker);
@@ -315,6 +317,21 @@ void Updater::CheckSteamAppIdTxt() {
 	}
 }
 
+constexpr UINT_PTR IDC_CANCEL_BUTTON = 101;
+constexpr UINT_PTR IDC_STATUS_LABEL = 102;
+
+LRESULT CALLBACK ProgressBarWndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+	if (uMsg == WM_COMMAND) {
+		if (LOWORD(wParam) == IDC_CANCEL_BUTTON && HIWORD(wParam) == BN_CLICKED) {
+			EnableWindow((HWND)lParam, FALSE);
+			Updater::_cancelRequested.store(true);
+			Logger::Info("User clicked cancel button.\n");
+			return 0;
+		}
+	}
+	return DefWindowProcA(hwnd, uMsg, wParam, lParam);
+}
+
 std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(POINT windowPos) {
 	HINSTANCE hInstance = GetModuleHandle(NULL);
 
@@ -324,7 +341,7 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(POINT wi
 		windowClass.cbSize = sizeof(windowClass);
 		windowClass.lpszClassName = "SelfUpdaterProgressBar";
 		windowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW);
-		windowClass.lpfnWndProc = DefWindowProcA;
+		windowClass.lpfnWndProc = ProgressBarWndProc;
 		windowClass.hInstance = hInstance;
 		windowClass.style = windowClass.style | CS_NOCLOSE;
 
@@ -340,7 +357,7 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(POINT wi
 	// Create main window
 	auto window = std::make_unique<UniqueWindow>(nullptr, windowClass.lpszClassName,
 		Updater::UpdaterProcessName, WS_POPUPWINDOW | WS_CAPTION | WS_SYSMENU,
-		windowPos.x - 225, windowPos.y - 30, 450, 95, windowClass.hInstance);
+		windowPos.x - 225, windowPos.y - 30, 450, 120, windowClass.hInstance);
 	HWND windowHandle = window->GetHandle();
 	if (windowHandle == NULL) {
 		Logger::Error("Error creating progress bar window (%d)\n", GetLastError());
@@ -354,6 +371,24 @@ std::unique_ptr<Updater::UniqueWindow> Updater::CreateProgressBarWindow(POINT wi
 		return nullptr;
 	}
 	SendMessageA(progressBar, PBM_SETMARQUEE, TRUE, NULL);
+
+	// Add status label
+	HWND statusLabel = CreateWindowExA(0, "STATIC", "", WS_CHILD | WS_VISIBLE | SS_LEFT, 15, 53, 310, 28, windowHandle, (HMENU)IDC_STATUS_LABEL, windowClass.hInstance, NULL);
+	if (statusLabel == NULL) {
+		Logger::Error("Error creating progress bar status label (%d)\n", GetLastError());
+		return nullptr;
+	}
+	HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+	SendMessageA(statusLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+	// Add cancel button
+	HWND cancelButton = CreateWindowExA(0, "BUTTON", "Cancel", WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON, 335, 48, 80, 26, windowHandle, (HMENU)IDC_CANCEL_BUTTON, windowClass.hInstance, NULL);
+	if (cancelButton == NULL) {
+		Logger::Error("Error creating progress bar cancel button (%d)\n", GetLastError());
+		return nullptr;
+	}
+	ShowWindow(cancelButton, SW_HIDE);
+	EnableWindow(cancelButton, FALSE);
 
 	// Finish window init
 	ShowWindow(windowHandle, SW_SHOWDEFAULT);
@@ -372,6 +407,9 @@ void Updater::ProgressBarThread(POINT windowPos) {
 
 	MSG msg = {};
 
+	std::chrono::steady_clock::time_point lastStateChange = std::chrono::steady_clock::now();
+	bool enabledCancelButton = false;
+
 	while (true) {
 		while (PeekMessageA(&msg, NULL, 0, 0, PM_REMOVE)) {
 			TranslateMessage(&msg);
@@ -387,6 +425,7 @@ void Updater::ProgressBarThread(POINT windowPos) {
 			break;
 		} else if (currentState != state) {
 			state = currentState;
+			lastStateChange = std::chrono::steady_clock::now();
 
 			if (UpdaterStateProgressBarLabels.find(state) != UpdaterStateProgressBarLabels.end()) {
 				if (!progressBarWindow) {
@@ -403,9 +442,18 @@ void Updater::ProgressBarThread(POINT windowPos) {
 					}
 				}
 				SetForegroundWindow(progressBarWindow->GetHandle());
-				if (!SetWindowTextA(progressBarWindow->GetHandle(), UpdaterStateProgressBarLabels.at(state))) {
-					Logger::Error("Error trying to set text of progress bar window (%d)\n", GetLastError());
+
+				// Update the current status label
+				HWND statusLabel = GetDlgItem(progressBarWindow->GetHandle(), IDC_STATUS_LABEL);
+				if (statusLabel && !SetWindowTextA(statusLabel, UpdaterStateProgressBarLabels.at(state))) {
+					Logger::Error("Error trying to set progress bar status label (%d)\n", GetLastError());
 					break;
+				}
+
+				if (enabledCancelButton) {
+					if (HWND cancelButton = GetDlgItem(progressBarWindow->GetHandle(), IDC_CANCEL_BUTTON)) {
+						EnableWindow(cancelButton, FALSE);
+					}
 				}
 			} else if (progressBarWindow) {
 				// Disable the progress bar window and stop the marquee (most likely the user is being prompted)
@@ -415,12 +463,27 @@ void Updater::ProgressBarThread(POINT windowPos) {
 					}
 				}
 			}
+		} else if (!enabledCancelButton && state == UpdaterState::UPDATER_CHECKING_FOR_UPDATE) {
+			int64_t secondsElapsed = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - lastStateChange).count();
+			if (secondsElapsed >= 5) {
+				if (HWND cancelButton = GetDlgItem(progressBarWindow->GetHandle(), IDC_CANCEL_BUTTON)) {
+					ShowWindow(cancelButton, SW_SHOW);
+					EnableWindow(cancelButton, TRUE);
+				}
+				enabledCancelButton = true;
+			}
 		}
 	}
 
 	Logger::Info("Progress bar thread ended.\n");
 }
 
+Updater::SelfUpdateCheckInfo Updater::SelfUpdateCheckThread(std::shared_ptr<Updater::LauncherUpdateManager> manager, const bool allowUnstable, const bool forceUpdate) {
+	std::string version;
+	std::string url;
+	LauncherUpdateManager::SelfUpdateCheckResult checkResult = manager->CheckSelfUpdateAvailability(allowUnstable, forceUpdate, version, url);
+	return SelfUpdateCheckInfo(std::move(version), std::move(url), checkResult);
+}
 
 Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, HWND mainWindow) {
 	Logger::Info("TryUpdateLauncher started.\n");
@@ -469,7 +532,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	// Check for available updates.
 	using lu = LauncherUpdateManager;
-	lu updateManager;
+	auto updateManager = std::make_shared<LauncherUpdateManager>();
 
 	const bool allowUnstable = Utils::AllowUnstable(argc, argv);
 	if (allowUnstable) {
@@ -494,7 +557,32 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	const bool skipConfirmation = urlGiven || forceUpdate;
 
 	if (!urlGiven) {
-		lu::SelfUpdateCheckResult checkResult = updateManager.CheckSelfUpdateAvailability(allowUnstable, forceUpdate, version, url);
+		// Check for updates on a separate (non-blocking) thread, so that in case it hangs (on something like the dns) we can give the user the option to cancel.
+		auto updateCheckTask = std::make_shared<std::packaged_task<SelfUpdateCheckInfo()>>(
+			[=]() { return SelfUpdateCheckThread(updateManager, allowUnstable, forceUpdate); }
+		);
+		std::future<SelfUpdateCheckInfo> updateCheckFuture = updateCheckTask->get_future();
+		std::thread updateCheckThread([updateCheckTask]() { (*updateCheckTask)(); });
+		updateCheckThread.detach();
+
+		std::future_status status;
+		do {
+			if (_cancelRequested.load()) {
+				Logger::Info("User requested to cancel update check.\n");
+				return UPDATE_SKIPPED;
+			}
+
+			status = updateCheckFuture.wait_for(std::chrono::milliseconds(20));
+		} while (status != std::future_status::ready);
+
+		SelfUpdateCheckInfo updateCheckInfo = updateCheckFuture.get();
+		lu::SelfUpdateCheckResult checkResult = updateCheckInfo.result;
+		if (!updateCheckInfo.url.empty()) {
+			url = updateCheckInfo.url;
+		}
+		if (!updateCheckInfo.version.empty()) {
+			version = updateCheckInfo.version;
+		}
 
 		switch (checkResult) {
 		case lu::SELF_UPDATE_CHECK_UP_TO_DATE:
@@ -506,14 +594,10 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 			}
 			break;
 
-		case lu::SELF_UPDATE_CHECK_STEAM_METHOD_FAILED:
-			Logger::Error("Error while checking for updates, and failed to use steam as a backup. Passing along to the launcher to try again using the Steam API.\n");
-			return UPDATE_CHECK_STEAM_METHOD_FAILED;
-
 		case lu::SELF_UPDATE_CHECK_ERR_GENERIC:
-			SetCurrentUpdaterState(UPDATER_FAILED);
-			ShowMessageBox(mainWindow, "An error was encountered while checking for the availability of updates. Check the log file for more details.\n", MB_ICONERROR);
-			return UPDATE_ERROR;
+		case lu::SELF_UPDATE_CHECK_STEAM_METHOD_FAILED:
+			Logger::Error("Error while checking for updates.\n");
+			return UPDATE_CHECK_FAILED;
 
 		case lu::SELF_UPDATE_CHECK_UPDATE_AVAILABLE:
 			Logger::Info("Found available update version: %s (from %s)\n", version.c_str(), url.c_str());
@@ -555,7 +639,7 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	std::string updateZipFilename;
 
-	if (!updateManager.DownloadUpdate(url, updateZipFilename)) {
+	if (!updateManager->DownloadUpdate(url, updateZipFilename)) {
 		SetCurrentUpdaterState(UPDATER_FAILED);
 		ShowMessageBox(mainWindow, "Failed to download the update for the launcher. Check the log file for more details.\n", MB_ICONERROR);
 		Logger::Error("Error trying to download update from URL: %s\n", url.c_str());
@@ -698,6 +782,9 @@ typedef int(__stdcall* LAUNCHERPROC)(int argc, char** argv);
 
 int Updater::RunLauncher(HWND mainWindow, int argc, char** argv, bool checkUpdates) {
 	Updater::SetCurrentUpdaterState(Updater::UPDATER_STARTING_LAUNCHER);
+
+	// This is dumb but helps avoid focus issues while the progress bar thread kills itself.
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
 	Logger::Info("Preparing to start launcher...\n");
 
@@ -885,9 +972,9 @@ int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 	switch (result) {
 	case Updater::UPDATE_ALREADY_UP_TO_DATE:
 	case Updater::UPDATE_SKIPPED:
-	case Updater::UPDATE_CHECK_STEAM_METHOD_FAILED:
+	case Updater::UPDATE_CHECK_FAILED:
 		// Run the launcher!
-		res = Updater::RunLauncher(mainWindow, argc, argv, result == Updater::UPDATE_CHECK_STEAM_METHOD_FAILED);
+		res = Updater::RunLauncher(mainWindow, argc, argv, result == Updater::UPDATE_CHECK_FAILED);
 		break;
 
 	case Updater::UPDATE_SUCCESSFUL:

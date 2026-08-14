@@ -71,7 +71,7 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	ClearInstallation();
 	_installationState = REPENTOGON_INSTALLATION_STATUS_NONE;
 
-	_gui->Log("Checking for validity of Repentogon installation...\n");
+	// _gui->Log("Checking for validity of Repentogon installation...\n");
 
 	if (repentogonFolder.empty()) {
 		_gui->LogError("Cannot check for a Repentogon installation without being "
@@ -205,7 +205,7 @@ bool RepentogonInstallation::Validate(std::string const& installationFolder) {
 	}
 
 	_repentogonZHLVersionMatch = true;
-	_gui->Log("Found a valid installation of Repentogon (version %s)\n", _zhlVersion.c_str());
+	// _gui->Log("Found a valid installation of Repentogon (version %s)\n", _zhlVersion.c_str());
 	Logger::Info("RepentogonInstallation::Validate: Repentogon installation in %s is valid\n",
 		installationFolder.c_str());
 	_installationState = REPENTOGON_INSTALLATION_STATUS_MODERN;

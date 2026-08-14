@@ -8,6 +8,7 @@
 #include <string>
 
 #include "self_updater/unique_window.h"
+#include "self_updater/launcher_update_manager.h"
 
 namespace Updater {
 	/* Name of the CLI flag that causes the lock file to be ignored. */
@@ -24,7 +25,7 @@ namespace Updater {
 	// Represents the final state of an attempted execution.
 	enum UpdateLauncherResult {
 		UPDATE_ERROR,
-		UPDATE_CHECK_STEAM_METHOD_FAILED,
+		UPDATE_CHECK_FAILED,
 		UPDATE_ALREADY_UP_TO_DATE,
 		UPDATE_SKIPPED,
 		UPDATE_SUCCESSFUL,
@@ -98,6 +99,16 @@ namespace Updater {
 	// A progress bar window is created/run on a separate thread so that it doesn't freeze during the update.
 	// The handle of the progress bar window is sent back to the main thread via the promise.
 	void ProgressBarThread(POINT windowPos);
+
+	// Aggregated outputs of LauncherUpdateManager::CheckSelfUpdateAvailability
+	struct SelfUpdateCheckInfo {
+		std::string version;
+		std::string url;
+		LauncherUpdateManager::SelfUpdateCheckResult result;
+	};
+
+	// Executes LauncherUpdateManager::CheckSelfUpdateAvailability and returns the results.
+	SelfUpdateCheckInfo SelfUpdateCheckThread(std::shared_ptr<LauncherUpdateManager> manager, const bool allowUnstable, const bool forceUpdate);
 
 	// "Main" function that initiates the self-update process.
 	UpdateLauncherResult TryUpdateLauncher(int argc, char** argv, HWND mainWindow);

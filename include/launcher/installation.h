@@ -40,6 +40,8 @@ namespace Launcher {
 
 		inline void SetGUI(ILoggableGUI* gui) {
 			_gui = gui;
+			_repentogonInstallation.SetGUI(gui);
+			_isaacInstallation.SetGUI(gui);
 		}
 
 		int SetIsaacExecutable(std::string const& file);

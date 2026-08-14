@@ -99,6 +99,10 @@ namespace Launcher {
 			return _unstableRepentogon->GetValue();
 		}
 
+		wxTextCtrlLog* GetLogWindow() {
+			return &_logWindow;
+		}
+
 	private:
 		/* Window building. */
 		void AddLauncherConfigurationOptions();

@@ -298,6 +298,10 @@ bool InstallationData::Validate(std::string const& sourcePath, bool repentogon) 
 		return false;
 	}
 
+	if (!repentogon && _patchAvailability == ISAAC_PATCH_ONLINE_CHECK_FAILED) {
+		_gui->LogError("Failed to download patch files. This may cause the vanilla executable to be considered incompatible with REPENTOGON. See launcher.log for more details.\n");
+	}
+
 	std::string steamAppidPath = _folderPath + "\\steam_appid.txt";
 	if (repentogon && !Filesystem::Exists(steamAppidPath.c_str())) {
 		Logger::Warn("Repentogon installation folder %s has no steam_appid.txt file, "
@@ -527,8 +531,8 @@ OnlinePatchCheckResult CheckIfAvailableOnlineNGet(const std::string& currexehash
 
 
 bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
-	if (_vanillaexeispatchable > 0) {
-		return _vanillaexeispatchable == 1; //so it doesnt do the whole check and we can call this a shitton of times without worrying, the vanilla exe shouldnt change while the launcher is open anyway, since the launcher doesnt update it and...if it does, just fucking restart the launcher, dude
+	if (_patchAvailability != ISAAC_PATCH_NOT_CHECKED) {
+		return _patchAvailability == ISAAC_PATCH_AVAILABLE; //so it doesnt do the whole check and we can call this a shitton of times without worrying, the vanilla exe shouldnt change while the launcher is open anyway, since the launcher doesnt update it and...if it does, just fucking restart the launcher, dude
 	}
 	std::string vanillaexehash;
 	HashResult result = Sha256::Sha256F(this->GetExePath().c_str(), vanillaexehash);
@@ -545,7 +549,7 @@ bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
 				[](unsigned char c) { return std::tolower(c); });
 
 			if (vanillaexehash == currexehash) {
-				_vanillaexeispatchable = 1;
+				_patchAvailability = ISAAC_PATCH_AVAILABLE;
 				return true;
 			} else {
 				Logger::Warn("InstallationData::PatchIsAvailable: Available patch's exe hash does not match the vanilla exe!\n");
@@ -566,11 +570,12 @@ bool InstallationData::PatchIsAvailable(const bool skipOnlineCheck) {
 			} else if (onlineCheckResult == ONLINE_PATCH_NOT_FOUND) {
 				Logger::Info("InstallationData::PatchIsAvailable: No online patch found.\n");
 			} else {
-				MessageBoxA(NULL, "Failed to download patch files. This may cause the vanilla executable to be considered incompatible with REPENTOGON.\n\nSee launcher.log for more details.", "REPENTOGON Launcher", MB_ICONERROR);
+				_patchAvailability = ISAAC_PATCH_ONLINE_CHECK_FAILED;
+				return false;
 			}
 		}
 	}
-	_vanillaexeispatchable = 0;
+	_patchAvailability = ISAAC_PATCH_NOT_AVAILABLE;
 	return false;
 }
 

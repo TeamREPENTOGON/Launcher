@@ -7,13 +7,14 @@
 #include "launcher/launcher_self_update.h"
 #include "launcher/version.h"
 #include "launcher/steam_workshop.h"
+#include "shared/filesystem.h"
 #include "shared/github_executor.h"
 #include "shared/logger.h"
 #include "shared/launcher_update_checker.h"
 #include "wx/busyinfo.h"
 
 namespace Launcher {
-	void HandleSelfUpdate(LauncherMainWindow* mainWindow, bool allowUnstable, bool force) {
+	void HandleSelfUpdate(LauncherMainWindow* mainWindow, bool allowUnstable, bool force, bool steamOnly) {
 		Shared::LauncherUpdateChecker checker;
 		std::string version, url;
 		curl::DownloadStringResult result;
@@ -24,14 +25,25 @@ namespace Launcher {
 		{
 			wxBusyInfo wait("Checking for launcher updates, please wait...", mainWindow);
 
-			updateAvailable = checker.IsSelfUpdateAvailable(allowUnstable, force, version, url, result, steamUpdateStatus);
-
-			if (!updateAvailable && steamUpdateStatus == Shared::STEAM_LAUNCHER_UPDATE_FAILED) {
-				// (Re)generate steamentrydir.txt (also checks the workshop item being subbed/downloaded) and try again.
-				if (!SteamWorkshop::CreateSteamEntryDirFile()) {
+			if (steamOnly) {
+				// We only get here when curl already failed previously.
+				result = curl::DOWNLOAD_STRING_BAD_CURL;
+				if (!Filesystem::SafeExists("steamentrydir.txt") && !SteamWorkshop::CreateSteamEntryDirFile()) {
 					Logger::Error("Failed to create steamentrydir.txt\n");
+					steamUpdateStatus = Shared::STEAM_LAUNCHER_UPDATE_FAILED;
+				} else {
+					updateAvailable = checker.IsSteamSelfUpdateAvailable(version, url, steamUpdateStatus);
 				}
+			} else {
 				updateAvailable = checker.IsSelfUpdateAvailable(allowUnstable, force, version, url, result, steamUpdateStatus);
+
+				if (!updateAvailable && steamUpdateStatus == Shared::STEAM_LAUNCHER_UPDATE_FAILED) {
+					// (Re)generate steamentrydir.txt (also checks the workshop item being subbed/downloaded) and try again.
+					if (!SteamWorkshop::CreateSteamEntryDirFile()) {
+						Logger::Error("Failed to create steamentrydir.txt\n");
+					}
+					updateAvailable = checker.IsSelfUpdateAvailable(allowUnstable, force, version, url, result, steamUpdateStatus);
+				}
 			}
 		}
 
@@ -49,7 +61,7 @@ namespace Launcher {
 				wxGetApp().RestartForSelfUpdate(url, version);
 			}
 		} else if (result != curl::DOWNLOAD_STRING_OK && steamUpdateStatus != Shared::STEAM_LAUNCHER_UPDATE_UP_TO_DATE) {
-			wxMessageBox("An error was encountered while checking for launcher updates. Check the log file for more details.", "REPENTOGON Launcher Error", wxICON_ERROR, mainWindow);
+			mainWindow->GetLogWindow()->LogError("An error was encountered while checking for launcher updates. Check the log file for more details.");
 		}
 	}
 }

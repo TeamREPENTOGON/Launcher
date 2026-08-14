@@ -54,6 +54,9 @@ namespace Shared {
 		 */
 		bool IsSelfUpdateAvailable(bool allowPreRelease, bool force,
 			std::string& version, std::string& url, curl::DownloadStringResult& fetchReleaseResult, SteamLauncherUpdateStatus& steamUpdateStatus);
+		
+		// Check if an update of the launcher is available through the backup Steam Workshop method.
+		bool IsSteamSelfUpdateAvailable(std::string& version, std::string& url, SteamLauncherUpdateStatus& steamUpdateStatus);
 
 		/* Select the target release for a self update.
 		 *

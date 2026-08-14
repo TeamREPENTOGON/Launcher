@@ -127,6 +127,10 @@ public:
 
 	static bool IsIsaacVersionCompatible(const char* version);
 
+	inline void SetGUI(ILoggableGUI* gui) {
+		_gui = gui;
+	}
+
 	friend class Launcher::Installation;
 private:
 	void Invalidate();
