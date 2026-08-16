@@ -19,8 +19,6 @@
 #include "launcher/version.h"
 #include "zip.h"
 
-#include <shlobj.h>
-#include <knownfolders.h>
 
 // Enables windows visual styles for a nicer-looking progress bar & the marquee style.
 // Incantation obtained from official docs: https://learn.microsoft.com/en-us/windows/win32/controls/cookbook-overview
@@ -854,82 +852,7 @@ bool Updater::Restart(int argc, char** argv) {
 
 
 
-
-bool RunningFromAppData()
-{
-	try {
-		wchar_t exePath[MAX_PATH];
-		GetModuleFileNameW(NULL, exePath, MAX_PATH);
-		std::filesystem::path currentDir = std::filesystem::path(exePath).parent_path();
-
-		PWSTR path = nullptr;
-		if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path))) // Mr Microsoft says this is the way to get it
-			return true; //at this point, assume copying to appdata is not possible and run normally....I guess?
-		std::filesystem::path appdatadir(path);
-
-		auto appDir = appdatadir / "REPENTOGONLauncher";
-		if (std::filesystem::exists(appDir) && std::filesystem::equivalent(currentDir, appDir))
-			return true;
-		std::filesystem::create_directories(appDir);
-
-		if (!std::filesystem::exists(appDir / "REPENTOGONLauncher.exe")) {
-			std::filesystem::copy_file(currentDir / "REPENTOGONLauncher.exe", appDir / "REPENTOGONLauncher.exe", std::filesystem::copy_options::overwrite_existing);
-			if (std::filesystem::exists(currentDir / "launcher-data.bin")) { //the launcher an get this from an update anyway if some clueless dude didnt extract it didnt extract it
-				std::filesystem::copy_file(currentDir / "launcher-data.bin", appDir / "launcher-data.bin", std::filesystem::copy_options::overwrite_existing);
-			}
-			std::ofstream file((appDir / L"steam_appid.txt").wstring(), std::ios::trunc);
-			if (file)
-			{
-				file << "250900";
-				file.close();
-			}
-		}
-
-		int argc;
-		LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-		std::wstring params;
-		for (int i = 1; i < argc; ++i) //peeling off the husk caller exe as a param
-		{
-			if (!params.empty())
-				params += L' ';
-
-			params += L'"';
-			params += argv[i];
-			params += L'"';
-		}
-		//ShellExecuteW(nullptr, L"open", (appDir / L"REPENTOGONLauncher.exe").c_str(), params.empty() ? nullptr : params.c_str(), appDir.c_str(), SW_SHOWNORMAL); //I vaguely remember us having issues with this one, so Im biting the turd here and doing it the annoying way...
-
-		std::wstring exe = (appDir / L"REPENTOGONLauncher.exe").wstring();
-		std::wstring cmdLine = L"\"" + exe + L"\"";
-		if (!params.empty()){
-			cmdLine += L" ";
-			cmdLine += params;
-		}
-
-		std::vector<wchar_t> cmdBuffer(cmdLine.begin(), cmdLine.end());
-		cmdBuffer.push_back(L'\0');
-
-		STARTUPINFOW si{};
-		si.cb = sizeof(si);
-		PROCESS_INFORMATION pi{};
-		if (CreateProcessW(exe.c_str(),cmdBuffer.data(),nullptr,nullptr,FALSE,0,nullptr,appDir.c_str(),&si,&pi))
-		{
-			CloseHandle(pi.hThread);
-			CloseHandle(pi.hProcess);
-		}
-		else {
-			return true; //failed to create the process from appdata, so just launch normally as a failsafe
-		}
-		return false;
-	}
-	catch (const std::exception& ex) { //failsafe, if this process fails, the launcher should launch at location, classic style
-		return true;
-	}
-}
-
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
-	if (!RunningFromAppData()) //appdata baton pass
-		ExitProcess(-1);
 	SetWorkingDirToExe();
 	Logger::Init("updater.log", true);
 	Logger::Info("Updater started with command-line args: %s\n", cli);
