@@ -40,7 +40,7 @@ void RepentogonInstallerFrame::Initialize() {
 			}
 		});
 	SetSize(640, 480);
-	SetBackgroundColour(wxColour(240, 240, 240));
+	SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_BTNFACE));
 	SetSizeHints(640, 480, 640, 480);
 	SetSizer(sizer);
 	sizer->Add(logWindow, wxSizerFlags().Expand().Border(240, 5));
