@@ -205,8 +205,14 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     listSizer->Add(rightBox, 1, wxEXPAND);
 
     wxBoxSizer* saveLoadBox = new wxBoxSizer(wxVERTICAL);
-    saveLoadBox->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_SAVE, "Save..."), 0, wxEXPAND | wxALL, 5);
-    saveLoadBox->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_LOAD, "Load..."), 0, wxEXPAND | wxALL, 5);
+    wxButton* exportbtn = new wxButton(panel, WINDOW_BUTTON_MODMAN_SAVE, "Export");
+    wxButton* importbtn = new wxButton(panel, WINDOW_BUTTON_MODMAN_SAVE, "Import");
+
+    exportbtn->SetToolTip("Exports List of enabled Mods as .txt");
+    importbtn->SetToolTip("Imports .txt list of enabled Mods, asks Steam to download the ones you dont have!");
+
+    saveLoadBox->Add(exportbtn, 0, wxEXPAND | wxALL, 5);
+    saveLoadBox->Add(importbtn, 0, wxEXPAND | wxALL, 5);
     listSizer->Add(saveLoadBox, 0, wxALIGN_TOP);
 
     rightPanel->Add(listSizer, 1, wxEXPAND);
