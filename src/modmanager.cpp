@@ -206,7 +206,7 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
 
     wxBoxSizer* saveLoadBox = new wxBoxSizer(wxVERTICAL);
     wxButton* exportbtn = new wxButton(panel, WINDOW_BUTTON_MODMAN_SAVE, "Export");
-    wxButton* importbtn = new wxButton(panel, WINDOW_BUTTON_MODMAN_SAVE, "Import");
+    wxButton* importbtn = new wxButton(panel, WINDOW_BUTTON_MODMAN_LOAD, "Import");
 
     exportbtn->SetToolTip("Exports List of enabled Mods as .txt");
     importbtn->SetToolTip("Imports .txt list of enabled Mods, asks Steam to download the ones you dont have!");
