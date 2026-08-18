@@ -1082,7 +1082,7 @@ ModManagerReinstallDialog::ModManagerReinstallDialog(wxWindow* parent, const uin
 	cancelButton_ = new wxButton(this, wxID_CANCEL, "Cancel");
     cancelButton_->SetMinSize(wxSize(100, 50));
 	h->AddStretchSpacer();
-	h->Add(cancelButton_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 1);
+	h->Add(cancelButton_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
 	v->Add(h, 0, wxEXPAND);
 	SetSizer(v);
 	Centre();
@@ -1162,7 +1162,7 @@ void ModManagerReinstallDialog::TryReinstallMod() {
 		}
 
 		Logger::Info("[ModManager] Requesting download from Steam...\n");
-		if (!SteamUGC()->DownloadItem(workshopid_, false)) {
+		if (!SteamUGC()->DownloadItem(workshopid_, true)) {
 			Logger::Info("[ModManager] ...Failed!\n");
 			wxMessageDialog(this, "Reinstall failed - could not request download from Steam.", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
 			return;
