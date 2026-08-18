@@ -26,15 +26,22 @@ namespace fs = std::filesystem;
 class ModUpdateDialog : public wxDialog {
 public:
     wxTextCtrlLog* launcherlogger;
+    uint64_t toupdate = 0;
 
     ModUpdateDialog(wxWindow* parent,
-        const fs::path& targetModsDir,wxTextCtrlLog* logger)
+        const fs::path& targetModsDir,wxTextCtrlLog* logger, uint64_t updateentryid = 0)
         : wxDialog(parent, wxID_ANY, "Copying Mod files from Steam...",
             wxDefaultPosition, wxSize(600, 300)),
         targetModsDir(targetModsDir), cancelrequest(false)
     {
-
+        toupdate = updateentryid;
         launcherlogger = logger;
+        if (launcherlogger == nullptr) {
+            wxTextCtrl* dummy = new wxTextCtrl();
+            wxTextCtrlLog* dummylog = new wxTextCtrlLog(dummy);
+            launcherlogger = dummylog;
+        }
+
         wxBoxSizer* v = new wxBoxSizer(wxVERTICAL);
         statuslog = new wxListBox(this, wxID_ANY, wxDefaultPosition, wxSize(-1, 180));
         v->Add(statuslog, 1, wxEXPAND | wxALL, 8);
@@ -58,6 +65,26 @@ public:
         std::thread(&ModUpdateDialog::MainProc, this).detach();
     }
 
+    void OnNameQuery(
+        SteamUGCQueryCompleted_t* result,
+        bool ioFailure)
+    {
+        if (ioFailure || result->m_eResult != k_EResultOK)
+            return;
+
+        SteamUGCDetails_t details{};
+
+        if (SteamUGC()->GetQueryUGCResult(
+            result->m_handle,
+            0,
+            &details))
+        {
+            downloadingmodname = details.m_rgchTitle;
+        }
+
+        SteamUGC()->ReleaseQueryUGCRequest(result->m_handle);
+    }
+
 private:
     fs::path targetModsDir;
     uint32 appid = 250900;
@@ -69,6 +96,8 @@ private:
 
     std::thread mthread;
     std::atomic<bool> cancelrequest;
+    std::string downloadingmodname;
+    CCallResult<ModUpdateDialog, SteamUGCQueryCompleted_t> m_NameQueryCall;
 
     void PostProgressEvent(int prc,const std::string& message) {
         if (!message.empty()) {
@@ -98,7 +127,7 @@ private:
         int pct = evt.GetInt();
         wxString msg = evt.GetString();
 
-        if (!msg.IsEmpty() && msg.StartsWith("Processed ")) { //sue me
+        if (!msg.IsEmpty() && (msg.StartsWith("Processed ") || msg.StartsWith("Downloading ") || msg.StartsWith("Done with ") || msg.StartsWith("Preparing "))) { //sue me twice
             progresstxt->SetLabel(msg);
         }
         else {
@@ -254,6 +283,68 @@ private:
         return 0;
     }
 
+    void ModNameGetter(uint64_t id) {
+        downloadingmodname = std::to_string(id);
+        UGCQueryHandle_t query =
+            SteamUGC()->CreateQueryUGCDetailsRequest(&id, 1);
+
+        if (query != k_UGCQueryHandleInvalid) {
+            SteamAPICall_t call =
+                SteamUGC()->SendQueryUGCRequest(query);
+            m_NameQueryCall.Set(call, this, &ModUpdateDialog::OnNameQuery);
+        }
+    }
+
+    bool SteamDownloadNWait(int* overallPct, uint64_t id) {
+        if (!SteamUGC()->DownloadItem(id, true)) {
+            PostProgressEvent(*overallPct, "Download Failed! (steam couldnt get the mod)");
+            return false;
+        }
+
+        uint64_t sizeOnDisk = 0;
+        uint32_t timeStamp = 0;
+        char folderBuf[4096] = { 0 };
+
+        uint64 bytesDownloaded = 0;
+        uint64 bytesTotal = 0;
+
+        PostProgressEvent(*overallPct, "Attempting to download missing mod...");
+        ModNameGetter(id);
+        while (!cancelrequest) {
+            SteamAPI_RunCallbacks();
+
+            uint32 state = SteamUGC()->GetItemState(id); 
+
+            if (state & k_EItemStateDownloading) {
+                if (SteamUGC()->GetItemDownloadInfo(id, &bytesDownloaded, &bytesTotal)) {
+                    if ((bytesTotal > 0)) {
+                    int pct = static_cast<int>((bytesDownloaded * 100) / bytesTotal);
+                    std::string progress = std::to_string(bytesDownloaded / 1024 / 1024);
+                    if ((state & k_EItemStateDownloadPending) && (pct == 100)) { pct = 0; progress = "0"; }
+                        PostProgressEvent(pct,"Downloading " + downloadingmodname +" (" + progress + "mb / " + std::to_string(bytesTotal / 1024 / 1024) + "mb)");
+                    }
+                    else {
+                        PostProgressEvent(0, "Preparing " + downloadingmodname + " cache (Waiting for Steam)");
+                    }
+                }
+                else {
+                    PostProgressEvent(100, "Done with " + downloadingmodname + " cache...");
+                    return true;
+                }
+            }
+            else if ((state & k_EItemStateDownloadPending) == 0) {
+                PostProgressEvent(100, "Done with " + downloadingmodname + " cache...");
+                return true;
+            }
+            else {
+                PostProgressEvent(0, "Preparing " + downloadingmodname + " cache (Waiting for Steam)");
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+        return false;
+    }
+
     void MainProc() {
         if (!SteamAPI_Init()) {
             PostProgressEvent(0, "Warning: SteamAPI_Init() failed or already initialized. Proceeding...");
@@ -296,7 +387,16 @@ private:
         int idx = 0;
         std::unordered_set<uint64> subscribedIds;
 
-        PostProgressEvent(overallPct, "Checking mod versions for updating...");
+        if (toupdate > 0) {
+            subscribed.clear();
+            subscribed.push_back(toupdate);
+            totalToProcess = 1;
+            PostProgressEvent(overallPct, "Reinstalling requested mod...");
+        }
+        else {
+            PostProgressEvent(overallPct, "Checking mod versions for updating...");
+        }
+
         for (auto pfid : subscribed) {
             subscribedIds.insert(pfid);
             if (cancelrequest){
@@ -312,27 +412,38 @@ private:
             bool ok = SteamUGC()->GetItemInstallInfo(pfid, &sizeOnDisk, folderBuf,
                 (uint32)sizeof(folderBuf), &timeStamp);
             if (!ok) {
-                PostProgressEvent(overallPct,"Mod " + std::to_string(id) + " is unavailable, privated by the author or Steam is still downloading it!"); //we can separately account for these 2 cases later, steamapi does provide the tools, but Im staying away from that for now for the initial versions
-                overallPct = (idx * 100) / totalToProcess;
-                PostProgressEvent(overallPct,"Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
-                continue;
+                PostProgressEvent(overallPct,"Mod " + std::to_string(id) + " is unavailable, privated by the author or Steam is still downloading it!"); 
+                
+                //ModManagerReinstallDialog(this, id, std::to_wstring(id)).ShowModal(); // cant do this on a thread anyway...
+                if (!SteamDownloadNWait(&overallPct, id) || !SteamUGC()->GetItemInstallInfo(pfid, &sizeOnDisk, folderBuf,
+                    (uint32)sizeof(folderBuf), &timeStamp)) {
+                    PostProgressEvent(overallPct, "Mod " + std::to_string(id) + " failed to download or was canceled!");
+                    overallPct = (idx * 100) / totalToProcess;
+                    PostProgressEvent(overallPct,"Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
+                    continue;
+                }
             }
 
 
             fs::path cachePath = fs::path(folderBuf);
-            if (!Filesystem::SafeExists(cachePath) || !fs::is_directory(cachePath)) {
-                PostProgressEvent(overallPct,"Install folder missing for " + std::to_string(id));
-                overallPct = (idx * 100) / totalToProcess;
-                PostProgressEvent(overallPct,"Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
-                continue;
+            if (!Filesystem::SafeExists(cachePath) || !fs::is_directory(cachePath)) { //this happens when cache gets fucked and steam still believes it got cache for this mod AND WONT DOWNLOAD IT NATURALLY
+                PostProgressEvent(overallPct,"Cache folder missing for " + std::to_string(id));
+
+                if (!SteamDownloadNWait(&overallPct, id) || !Filesystem::SafeExists(cachePath) || !fs::is_directory(cachePath)) {
+                    overallPct = (idx * 100) / totalToProcess;
+                    PostProgressEvent(overallPct, "Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
+                    continue;
+                }
             }
 
             fs::path metadataPath = cachePath / "metadata.xml";
-            if (!Filesystem::SafeExists(metadataPath)) {
-                PostProgressEvent(overallPct,"Skipping " + std::to_string(id) + ": metadata.xml not found.");
-                overallPct = (idx * 100) / totalToProcess;
-                PostProgressEvent(overallPct,"Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
-                continue;
+            if (!Filesystem::SafeExists(metadataPath)) { //this happens if cache is corrupted
+                if (!SteamDownloadNWait(&overallPct, id) || !Filesystem::SafeExists(metadataPath)) {
+                    PostProgressEvent(overallPct, "Skipping " + std::to_string(id) + ": metadata.xml not found.");
+                    overallPct = (idx * 100) / totalToProcess;
+                    PostProgressEvent(overallPct, "Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
+                    continue;
+                }
             }
 
             std::string cacheName, cacheVersion;
@@ -403,7 +514,10 @@ private:
             overallPct = (idx * 100) / totalToProcess;
             PostProgressEvent(overallPct,"Processed " + std::to_string(idx) + " / " + std::to_string(totalToProcess));
         }
-
+        if (toupdate > 0) {
+            PostProgressEvent(overallPct, "FINISH: mod reinstall process finished.");
+            return;
+        }
 
         PostProgressEvent(overallPct, "Checking unsubbed mods for deletion...");
         for (auto& entry : fs::directory_iterator(targetModsDir)) {

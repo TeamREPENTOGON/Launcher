@@ -18,6 +18,7 @@
 #include "wx/mstream.h"
 #include "wx/filedlg.h"
 #include "wx/msgdlg.h"
+#include <launcher/modupdater.h>
 
 namespace fs = std::filesystem;
 
@@ -1048,6 +1049,8 @@ void ModManagerFrame::OnReinstall(wxCommandEvent&) {
 			return;
 		}
 		ModManagerReinstallDialog(this, id, selectedMod.displayName).ShowModal();
+        std::ofstream(_modspath / selectedMod.folderName / "Update.it"); //label for forced updating later   
+        ModUpdateDialog(nullptr, _modspath, nullptr, std::stoull(selectedMod.id)).ShowModal();
 	}
 }
 
@@ -1063,16 +1066,17 @@ ModManagerReinstallDialog::ModManagerReinstallDialog(wxWindow* parent, const uin
 
 	wxBoxSizer* v = new wxBoxSizer(wxVERTICAL);
 
-	statusLabel_ = new wxStaticText(this, wxID_ANY, "Deleting current installation...");
+	statusLabel_ = new wxStaticText(this, wxID_ANY, "Deleting current steam cache...");
 	v->Add(statusLabel_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
 	progressBar_ = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(-1, 24));
 	v->Add(progressBar_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
 	wxBoxSizer* h = new wxBoxSizer(wxHORIZONTAL);
-	cancelButton_ = new wxButton(this, wxID_CANCEL, "Dismiss");
+	cancelButton_ = new wxButton(this, wxID_CANCEL, "Cancel");
+    cancelButton_->SetMinSize(wxSize(100, 50));
 	h->AddStretchSpacer();
-	h->Add(cancelButton_, 0, wxALL, 5);
+	h->Add(cancelButton_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 1);
 	v->Add(h, 0, wxEXPAND);
 	SetSizer(v);
 	Centre();
@@ -1138,17 +1142,17 @@ void ModManagerReinstallDialog::TryReinstallMod() {
 		char folderPath[1024];
 		uint64 sizeOnDisk = 0;
 		uint32 timeStamp = 0;
-		Logger::Info("[ModManager] Getting current installation info...\n");
+		Logger::Info("[ModManager] Getting current cache info...\n");
 		if (SteamUGC()->GetItemInstallInfo(workshopid_, &sizeOnDisk, folderPath, sizeof(folderPath), &timeStamp)) {
-			Logger::Info("[ModManager] Deleting existing installation from `%s`...\n", folderPath);
+			Logger::Info("[ModManager] Deleting existing cache from `%s`...\n", folderPath);
 			// We CAN continue if this fails.
 			std::error_code err;
 			std::filesystem::remove_all(folderPath, err);
 			if (err) {
-				Logger::Error("[ModManager] Failed to delete mod files for reinstall: %s (%s:%d)\n", err.message().c_str(), err.category().name(), err.value());
+				Logger::Error("[ModManager] Failed to delete mod cache files for reinstall: %s (%s:%d)\n", err.message().c_str(), err.category().name(), err.value());
 			}
 		} else {
-			Logger::Info("[ModManager] ...No current installation found.\n");
+			Logger::Info("[ModManager] ...No current cache found.\n");
 		}
 
 		Logger::Info("[ModManager] Requesting download from Steam...\n");
@@ -1157,6 +1161,7 @@ void ModManagerReinstallDialog::TryReinstallMod() {
 			wxMessageDialog(this, "Reinstall failed - could not request download from Steam.", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
 			return;
 		}
+
 	}
 
 	do {
@@ -1189,8 +1194,8 @@ void ModManagerReinstallDialog::TryReinstallMod() {
 
 	if (cancelRequested_) {
 		Logger::Info("[ModManager] Dialog was dismissed by user.\n");
-	} else {
-		Logger::Info("[ModManager] Reinstallation complete!\n");
+	} else {     
+		Logger::Info("[ModManager] Cache deletion complete!, waiting for the modupdater...\n");
 	}
 }
 

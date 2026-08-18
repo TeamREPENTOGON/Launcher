@@ -323,6 +323,7 @@ namespace Launcher {
 	}
 
 	void LauncherMainWindow::OnModManagerButtonPressed(wxCommandEvent&) {
+		ModUpdateDialog(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "mods", &_logWindow).ShowModal();
 		ModManagerFrame* modWindow = new ModManagerFrame(this,_installation);
 		modWindow->Show();
 	}
