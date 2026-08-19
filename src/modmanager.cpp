@@ -1067,24 +1067,24 @@ void ModManagerFrame::OnClose(wxCommandEvent&) {
 // Reinstaller Dialog
 ModManagerReinstallDialog::ModManagerReinstallDialog(wxWindow* parent, const uint64_t workshopid, const std::wstring& modname)
 	: wxDialog(parent, wxID_ANY, L"Reinstalling " + modname + L"...",
-		wxDefaultPosition, wxSize(600, 130)), workshopid_(workshopid) {
+		wxDefaultPosition, wxDefaultSize), workshopid_(workshopid) {
 	Logger::Info("[ModManager] Reinstalling %ls...\n", modname.c_str());
 
 	wxBoxSizer* v = new wxBoxSizer(wxVERTICAL);
+	v->SetMinSize(wxSize(500, -1));
 
 	statusLabel_ = new wxStaticText(this, wxID_ANY, "Deleting current steam cache...");
-	v->Add(statusLabel_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
+	v->Add(statusLabel_, 0, wxEXPAND | wxALL, 8);
 
 	progressBar_ = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(-1, 24));
 	v->Add(progressBar_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
 	wxBoxSizer* h = new wxBoxSizer(wxHORIZONTAL);
 	cancelButton_ = new wxButton(this, wxID_CANCEL, "Cancel");
-    cancelButton_->SetMinSize(wxSize(100, 50));
 	h->AddStretchSpacer();
-	h->Add(cancelButton_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
+	h->Add(cancelButton_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxBOTTOM, 8);
 	v->Add(h, 0, wxEXPAND);
-	SetSizer(v);
+	SetSizerAndFit(v);
 	Centre();
 
 	timer_ = std::make_unique<wxTimer>(this, wxID_ANY);
@@ -1162,7 +1162,7 @@ void ModManagerReinstallDialog::TryReinstallMod() {
 		}
 
 		Logger::Info("[ModManager] Requesting download from Steam...\n");
-		if (!SteamUGC()->DownloadItem(workshopid_, true)) {
+		if (!SteamUGC()->DownloadItem(workshopid_, false)) {
 			Logger::Info("[ModManager] ...Failed!\n");
 			wxMessageDialog(this, "Reinstall failed - could not request download from Steam.", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
 			return;
