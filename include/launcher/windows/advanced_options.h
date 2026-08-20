@@ -39,6 +39,8 @@ namespace Launcher {
 		~AdvancedModOptionsWindow();
 
 		wxCheckBox* luaDebug;
+		wxCheckBox* modupdate;
+		wxCheckBox* moddownload;
 		wxTextCtrl* luaheapSize;
 
 	private:

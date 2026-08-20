@@ -134,6 +134,14 @@ public:
         return _unstableLauncher;
     }
 
+    inline bool SkipUpdateMods() const {
+        return _skipUpdateMods;
+    }
+    
+    inline bool SkipWaitModDownloads() const {
+        return _skipWaitModDownloads;
+    }
+
 private:
     CLIParser();
 
@@ -186,6 +194,8 @@ private:
     bool _strictThreadCancel = false;
     bool _skipUnique = false;
     bool _unstableLauncher = false;
+    bool _skipUpdateMods = false;
+    bool _skipWaitModDownloads = false;
     unsigned long _repentogonInstallerRefreshRate = Options::_repentogonInstallerDefaultRefreshRate;
     unsigned long _curlLimit = 0;
     unsigned long _curlTimeout = 0;

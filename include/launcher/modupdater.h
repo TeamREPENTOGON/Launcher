@@ -27,9 +27,11 @@ class ModUpdateDialog : public wxDialog {
 public:
     wxTextCtrlLog* launcherlogger;
     uint64_t toupdate = 0;
+    wxCheckBox* disablemoddownload;
+    LauncherConfiguration* _configuration;
 
     ModUpdateDialog(wxWindow* parent,
-        const fs::path& targetModsDir,wxTextCtrlLog* logger, uint64_t updateentryid = 0)
+        const fs::path& targetModsDir,wxTextCtrlLog* logger, uint64_t updateentryid = 0, LauncherConfiguration* config = nullptr)
         : wxDialog(parent, wxID_ANY, "Copying Mod files from Steam...",
             wxDefaultPosition, wxSize(600, 300)),
         targetModsDir(targetModsDir), cancelrequest(false)
@@ -52,6 +54,20 @@ public:
         loadbar = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(-1, 24));
         v->Add(loadbar, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
         wxBoxSizer* h = new wxBoxSizer(wxHORIZONTAL);
+
+        if (config != nullptr) {
+            _configuration = config;
+            disablemoddownload = new wxCheckBox(this, wxID_ANY, "Skip waiting for mod downloading");
+            disablemoddownload->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
+                wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
+                _configuration->SetSkipWaitModDownloads(box->GetValue());
+                canceldownloads = box->GetValue();
+            });
+            disablemoddownload->SetValue(_configuration->SkipWaitModDownloads());
+            canceldownloads = _configuration->SkipWaitModDownloads();
+            h->Add(disablemoddownload,0,wxALIGN_CENTER_VERTICAL | wxLEFT | wxBOTTOM,5);        
+            h->AddStretchSpacer();
+        }
         cancelbtn = new wxButton(this, wxID_CANCEL, "Cancel");
         h->AddStretchSpacer();
         h->Add(cancelbtn, 0, wxALL, 8);
@@ -96,6 +112,7 @@ private:
 
     std::thread mthread;
     std::atomic<bool> cancelrequest;
+    std::atomic<bool> canceldownloads;
     std::string downloadingmodname;
     CCallResult<ModUpdateDialog, SteamUGCQueryCompleted_t> m_NameQueryCall;
 
@@ -296,6 +313,7 @@ private:
     }
 
     bool SteamDownloadNWait(int* overallPct, uint64_t id) {
+        if (canceldownloads || (toupdate > 0)) { return false; }
         if (!SteamUGC()->DownloadItem(id, true)) {
             PostProgressEvent(*overallPct, "Download Failed! (steam couldnt get the mod)");
             return false;
@@ -308,39 +326,55 @@ private:
         uint64 bytesDownloaded = 0;
         uint64 bytesTotal = 0;
 
-        PostProgressEvent(*overallPct, "Attempting to download missing mod...");
+        bool started = false;
+        int fallbackprc = 0;
+
         ModNameGetter(id);
-        while (!cancelrequest) {
+        PostProgressEvent(*overallPct, "Attempting to download " + downloadingmodname + " cache (Waiting for Steam)");
+        while (!cancelrequest && !canceldownloads) {
             SteamAPI_RunCallbacks();
 
             uint32 state = SteamUGC()->GetItemState(id); 
 
             if (state & k_EItemStateDownloading) {
+                started = true;
+                fallbackprc = 100;
                 if (SteamUGC()->GetItemDownloadInfo(id, &bytesDownloaded, &bytesTotal)) {
                     if ((bytesTotal > 0)) {
-                    int pct = static_cast<int>((bytesDownloaded * 100) / bytesTotal);
-                    std::string progress = std::to_string(bytesDownloaded / 1024 / 1024);
-                    if ((state & k_EItemStateDownloadPending) && (pct == 100)) { pct = 0; progress = "0"; }
-                        PostProgressEvent(pct,"Downloading " + downloadingmodname +" (" + progress + "mb / " + std::to_string(bytesTotal / 1024 / 1024) + "mb)");
+                        int pct = static_cast<int>((bytesDownloaded * 100) / bytesTotal);
+                        double div = 1024 * 1024;
+                        std::string unity = "mb";
+                        if ((bytesTotal / div) < 1) {
+                            div = 1024;
+                            unity = "kb";
+                        }
+                        double progress = bytesDownloaded / div;
+                        double total = bytesTotal / div;
+                        std::ostringstream progressStr;
+                        progressStr << std::fixed << std::setprecision(2) << progress;
+
+                        std::ostringstream totalStr;
+                        totalStr << std::fixed << std::setprecision(2) << total;
+                        PostProgressEvent(pct,"Downloading " + downloadingmodname +" (" + progressStr.str() + unity + " / " + totalStr.str() + unity + ")");
                     }
                     else {
-                        PostProgressEvent(0, "Preparing " + downloadingmodname + " cache (Waiting for Steam)");
+                        PostProgressEvent(fallbackprc, "Preparing " + downloadingmodname + " cache (Waiting for Steam)");
                     }
                 }
                 else {
-                    PostProgressEvent(100, "Done with " + downloadingmodname + " cache...");
+                    PostProgressEvent(*overallPct, "Done with " + downloadingmodname + " cache...");
                     return true;
                 }
             }
             else if ((state & k_EItemStateDownloadPending) == 0) {
-                PostProgressEvent(100, "Done with " + downloadingmodname + " cache...");
+                PostProgressEvent(*overallPct, "Done with " + downloadingmodname + " cache...");
                 return true;
             }
             else {
-                PostProgressEvent(0, "Preparing " + downloadingmodname + " cache (Waiting for Steam)");
+                PostProgressEvent(fallbackprc, "Preparing " + downloadingmodname + " cache (Waiting for Steam)");
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
         return false;
     }

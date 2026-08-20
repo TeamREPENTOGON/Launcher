@@ -322,8 +322,10 @@ namespace Launcher {
 		SelectIsaacExecutablePath();
 	}
 
-	void LauncherMainWindow::OnModManagerButtonPressed(wxCommandEvent&) {
-		ModUpdateDialog(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "mods", &_logWindow).ShowModal();
+	void LauncherMainWindow::OnModManagerButtonPressed(wxCommandEvent&) {		
+		if (SteamAPI_Init() && SteamAPI_IsSteamRunning() && !_configuration->SkipUpdateMods()) {
+			ModUpdateDialog(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "mods", &_logWindow ,false, _configuration).ShowModal();
+		}
 		ModManagerFrame* modWindow = new ModManagerFrame(this,_installation);
 		modWindow->Show();
 	}
@@ -406,7 +408,12 @@ namespace Launcher {
 		case WINDOW_CHECKBOX_STEALTH_MODE:
 			_configuration->SetStealthMode(box->GetValue());
 			break;
-
+		case WINDOW_CHECKBOX_REPENTOGON_SKIPMODUPDATE:
+			_configuration->SetSkipUpdateMods(box->GetValue());
+			break;
+		case WINDOW_CHECKBOX_REPENTOGON_SKIPMODDOWNLOAD:
+			_configuration->SetSkipWaitModDownloads(box->GetValue());
+			break;
 		default:
 			return;
 		}
@@ -469,9 +476,9 @@ namespace Launcher {
 	}
 
 	bool LauncherMainWindow::LaunchIsaac(bool relaunch) {
-		if (!relaunch && SteamAPI_Init() && SteamAPI_IsSteamRunning()) { //No point in running the updater if nonsteam....for now?, lol
+		if (!relaunch && SteamAPI_Init() && SteamAPI_IsSteamRunning() && !_configuration->SkipUpdateMods()) { //No point in running the updater if nonsteam....for now?, lol
 			_logWindow.Log("Checking for mod updates on Steam's folder:");
-			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "mods", &_logWindow);
+			ModUpdateDialog dlg(nullptr, fs::path(_configuration->IsaacExecutablePath()).parent_path() / "mods", &_logWindow,false,_configuration);
 			dlg.ShowModal();
 		}
 

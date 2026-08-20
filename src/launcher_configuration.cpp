@@ -62,6 +62,13 @@ static ConfigurationTuple<bool> UnstableUpdatesConf() {
 	return { Sections::repentogon, Keys::unstableUpdates, Defaults::unstableUpdates };
 }
 
+static ConfigurationTuple<bool> SkipUpdateModsConf() {
+	return { Sections::repentogon, Keys::skipUpdateMods, Defaults::skipUpdateMods };
+}
+static ConfigurationTuple<bool> SkipWaitModDownloadsConf() {
+	return { Sections::repentogon, Keys::skipWaitModDownloads, Defaults::skipWaitModDownloads };
+}
+
 static ConfigurationTuple<int> LaunchModeConf() {
 	return { Sections::shared, Keys::launchMode, Defaults::launchMode };
 }
@@ -189,6 +196,9 @@ void LauncherConfiguration::LoadFromFile(INIReader const& reader) {
 	_options.stageType = ReadInteger(reader, StageTypeConf);
 	_options.luaDebug = ReadBoolean(reader, LuaDebugConf);
 	_options.luaHeapSize = ReadString(reader, LuaHeapSizeConf);
+
+	_options.skipUpdateMods = ReadBoolean(reader, SkipUpdateModsConf);
+	_options.skipWaitModDownloads = ReadBoolean(reader, SkipWaitModDownloadsConf);
 	// Not reading LoadRoom from the config file yet as it is not supported in the UI.
 	// _options.loadRoom = ReadString(reader, LoadRoomConf);
 	_options.hideWindow = ReadBoolean(reader, HideWindowConf);
@@ -264,6 +274,9 @@ void LauncherConfiguration::Write() {
 	fprintf(f, "%s = %d\n", Keys::console.c_str(), RepentogonConsoleIgnoreOverride());
 	fprintf(f, "%s = %d\n", Keys::update.c_str(), AutomaticUpdatesIgnoreOverride());
 	fprintf(f, "%s = %d\n", Keys::unstableUpdates.c_str(), UnstableUpdatesIgnoreOverride() ? 1 : 0);
+
+	fprintf(f, "%s = %d\n", Keys::skipUpdateMods.c_str(), SkipUpdateModsIgnoreOverride() ? 1 : 0);
+	fprintf(f, "%s = %d\n", Keys::skipWaitModDownloads.c_str(), SkipWaitModDownloadsIgnoreOverride() ? 1 : 0);
 
 	fprintf(f, "[%s]\n", Sections::vanilla.c_str());
 

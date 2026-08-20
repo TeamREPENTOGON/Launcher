@@ -115,7 +115,26 @@ namespace Launcher {
 	void AdvancedModOptionsWindow::Build() {
 		wxSizer* mainSizer = new wxBoxSizer(wxVERTICAL);
 		SetSizer(mainSizer);
-		luaDebug = new wxCheckBox(this, Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe)");
+
+		wxSizer* subSizer = new wxBoxSizer(wxVERTICAL);
+
+		modupdate = new wxCheckBox(this, Launcher::WINDOW_CHECKBOX_REPENTOGON_SKIPMODUPDATE, "Skip workshop mod update process");
+		modupdate->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
+			wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
+			_mainFrame->_configuration->SetSkipUpdateMods(box->GetValue());
+		});
+		modupdate->SetValue(_mainFrame->_configuration->SkipUpdateMods());
+		subSizer->Add(modupdate, 0, wxALL, 5);
+
+		moddownload = new wxCheckBox(this, Launcher::WINDOW_CHECKBOX_REPENTOGON_SKIPMODDOWNLOAD, "Skip waiting for mod downloading");
+		moddownload->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
+			wxCheckBox* box = dynamic_cast<wxCheckBox*>(event.GetEventObject());
+			_mainFrame->_configuration->SetSkipWaitModDownloads(box->GetValue());
+		});
+		moddownload->SetValue(_mainFrame->_configuration->SkipWaitModDownloads());
+		subSizer->Add(moddownload, 0, wxALL, 5);
+
+		luaDebug = new wxCheckBox(this, Launcher::WINDOW_CHECKBOX_VANILLA_LUADEBUG, "Enable luadebug (unsafe and NOT RECOMMENDED)");
 			luaDebug->Bind(wxEVT_CHECKBOX, [this](wxCommandEvent& event) {
 				if (luaDebug->IsChecked()) {
 					luaDebug->SetValue(false);
@@ -134,7 +153,10 @@ namespace Launcher {
 			event.Skip();
 				});
 			luaDebug->SetValue(_mainFrame->_configuration->LuaDebug());
-			mainSizer->Add(luaDebug, 0, wxALL, 10);
+			subSizer->Add(luaDebug, 0, wxALL, 5);
+
+			mainSizer->Add(subSizer, 0, wxALL, 5);
+
 
 			//wxSizer* heapSizeBox = new wxBoxSizer(wxHORIZONTAL);
 			//luaheapSize = new wxTextCtrl(this, WINDOW_TEXT_VANILLA_LUAHEAPSIZE, "1024M");

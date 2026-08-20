@@ -52,6 +52,9 @@ struct Options {
 	std::optional<bool> automaticUpdates;
 	std::optional<bool> unstableUpdates;
 
+	std::optional<bool> skipUpdateMods;
+	std::optional<bool> skipWaitModDownloads;
+
 	/* Game options */
 	std::optional<bool> luaDebug;
 	std::optional<long> levelStage;
@@ -74,6 +77,9 @@ namespace Configuration::Defaults {
 	constexpr const int stageType = 0;
 	const std::string luaHeapSize = "1024M";
 	const std::string loadRoom = "";
+
+	constexpr const bool skipUpdateMods = false;
+	constexpr const bool skipWaitModDownloads = false;
 }
 
 namespace Configuration::Sections {
@@ -100,6 +106,9 @@ namespace Configuration::Keys {
 	const std::string console("Console");
 	const std::string update("Update");
 	const std::string unstableUpdates("UnstableUpdates");
+
+	const std::string skipUpdateMods("SkipUpdateMods");
+	const std::string skipWaitModDownloads("SkipWaitModDownloads");
 }
 
 /**
@@ -207,6 +216,9 @@ public:
 	CONFIGURATION_FIELD(long, StageType, stageType);
 	CONFIGURATION_FIELD(std::string, LoadRoom, loadRoom);
 	CONFIGURATION_FIELD(std::string, LuaHeapSize, luaHeapSize);
+
+	CONFIGURATION_FIELD(bool, SkipUpdateMods, skipUpdateMods);
+	CONFIGURATION_FIELD(bool, SkipWaitModDownloads, skipWaitModDownloads);
 
 private:
 	bool Search(LauncherConfigurationLoad* result);
