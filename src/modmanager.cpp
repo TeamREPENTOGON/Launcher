@@ -70,6 +70,7 @@ void OnRichTextUrlClick(wxTextUrlEvent& event)
 std::wstring to_wstring(const char* s)
 {
     if (!s) return {};
+	// Don't replace CP_ACP with CP_UTF8
     int len = MultiByteToWideChar(CP_ACP, 0, s, -1, nullptr, 0);
     std::wstring out(len - 1, L'\0');
     MultiByteToWideChar(CP_ACP, 0, s, -1, out.data(), len);
@@ -276,7 +277,7 @@ void ModManagerFrame::LoadModsFromFolder() {
                     auto* metadata = doc.first_node("metadata");
                     if (metadata) {
                         if (metadata->first_node("name")) {
-                            info.displayName = to_wstring(metadata->first_node("name")->value());
+                            info.displayName = wxString::FromUTF8(metadata->first_node("name")->value()).ToStdWstring();
                         }
                         if (metadata->first_node("id")) {
                             info.id = to_wstring(metadata->first_node("id")->value());

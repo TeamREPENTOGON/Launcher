@@ -274,7 +274,7 @@ private:
 
         wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
         evt->SetInt(prc);
-        evt->SetString(message);
+        evt->SetString(wxString::FromUTF8(message));
         if (!IsBeingDeleted()) {
             wxQueueEvent(this, evt);
         }
