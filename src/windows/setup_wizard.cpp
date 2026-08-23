@@ -470,6 +470,10 @@ void LauncherWizard::SetupCompatibilityWithRepentogonText() {
         _compatibleWithRepentogon = false;
         compatibleWithRepentogonreason->SetForegroundColour(*wxBLACK);
     }
+
+	if (_isaacSetupPage) {
+		_isaacSetupPage->Layout();
+	}
 }
 
 void LauncherWizard::PromptIsaacExecutable() {
