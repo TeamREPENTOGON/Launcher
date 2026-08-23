@@ -523,12 +523,12 @@ private:
 
     void MainProc() {
         if (!SteamAPI_Init()) {
-            PostProgressEvent(0, "Warning: SteamAPI_Init() failed or already initialized. Proceeding...");
+            PostProgressEvent(0, "ERROR: Failed to initialize Steam API");
             PostProgressEvent(0, "FINISH: update process finished.");
             return;
         }
         if (!SteamAPI_IsSteamRunning()) {
-            PostProgressEvent(0,"Steam is not running. Start Steam and try again.");
+            PostProgressEvent(0,"ERROR: Steam is not running. Start Steam and try again.");
             PostProgressEvent(0,"DONE: Steam not running");
             PostProgressEvent(0, "FINISH: update process finished.");
             return;
@@ -542,15 +542,15 @@ private:
         int overallPct = 0;
 
         uint32 num = SteamUGC()->GetNumSubscribedItems();
-        if (num == 0) {
+        /*if (num == 0) {
             PostProgressEvent(overallPct,"No subscribed workshop items found.");
             PostProgressEvent(overallPct,"DONE: nothing to update");
             PostProgressEvent(overallPct, "FINISH: update process finished.");
             return;
-        }
+        }*/
         std::vector<PublishedFileId_t> subscribed(num);
         uint32 returned = SteamUGC()->GetSubscribedItems(subscribed.data(), num);
-        if (returned == 0) {
+        if (num > 0 && returned == 0) {
             PostProgressEvent(overallPct,"Failed to retrieve subscribed items from Steam.");
             PostProgressEvent(overallPct,"DONE: failed to get subscriptions");
             PostProgressEvent(overallPct, "FINISH: update process finished.");
@@ -576,7 +576,7 @@ private:
 
 		// If downloads are allowed, check for updates by sending a batch query to Steam to fetch/compare timestamps and names.
 		std::unordered_map<PublishedFileId_t, QueriedModDetails> queriedModDetails;
-		if (toupdate == 0 && !canceldownloads && !cancelrequest) {
+		if (!subscribed.empty() && toupdate == 0 && !canceldownloads && !cancelrequest) {
 			auto checker = QueryModDetailsHelper::CreateAndStart(subscribed);
 			std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 			while (!checker->IsReady() && !canceldownloads && !cancelrequest) {
