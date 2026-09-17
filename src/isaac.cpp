@@ -47,6 +47,7 @@ namespace IsaacInterface {
 		{ STAGE4_2, STAGETYPE_REPENTANCE, "Corpse II" },
 
 		{ STAGE4_3, STAGETYPE_ORIGINAL, "???" },
+		{ STAGE4_3, STAGETYPE_REPENTANCE, "Ascent" },
 
 		{ STAGE5, STAGETYPE_ORIGINAL, "Sheol" },
 		{ STAGE5, STAGETYPE_WOTL, "Cathedral" },
