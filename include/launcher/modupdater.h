@@ -28,6 +28,7 @@ namespace fs = std::filesystem;
 // fetching the NAME is not optional, so we may as well make use of it.
 struct QueriedModDetails {
 	std::string name;
+	EResult queryResult = k_EResultNone;
 	bool needsUpdate = false;
 };
 
@@ -156,7 +157,8 @@ private:
 
 					QueriedModDetails& modDetails = modDetails_[details.m_nPublishedFileId];
 					modDetails.name = details.m_rgchTitle;
-					modDetails.needsUpdate = !installed || details.m_rtimeUpdated > timestampOnDisk;
+					modDetails.queryResult = details.m_eResult;
+					modDetails.needsUpdate = details.m_eResult == k_EResultOK && (!installed || details.m_rtimeUpdated > timestampOnDisk);
 				}
 			}
 		}
@@ -613,10 +615,12 @@ private:
             uint64_t sizeOnDisk = 0;
             uint32_t timeStamp = 0;
             char folderBuf[4096] = { 0 };
-            bool ok = SteamUGC()->GetItemInstallInfo(pfid, &sizeOnDisk, folderBuf,
+            bool isInstalled = SteamUGC()->GetItemInstallInfo(pfid, &sizeOnDisk, folderBuf,
                 (uint32)sizeof(folderBuf), &timeStamp);
-            if (!ok || queriedModDetails[id].needsUpdate) {
-				if (!ok) {
+			bool canDownload = queriedModDetails[id].queryResult == k_EResultOK;
+
+            if (canDownload && (!isInstalled || queriedModDetails[id].needsUpdate)) {
+				if (!isInstalled) {
 					PostProgressEvent(overallPct, "DOWNLOADING MOD: " + displayName);
 				} else {
 					PostProgressEvent(overallPct, "DOWNLOADING UPDATE: " + displayName);
@@ -634,7 +638,7 @@ private:
 
 
             fs::path cachePath = fs::path(folderBuf);
-            if (!Filesystem::SafeExists(cachePath) || !fs::is_directory(cachePath)) { //this happens when cache gets fucked and steam still believes it got cache for this mod AND WONT DOWNLOAD IT NATURALLY
+            if (canDownload && (!Filesystem::SafeExists(cachePath) || !fs::is_directory(cachePath))) { //this happens when cache gets fucked and steam still believes it got cache for this mod AND WONT DOWNLOAD IT NATURALLY
                 PostProgressEvent(overallPct, "Cache folder missing for " + displayName);
 
                 if (!SteamDownloadNWait(&overallPct, id, displayName) || !Filesystem::SafeExists(cachePath) || !fs::is_directory(cachePath)) {
@@ -645,7 +649,7 @@ private:
             }
 
             fs::path metadataPath = cachePath / "metadata.xml";
-            if (!Filesystem::SafeExists(metadataPath)) { //this happens if cache is corrupted
+            if (canDownload && !Filesystem::SafeExists(metadataPath)) { //this happens if cache is corrupted
 				PostProgressEvent(overallPct, "metadata.xml missing for " + displayName);
 
                 if (!SteamDownloadNWait(&overallPct, id, displayName) || !Filesystem::SafeExists(metadataPath)) {
