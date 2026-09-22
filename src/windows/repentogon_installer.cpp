@@ -16,7 +16,7 @@ wxEND_EVENT_TABLE()
 
 RepentogonInstallerFrame::RepentogonInstallerFrame(wxWindow* parent,
 	bool synchronous, Launcher::Installation* installation, bool forceUpdate,
-	bool allowUnstable) : wxFrame(parent, wxID_ANY, "Repentogon updater"),
+	bool allowUnstable) : wxFrame(parent, wxID_ANY, "REPENTOGON Updater"),
 		_synchronous(synchronous), _installation(installation),
 		_forceUpdate(forceUpdate), _allowUnstable(allowUnstable) {
 
