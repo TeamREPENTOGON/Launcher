@@ -398,12 +398,11 @@ static size_t patchwriteresponse(void* contents, size_t size, size_t nmemb, void
 
 static bool RemoveOldPatchFolder()
 {
+	Logger::Info("Attempting to delete old patch folder (%s)...\n", __patchFolder);
 	int attempts = 0;
 	while (Filesystem::SafeExists(__patchFolder) && attempts++ <= 5) {
-		try {
-			fs::remove_all(__patchFolder);
-		} catch (std::filesystem::filesystem_error& err) {
-			Logger::Error("Failed to delete patch folder: %s (attempt #%d)\n", err.what(), attempts);
+		if (!Filesystem::OneDriveSafeDelete(__patchFolder)) {
+			Logger::Error("Failed to delete patch folder (attempt #%d)\n", attempts);
 			std::this_thread::sleep_for(std::chrono::milliseconds(200));
 		}
 	}

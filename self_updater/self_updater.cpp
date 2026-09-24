@@ -222,31 +222,31 @@ void Updater::CleanInstallation() {
 		Logger::Error("Not performing installation cleanup: Integrity check failed!\n");
 		return;
 	}
+	if (Filesystem::SafeExists(LauncherDataBackupFolder)) {
+		Logger::Info("Deleting backup folder...\n");
+		Filesystem::OneDriveSafeDelete(LauncherDataBackupFolder);
+	}
+	if (Filesystem::SafeExists(UpdateStagingFolder)) {
+		Logger::Info("Deleting staging folder...\n");
+		Filesystem::OneDriveSafeDelete(UpdateStagingFolder);
+	}
 	try {
-		if (Filesystem::SafeExists(LauncherBinBackupFilename)) {
+		if (std::filesystem::exists(LauncherBinBackupFilename)) {
 			Logger::Info("Deleting bin backup...\n");
 			std::filesystem::remove(LauncherBinBackupFilename);
 		}
-		if (Filesystem::SafeExists(LauncherDataBackupFolder)) {
-			Logger::Info("Deleting backup folder...\n");
-			std::filesystem::remove_all(LauncherDataBackupFolder);
-		}
-		if (Filesystem::SafeExists(UpdateStagingFolder)) {
-			Logger::Info("Deleting staging folder...\n");
-			std::filesystem::remove_all(UpdateStagingFolder);
-		}
-		if (Filesystem::SafeExists(RenamedUpdaterExeFilename) && !Utils::FileLocked(RenamedUpdaterExeFilename)) {
+		if (std::filesystem::exists(RenamedUpdaterExeFilename) && !Utils::FileLocked(RenamedUpdaterExeFilename)) {
 			Logger::Info("Deleting old exe...\n");
 			std::filesystem::remove(RenamedUpdaterExeFilename);
 		}
 		for (const std::string& filename : Updater::LegacyCleanupFiles) {
-			if (Filesystem::SafeExists(filename)) {
+			if (std::filesystem::exists(filename)) {
 				Logger::Info("Deleting legacy file %s...\n", filename.c_str());
 				std::filesystem::remove(filename);
 			}
 		}
 	} catch (std::filesystem::filesystem_error& err) {
-		Logger::Error("Error trying to clean up installation: %s", err.what());
+		Logger::Error("Error trying to clean up installation: %s\n", err.what());
 	}
 }
 
@@ -274,7 +274,10 @@ void Updater::TryRepairInstallation(HWND mainWindow) {
 			Logger::Info("Installation incomplete, or simply first-time setup. Will attempt to extract %s...\n", LauncherBinFilename);
 		}
 
-		std::filesystem::remove_all(LauncherDataFolder);
+		if (Filesystem::SafeExists(LauncherDataFolder) && !Filesystem::OneDriveSafeDelete(LauncherDataFolder)) {
+			Logger::Error("[TryRepairInstallation] Failed to delete launcher data folder!\n");
+			return;
+		}
 
 		// Try extracting files from the bin.
 		if (Filesystem::SafeExists(LauncherBinFilename)) {
@@ -283,7 +286,10 @@ void Updater::TryRepairInstallation(HWND mainWindow) {
 			CreateUnfinishedUpdateMarker();
 			if (!Zip::ExtractAllToFolder(LauncherBinFilename, LauncherDataFolder)) {
 				Logger::Error("Extraction of `%s` failed.\n", LauncherBinFilename);
-				std::filesystem::remove_all(LauncherDataFolder);
+				if (!Filesystem::OneDriveSafeDelete(LauncherDataFolder)) {
+					Logger::Error("[TryRepairInstallation] Failed to delete launcher data folder!\n");
+					return;
+				}
 			} else {
 				DeleteUnfinishedUpdateMarker();
 				Logger::Info("...done!\n");
@@ -663,7 +669,10 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 
 	if (Filesystem::SafeExists(LauncherDataBackupFolder)) {
 		Logger::Info("Deleting backup of previous version...\n");
-		std::filesystem::remove_all(LauncherDataBackupFolder);
+		if (!Filesystem::OneDriveSafeDelete(LauncherDataBackupFolder)) {
+			Logger::Info("Failed to delete pre-existing backup. Cannot continue.\n");
+			return UPDATE_ERROR;
+		}
 	}
 	if (Filesystem::SafeExists(LauncherDataFolder)) {
 		Logger::Info("Backing up current version...\n");
@@ -701,7 +710,10 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 	// Initialize the staging folder.
 	if (Filesystem::SafeExists(UpdateStagingFolder)) {
 		Logger::Warn("Deleting an existing staging folder...\n");
-		std::filesystem::remove_all(UpdateStagingFolder);
+		if (!Filesystem::OneDriveSafeDelete(UpdateStagingFolder)) {
+			Logger::Error("Failed to delete existing staging folder. Cannot continue.\n");
+			return UPDATE_ERROR;
+		}
 	}
 	Logger::Info("Creating staging folder...\n");
 	std::filesystem::create_directories(UpdateStagingFolder);
@@ -715,36 +727,22 @@ Updater::UpdateLauncherResult Updater::TryUpdateLauncher(int argc, char** argv, 
 		return UPDATE_ERROR;
 	}
 
-	// Copy files from the staging folder into the current folder, making sure to copy the exe LAST, just in case.
-	Logger::Info("Installing files from staging folder...\n");
-	std::optional<std::filesystem::directory_entry> newExe = std::nullopt;
-	for (const auto& entry : std::filesystem::directory_iterator(UpdateStagingFolder)) {
-		if (entry.is_directory()) {
-			Logger::Info("Copying directory: %s\n", entry.path().string().c_str());
-			std::filesystem::copy(entry, std::filesystem::current_path() / entry.path().filename(), std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::recursive);
-		} else if (entry.path().filename() == UpdaterExeFilename) {
-			Logger::Info("Found exe: %s\n", entry.path().string().c_str());
-			newExe = entry;
-		} else {
-			Logger::Info("Copying file: %s\n", entry.path().string().c_str());
-			std::filesystem::copy(entry, std::filesystem::current_path(), std::filesystem::copy_options::overwrite_existing);
+	// Copy files from the staging folder into the current folder, overwriting any existing files with the same names.
+	Logger::Info("Copying files from staging folder...\n");
+
+	if (!Filesystem::OneDriveSafeCopy(UpdateStagingFolder, std::filesystem::current_path())) {
+		Logger::Error("Failed to copy file(s)!\n");
+		try {
+			std::filesystem::copy(UpdaterExeFilename, RenamedUpdaterExeFilename, std::filesystem::copy_options::overwrite_existing);
+		} catch (std::filesystem::filesystem_error& err) {
+			Logger::Error("Failed to restore original exe: %s", err.what());
 		}
-	}
-	if (newExe && Filesystem::SafeExists(*newExe)) {
-		Logger::Info("Copying exe: %s\n", newExe->path().string().c_str());
-		std::filesystem::copy(*newExe, std::filesystem::current_path(), std::filesystem::copy_options::overwrite_existing);
-	} else {
-		Logger::Warn("Did not find %s in unpacked update!\n", UpdaterExeFilename);
+		// Due to the precense of the unfinished update marker, the next launch will attempt to roll back or repair the installation.
+		return UPDATE_ERROR;
 	}
 
 	Logger::Info("Deleting 'unfinished update' marker...\n");
 	DeleteUnfinishedUpdateMarker();
-
-	Logger::Info("Successfully installed all new files. Deleting bin backup..\n");
-	std::filesystem::remove(LauncherBinBackupFilename);
-
-	Logger::Info("Deleting staging folder...\n");
-	std::filesystem::remove_all(UpdateStagingFolder);
 
 	Logger::Info("Update successful!\n");
 	return UPDATE_SUCCESSFUL;
@@ -855,7 +853,7 @@ bool Updater::Restart(int argc, char** argv) {
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 	SetWorkingDirToExe();
 	Logger::Init("updater.log", true);
-	Logger::Info("Updater started with command-line args: %s\n", cli);
+	Logger::Info("Updater version %s started with command-line args: %s\n", Launcher::LAUNCHER_VERSION, cli);
 	Logger::Info("Current Directory: %s\n", std::filesystem::current_path().u8string().c_str());
 
 	int argc = 0;

@@ -45,6 +45,14 @@ namespace Filesystem {
 	 */
 	bool RemoveFile(const char* filename, HANDLE transaction = NULL);
 
+	// Attempt to copy using std::filesystem. If it fails, try again with Windows Shell API.
+	// Only relevant when copying a directory OR maybe when copying files in a directory iterator.
+	bool OneDriveSafeCopy(const std::filesystem::path& src, const std::filesystem::path& dst);
+
+	// Attempt to delete using std::filesystem. If it fails, try again with Windows Shell API.
+	// Only relevant when trying to delete entire directories OR maybe when deleting files in a directory iterator.
+	bool OneDriveSafeDelete(const std::filesystem::path& path);
+
 	/* Remove a folder, regardless of whether it is empty or not.
 	 * If the handle is not null, the operation is transacted inside the given
 	 * transaction.

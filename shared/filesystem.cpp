@@ -1,5 +1,6 @@
 #include <WinSock2.h>
 #include <Windows.h>
+#include <shellapi.h>
 
 #include <cstdlib>
 #include <cstring>
@@ -94,6 +95,89 @@ namespace Filesystem {
 		} else {
 			return DeleteFileA(filename) != 0;
 		}
+	}
+
+	// SHFILEOPSTRUCT requires double-null terminated strings
+	std::vector<wchar_t> CreateShellPathBuffer(const std::filesystem::path& path, const bool dirContents) {
+		std::wstring str = path.wstring();
+		std::vector<wchar_t> buffer(str.begin(), str.end());
+		if (dirContents && std::filesystem::is_directory(path)) {
+			buffer.push_back(L'\\');
+			buffer.push_back(L'*');
+		}
+		buffer.push_back(L'\0');
+		buffer.push_back(L'\0');
+		return buffer;
+	}
+
+	bool OneDriveSafeCopy(const std::filesystem::path& src, const std::filesystem::path& dst) {
+		if (!Filesystem::SafeExists(src)) {
+			Logger::Error("Cannot copy `%s`: It doesn't exist!\n", src.string().c_str());
+			return false;
+		}
+
+		try {
+			std::filesystem::copy(src, dst, std::filesystem::copy_options::overwrite_existing | std::filesystem::copy_options::recursive);
+			return true;
+		}
+		catch (std::filesystem::filesystem_error& err) {
+			Logger::Error("Failed to copy from `%s` to `%s` (%d)\n", src.string().c_str(), dst.string().c_str(), err.what());
+		}
+
+		// copy failed. Try again using a windows file operation.
+		
+		std::vector<wchar_t> src_buf = CreateShellPathBuffer(src, true);
+		std::vector<wchar_t> dst_buf = CreateShellPathBuffer(dst, false);
+
+		SHFILEOPSTRUCTW file_op = { 0 };
+		file_op.wFunc = FO_COPY;
+		file_op.pFrom = src_buf.data();
+		file_op.pTo = dst_buf.data();
+		file_op.fFlags = FOF_NO_UI | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOCONFIRMMKDIR | FOF_NOERRORUI;
+
+		int result = SHFileOperationW(&file_op);
+		if (result != 0) {
+			Logger::Error("Shell copy of `%s` -> `%s` failed: %d\n", src.string().c_str(), dst.string().c_str(), result);
+			return false;
+		}
+		if (file_op.fAnyOperationsAborted) {
+			Logger::Error("Shell copy of `%s` -> `%s` aborted!\n", src.string().c_str(), dst.string().c_str());
+			return false;
+		}
+		return true;
+	}
+
+	bool OneDriveSafeDelete(const std::filesystem::path& path) {
+		if (!Filesystem::SafeExists(path)) {
+			return true;
+		}
+
+		try {
+			std::filesystem::remove_all(path);
+			return true;
+		} catch (std::filesystem::filesystem_error& err) {
+			Logger::Error("Deletion of `%s` failed: %s\n", path.string().c_str(), err.what());
+		}
+
+		// remove_all failed. Try again using a windows file operation.
+		
+		std::vector<wchar_t> buf = CreateShellPathBuffer(path, false);
+
+		SHFILEOPSTRUCTW file_op = { 0 };
+		file_op.wFunc = FO_DELETE;
+		file_op.pFrom = buf.data();
+		file_op.fFlags = FOF_NO_UI | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI;
+
+		int result = SHFileOperationW(&file_op);
+		if (result != 0) {
+			Logger::Error("Shell deletion of `%s` failed: %d\n", path.string().c_str(), result);
+			return false;
+		}
+		if (file_op.fAnyOperationsAborted) {
+			Logger::Error("Shell deletion of `%s` aborted!\n", path.string().c_str());
+			return false;
+		}
+		return true;
 	}
 
 	bool DeleteFolder(const char* path, HANDLE transaction) {
