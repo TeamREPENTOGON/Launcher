@@ -144,6 +144,7 @@ namespace Filesystem {
 			Logger::Error("Shell copy of `%s` -> `%s` aborted!\n", src.string().c_str(), dst.string().c_str());
 			return false;
 		}
+		Logger::Info("Fallback shell copy succeeded!\n");
 		return true;
 	}
 
@@ -177,6 +178,7 @@ namespace Filesystem {
 			Logger::Error("Shell deletion of `%s` aborted!\n", path.string().c_str());
 			return false;
 		}
+		Logger::Info("Fallback shell deletion succeeded!\n");
 		return true;
 	}
 
