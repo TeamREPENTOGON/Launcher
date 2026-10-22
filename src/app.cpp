@@ -115,7 +115,7 @@ void Launcher::App::ReleaseLockFile() {
 }
 
 bool Launcher::App::OnInit() {
-	SetAppearance(Appearance::System);
+	SetAppearance(wxSystemSettings::GetAppearance().AreAppsDark() ? Appearance::Dark : Appearance::Light);
 	SetWorkingDirToExe();
 	Logger::Init("launcher.log", "w");
 	Logger::Info("Launcher started, version %s\n", LAUNCHER_VERSION);
