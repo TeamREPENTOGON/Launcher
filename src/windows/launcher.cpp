@@ -115,7 +115,8 @@ namespace Launcher {
 
 		// Log window
 		wxTextCtrl* logWindow = _logWindow.Get();
-		logWindow->SetBackgroundColour(*wxWHITE);
+//		logWindow->SetBackgroundColour(*wxWHITE);
+		logWindow->UseBackgroundColour();
 		const wxSizerFlags logFlags = wxSizerFlags().Expand().Proportion(5).Border(wxALL, 5);
 		_verticalSizer->Add(logWindow, logFlags);
 
@@ -171,7 +172,7 @@ namespace Launcher {
 
 		// Isaac exe path
 		_isaacFileText = new wxTextCtrl(_configurationBox, wxID_ANY, wxEmptyString, wxDefaultPosition, wxDefaultSize, wxTE_READONLY | wxTE_RICH);
-		_isaacFileText->SetBackgroundColour(*wxWHITE);
+		_isaacFileText->UseBackgroundColour();
 		wxTextAttr textAttr = _isaacFileText->GetDefaultStyle();
 		_isaacFileText->SetDefaultStyle(wxTextAttr(NoIsaacColor));
 		_isaacFileText->AppendText(NoIsaacText);
@@ -671,7 +672,7 @@ namespace Launcher {
 
 		InstallationData const& mainData = isaacInstallation.GetMainInstallation();
 		if (mainData.IsValid()) {
-			_isaacFileText->SetForegroundColour(*wxBLACK);
+			_isaacFileText->UseForegroundColour();
 			_isaacFileText->SetValue(mainData.GetExePath());
 		} else {
 			_isaacFileText->SetForegroundColour(*wxRED);
@@ -682,7 +683,8 @@ namespace Launcher {
 
 		if (repentogonInstallation.IsValid()) {
 			InstallationData const& repData = isaacInstallation.GetRepentogonInstallation();
-			_repentogonFileText->SetForegroundColour(*wxBLACK);
+//			_repentogonFileText->SetForegroundColour(*wxBLACK);
+			_repentogonFileText->SetForegroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_CAPTIONTEXT));
 			_repentogonFileText->SetValue(repData.GetExePath());
 		} else {
 			_repentogonFileText->SetForegroundColour(*wxRED);
@@ -724,7 +726,7 @@ namespace Launcher {
 			_repentogonFileText->SetForegroundColour(*wxRED);
 			_repentogonFileText->SetValue("Didnt install properly! (Incompatible?)");
 		} else {
-			_repentogonFileText->SetForegroundColour(*wxBLACK);
+			_repentogonFileText->SetForegroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_CAPTIONTEXT));
 			_repentogonFileText->SetValue(repentogonPath);
 		}
 	}

@@ -754,13 +754,13 @@ void ParseBBCode(wxRichTextCtrl* field, const std::string& bbcode) {
                 field->EndStyle();
             }
             std::string url = iter->str();
-            style.SetTextColour("Blue"); //not the exact URL-color but fuck it, close enough
+            style.SetTextColour(wxSystemSettings::GetColour(wxSYS_COLOUR_HOTLIGHT)); //not the exact URL-color but fuck it, close enough
             field->BeginStyle(style);
             field->BeginURL(url);
             field->WriteText(wxString::FromUTF8(url));
             field->EndURL();
             field->EndStyle();
-            style.SetTextColour("Black");
+            style.SetTextColour(wxSystemSettings::GetColour(wxSYS_COLOUR_CAPTIONTEXT));
             last_pos = iter->position() + iter->length();
         }
         if (last_pos < text.size()) {
@@ -819,11 +819,11 @@ void ParseBBCode(wxRichTextCtrl* field, const std::string& bbcode) {
             pos = tag_end + 1;
         }
         else if (tag == "spoiler") {
-            style.SetBackgroundColour(wxColor("Black"));
+            style.SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_CAPTIONTEXT));
             pos = tag_end + 1;
         }
         else if (tag == "/spoiler") {
-            style.SetBackgroundColour(wxColor("White"));
+            style.SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
             pos = tag_end + 1;
         }
         else if (tag == "*") {
@@ -837,7 +837,7 @@ void ParseBBCode(wxRichTextCtrl* field, const std::string& bbcode) {
             pos = tag_end + 1;
         }
         else if (tag == "/color") {
-            style.SetTextColour(*wxBLACK);
+            style.SetTextColour(wxSystemSettings::GetColour(wxSYS_COLOUR_CAPTIONTEXT));
             pos = tag_end + 1;
         }
         else if (tag.compare(0, 2, "h1") == 0) {
