@@ -52,10 +52,6 @@ RepentogonInstallerFrame* Launcher::App::CreateRepentogonInstallerWindow(
 
 Launcher::LauncherMainWindow* Launcher::App::CreateMainWindow() {
 	LauncherMainWindow* frame = new LauncherMainWindow(__installation, &__configuration);
-	wxWindow* win = wxTheApp->GetTopWindow();
-	win->Show();
-	win->Raise();
-	win->SetFocus();
 	return frame;
 }
 
@@ -192,8 +188,6 @@ bool Launcher::App::OnInit() {
 	// Force unstable updates to true for the beta.
 	// This can be removed once a stable REPENTOGON release exists that uses the launcher.
 	//__configuration.SetUnstableUpdatesOverride(true);
-
-	_mainFrame->Show(!__configuration.AutoLaunch());
 
 	std::optional<std::string> providedPath;
 	std::string cliIsaacPath = sCLI->IsaacPath();
