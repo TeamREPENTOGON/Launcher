@@ -52,7 +52,7 @@ namespace Launcher {
 
 	void LaunchCountdownWindow::Build() {
 		wxPanel* panel = new wxPanel(this);
-		panel->SetBackgroundColour(*wxWHITE);
+		panel->SetBackgroundColour(wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOW));
 
 		wxBoxSizer* panelSizer = new wxBoxSizer(wxVERTICAL);
 
