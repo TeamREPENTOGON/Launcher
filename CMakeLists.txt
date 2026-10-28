@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.20)
-project (Launcher CXX)
+project (Launcher CXX C)
 set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/;${CMAKE_MODULE_PATH}")
 
@@ -90,7 +90,7 @@ if (CMAKE_LAUNCHER_FORCE_UNSTABLE)
   target_compile_definitions (REPENTOGONLauncher PRIVATE LAUNCHER_FORCE_UNSTABLE)
 endif()
 
-target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip Imagehlp bzip2 bspatch steamapi Winhttp userenv)
+target_link_libraries (REPENTOGONLauncher shared wxbase wxcore wxrichtext bcrypt inih libcurl zip imagehlp bzip2 bspatch steamapi winhttp userenv)
 add_custom_command(
     TARGET REPENTOGONLauncher POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_RUNTIME_DLLS:REPENTOGONLauncher> $<TARGET_FILE_DIR:REPENTOGONLauncher> COMMAND_EXPAND_LISTS
@@ -109,7 +109,7 @@ add_custom_command(
 file (GLOB_RECURSE UPDATER_FILES "include/self_updater/*.h" self_updater/*.cpp "include/launcher/version.h" src/version.cpp ${SHARED_FILES})
 add_executable (REPENTOGONLauncherUpdater WIN32 ${UPDATER_FILES} ${WIN32_RESOURCES})
 set_target_properties(REPENTOGONLauncherUpdater PROPERTIES OUTPUT_NAME "REPENTOGONLauncher")
-target_link_libraries (REPENTOGONLauncherUpdater libcurl_static zip zlibstatic userenv ktmw32 comctl32 Winhttp)
+target_link_libraries (REPENTOGONLauncherUpdater libcurl_static zip zlibstatic userenv ktmw32 comctl32 winhttp)
 target_include_directories (REPENTOGONLauncherUpdater PRIVATE
     "${CMAKE_SOURCE_DIR}/include"
     "${CMAKE_SOURCE_DIR}/deps/libzip/lib"

@@ -20,7 +20,7 @@
 #include "curl/curl.h"
 #include "launcher/app.h"
 #include "launcher/windows/advanced_options.h"
-#include "launcher/windows/checklogs_modal.h"
+#include "launcher/windows/Checklogs_modal.h"
 #include "launcher/installation.h"
 #include "launcher/isaac.h"
 #include "launcher/launcher_configuration.h"

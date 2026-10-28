@@ -1,6 +1,6 @@
 #include <WinSock2.h>
 
-#include "launcher/windows/checklogs_modal.h"
+#include "launcher/windows/Checklogs_modal.h"
 #include "launcher/windows/launcher.h"
 
 wxBEGIN_EVENT_TABLE(Launcher::CheckLogsWindow, wxDialog)

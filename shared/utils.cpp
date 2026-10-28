@@ -1,8 +1,11 @@
+#include <WinSock2.h>
+#include <winnt.h>
+
 #include "shared/utils.h"
 
 #include <filesystem>
 
-#include "shared/status_codes.h"
+// #include "shared/status_codes.h"
 #include "shared/logger.h"
 #include "userenv.h"
 
@@ -28,174 +31,174 @@ namespace utils {
 		case 0:
 			break;
 
-		case GUARD_PAGE_VIOLATION:
+		case STATUS_GUARD_PAGE_VIOLATION:
 			str = "guard page violation";
 			break;
 
-		case DATATYPE_MISALIGNMENT:
+		case STATUS_DATATYPE_MISALIGNMENT:
 			str = "data type misalignment";
 			break;
 
-		case BREAKPOINT:
+		case STATUS_BREAKPOINT:
 			str = "breakpoint";
 			break;
 
-		case SINGLE_STEP:
+		case STATUS_SINGLE_STEP:
 			str = "single step";
 			break;
 
-		case LONGJUMP:
+		case STATUS_LONGJUMP:
 			str = "longjump";
 			break;
 
-		case UNWIND_CONSOLIDATE:
+		case STATUS_UNWIND_CONSOLIDATE:
 			str = "unwind consolidate";
 			break;
 
-		case ACCESS_VIOLATION:
+		case STATUS_ACCESS_VIOLATION:
 			str = "access violation";
 			break;
 
-		case IN_PAGE_ERROR:
+		case STATUS_IN_PAGE_ERROR:
 			str = "in page error";
 			break;
 
-		case INVALID_HANDLE:
+		case STATUS_INVALID_HANDLE:
 			str = "invalid handle";
 			break;
 
-		case INVALID_PARAMETER:
+		case STATUS_INVALID_PARAMETER:
 			str = "invalid parameter";
 			break;
 
-		case NO_MEMORY:
+		case STATUS_NO_MEMORY:
 			str = "no memory";
 			break;
 
-		case ILLEGAL_INSTRUCTION:
+		case STATUS_ILLEGAL_INSTRUCTION:
 			str = "illegal instruction";
 			break;
 
-		case NONCONTINUABLE_EXCEPTION:
+		case STATUS_NONCONTINUABLE_EXCEPTION:
 			str = "non continuable exception";
 			break;
 
-		case INVALID_DISPOSITION:
+		case STATUS_INVALID_DISPOSITION:
 			str = "invalid disposition";
 			break;
 
-		case ARRAY_BOUNDS_EXCEEDED:
+		case STATUS_ARRAY_BOUNDS_EXCEEDED:
 			str = "array bounds exceeded";
 			break;
 
-		case FLOAT_DENORMAL_OPERAND:
+		case STATUS_FLOAT_DENORMAL_OPERAND:
 			str = "float denormal operand";
 			break;
 
-		case FLOAT_DIVIDE_BY_ZERO:
+		case STATUS_FLOAT_DIVIDE_BY_ZERO:
 			str = "float divide by zero";
 			break;
 
-		case FLOAT_INEXACT_RESULT:
+		case STATUS_FLOAT_INEXACT_RESULT:
 			str = "float inexact result";
 			break;
 
-		case FLOAT_INVALID_OPERATION:
+		case STATUS_FLOAT_INVALID_OPERATION:
 			str = "float invalid operation";
 			break;
 
-		case FLOAT_OVERFLOW:
+		case STATUS_FLOAT_OVERFLOW:
 			str = "float overflow";
 			break;
 
-		case FLOAT_STACK_CHECK:
+		case STATUS_FLOAT_STACK_CHECK:
 			str = "float stack check";
 			break;
 
-		case FLOAT_UNDERFLOW:
+		case STATUS_FLOAT_UNDERFLOW:
 			str = "float underflow";
 			break;
 
-		case INTEGER_DIVIDE_BY_ZERO:
+		case STATUS_INTEGER_DIVIDE_BY_ZERO:
 			str = "integer divide by zero";
 			break;
 
-		case INTEGER_OVERFLOW:
+		case STATUS_INTEGER_OVERFLOW:
 			str = "integer overflow";
 			break;
 
-		case PRIVILEGED_INSTRUCTION:
+		case STATUS_PRIVILEGED_INSTRUCTION:
 			str = "privileged instruction";
 			break;
 
-		case STACK_OVERFLOW:
+		case STATUS_STACK_OVERFLOW:
 			str = "stack overflow";
 			break;
 
-		case DLL_NOT_FOUND:
+		case STATUS_DLL_NOT_FOUND:
 			str = "dll not found";
 			break;
 
-		case ORDINAL_NOT_FOUND:
+		case STATUS_ORDINAL_NOT_FOUND:
 			str = "ordinal not found";
 			break;
 
-		case ENTRYPOINT_NOT_FOUND:
+		case STATUS_ENTRYPOINT_NOT_FOUND:
 			str = "entrypoint not found";
 			break;
 
-		case CONTROL_C_EXIT:
+		case STATUS_CONTROL_C_EXIT:
 			break;
 
-		case DLL_INIT_FAILED:
+		case STATUS_DLL_INIT_FAILED:
 			str = "dll init failed";
 			break;
 
-		case CONTROL_STACK_VIOLATION:
+		case STATUS_CONTROL_STACK_VIOLATION:
 			str = "control stack violation";
 			break;
 
-		case FLOAT_MULTIPLE_FAULTS:
+		case STATUS_FLOAT_MULTIPLE_FAULTS:
 			str = "float multiple faults";
 			break;
 
-		case FLOAT_MULTIPLE_TRAPS:
+		case STATUS_FLOAT_MULTIPLE_TRAPS:
 			str = "float multiple traps";
 			break;
 
-		case REG_NAT_CONSUMPTION:
+		case STATUS_REG_NAT_CONSUMPTION:
 			str = "reg nat consumption (seriously how the fuck did you trigger this ?)";
 			break;
 
-		case HEAP_CORRUPTION:
+		case STATUS_HEAP_CORRUPTION:
 			str = "heap corruption";
 			break;
 
-		case STACK_BUFFER_OVERRUN:
+		case STATUS_STACK_BUFFER_OVERRUN:
 			str = "stack buffer overrun";
 			break;
 
-		case INVALID_CRUNTIME_PARAMETER:
+		case STATUS_INVALID_CRUNTIME_PARAMETER:
 			str = "invalid cruntime parameter";
 			break;
 
-		case ASSERTION_FAILURE:
+		case STATUS_ASSERTION_FAILURE:
 			str = "assertion failure";
 			break;
 
-		case ENCLAVE_VIOLATION:
+		case STATUS_ENCLAVE_VIOLATION:
 			str = "enclave violation";
 			break;
 
-		case INTERRUPTED:
+		case STATUS_INTERRUPTED:
 			str = "interrupted";
 			break;
 
-		case THREAD_NOT_RUNNING:
+		case STATUS_THREAD_NOT_RUNNING:
 			str = "thread not running";
 			break;
 
-		case ALREADY_REGISTERED:
+		case STATUS_ALREADY_REGISTERED:
 			str = "already registered";
 			break;
 

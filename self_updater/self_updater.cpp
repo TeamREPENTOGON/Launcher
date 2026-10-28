@@ -2,7 +2,7 @@
 #include <Windows.h>
 #include <WinBase.h>
 #include <filesystem>
-#include <Commctrl.h>
+#include <CommCtrl.h>
 #include <thread>
 #include <memory>
 #include <fstream>
