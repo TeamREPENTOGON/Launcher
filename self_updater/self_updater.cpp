@@ -848,13 +848,11 @@ bool Updater::Restart(int argc, char** argv) {
 	return result;
 }
 
-
-
 int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR cli, int) {
 	SetWorkingDirToExe();
 	Logger::Init("updater.log", true);
 	Logger::Info("Updater version %s started with command-line args: %s\n", Launcher::LAUNCHER_VERSION, cli);
-	Logger::Info("Current Directory: %s\n", std::filesystem::current_path().u8string().c_str());
+	Logger::Info("Current Directory: %s\n", std::filesystem::current_path().string().c_str());
 
 	int argc = 0;
 	char** argv = Updater::Utils::CommandLineToArgvA(cli, &argc);

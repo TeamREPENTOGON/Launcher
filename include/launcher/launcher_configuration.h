@@ -113,7 +113,7 @@ namespace Configuration::Keys {
 
 /**
  * On "Overrides":
- * 
+ *
  * If an "override" value is set for an option, that value will override
  * whatever value was loaded from the configuration file, but will NOT
  * be written back to the configuration file. Typically, this is used

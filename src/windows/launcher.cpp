@@ -156,6 +156,25 @@ namespace Launcher {
 		_logWindow.Log("Current directory is: %s", std::filesystem::current_path().u8string().c_str());
 		_logWindow.Log("Using configuration file %s\n", LauncherConfiguration::GetConfigurationPathUTF8().c_str());
 		_logWindow.Log("Command line: %s", utils::ConvertToUTF8(GetCommandLineW()).c_str());
+
+		if (uint32_t flags = sCLI->TrapIsaacLaunchFlags()) {
+			_logWindow.LogWarn("--trap-isaac-launch given");
+			if (flags & TRAP_ISAAC_FLAG_LAUNCHER) {
+				_logWindow.LogWarn("\tWill trap in the launcher");
+			}
+
+			if (flags & TRAP_ISAAC_FLAG_EARLY_LOADER) {
+				_logWindow.LogWarn("\tWill trap in the ZHL loader");
+			}
+
+			if (flags & TRAP_ISAAC_FLAG_LIBZHL_INIT) {
+				_logWindow.LogWarn("\tWill trap in the ZHL entry point");
+			}
+
+			if (flags & TRAP_ISAAC_FLAG_REPENTOGON_INIT) {
+				_logWindow.LogWarn("\tWill trap in the Repentogon entry point");
+			}
+		}
 	}
 
 	LauncherMainWindow::~LauncherMainWindow() {

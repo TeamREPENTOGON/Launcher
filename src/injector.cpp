@@ -61,6 +61,19 @@ std::string GenerateCLI(const char* path, LauncherConfiguration const* configura
 		cli << " --repentogonoff";
 	}
 
+	uint32_t flags = sCLI->TrapIsaacLaunchFlags();
+	if (flags & TRAP_ISAAC_FLAG_EARLY_LOADER) {
+		cli << " --trap-zhl-loader";
+	}
+
+	if (flags & TRAP_ISAAC_FLAG_LIBZHL_INIT) {
+		cli << " --trap-zhl";
+	}
+
+	if (flags & TRAP_ISAAC_FLAG_REPENTOGON_INIT) {
+		cli << " --trap-repentogon";
+	}
+
 	return cli.str();
 }
 
@@ -246,10 +259,12 @@ int FirstStageInit(const char* path, bool isLegacy, LauncherConfiguration const*
 static volatile int __trapIsaacLaunch = 1;
 
 int CreateAndWait(HANDLE process, void* remotePage, size_t functionOffset, size_t paramOffset) {
-	if (sCLI->TrapIsaacLaunch()) {
+	uint32_t flags = sCLI->TrapIsaacLaunchFlags();
+	if (flags & TRAP_ISAAC_FLAG_LAUNCHER) {
 		while (__trapIsaacLaunch) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));
 		}
+		__trapIsaacLaunch = 1;
 	}
 
 	HANDLE remoteThread = CreateRemoteThread(process, NULL, 0,

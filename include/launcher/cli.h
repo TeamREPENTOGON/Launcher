@@ -5,6 +5,19 @@
 
 #include "launcher/launcher_configuration.h"
 
+enum TrapIsaacFlags {
+    /* Trap the launcher itself in-between CreateProcessA and CreateRemoteThread.
+     * This is used to debug the loader itself.
+     */
+    TRAP_ISAAC_FLAG_LAUNCHER	  = 1 << 0,
+    /* Trap the loader in its entry point. */
+    TRAP_ISAAC_FLAG_EARLY_LOADER	  = 1 << 1,
+    /* Trap libzhl in its entry point. */
+    TRAP_ISAAC_FLAG_LIBZHL_INIT	  = 1 << 2,
+    /* Trap zhlRepentogon in its entry point (ModInit / InitRepentogon). */
+    TRAP_ISAAC_FLAG_REPENTOGON_INIT = 1 << 3
+};
+
 class CLIParser {
 public:
     int Parse(int argc, wxChar** argv);
@@ -114,8 +127,8 @@ public:
         return _skipRepentogonUpdate;
     }
 
-    inline bool TrapIsaacLaunch() const {
-        return _trapIsaacLaunch;
+    inline uint32_t TrapIsaacLaunchFlags() const {
+        return _trapIsaacLaunchFlags;
     }
 
     inline long IsaacWaitTime() const {
@@ -137,7 +150,7 @@ public:
     inline bool SkipUpdateMods() const {
         return _skipUpdateMods;
     }
-    
+
     inline bool SkipWaitModDownloads() const {
         return _skipWaitModDownloads;
     }
@@ -182,7 +195,7 @@ private:
     };
 
     long _isaacWaitTime = 0;
-    bool _trapIsaacLaunch = false;
+    uint32_t _trapIsaacLaunchFlags = false;
     bool _skipWizard = false;
     bool _forceWizard = false;
     bool _skipRepentogonUpdate = false;

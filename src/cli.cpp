@@ -6,6 +6,20 @@
 #include "shared/logger.h"
 #include "wx/cmdline.h"
 
+static uint32_t ParseTrapOption(const char* start, size_t len) {
+    if (!strncmp(start, "launcher", len)) {
+	return TRAP_ISAAC_FLAG_LAUNCHER;
+    } else if (!strncmp(start, "loader", len)) {
+	return TRAP_ISAAC_FLAG_EARLY_LOADER;
+    } else if (!strncmp(start, "libzhl", len)) {
+	return TRAP_ISAAC_FLAG_LIBZHL_INIT;
+    } else if (!strncmp(start, "repentogon", len)) {
+	return TRAP_ISAAC_FLAG_REPENTOGON_INIT;
+    }
+
+    return 0;
+}
+
 CLIParser::CLIParser() {
 
 }
@@ -31,7 +45,16 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     parser.AddLongOption(Options::curlConnectTimeout, "Timeout (in milliseconds) when curl opens a connection",
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongOption(Options::configurationPath, "Path to the configuration file");
-    parser.AddLongSwitch(Options::trapIsaacLaunch, "Trap the launcher when starting Isaac, allowing for a debugger to attach");
+    parser.AddLongOption(
+	Options::trapIsaacLaunch,
+	"Enable various trap loops in the launcher and in the components of the ZHL framework " \
+	"to ease early stage debug. Multiple values can be given, separated by a comma.\n" \
+	"Allowed values:\n"
+	"  * launcher (trap the launcher in-between CreateProcessA and CreateRemoteThread\n"
+	"  * loader (trap the ZHL Loader before it loads anything)\n"
+	"  * libzhl (trap ZHL in InitZHL)\n"
+	"  * repentogon (trap Repentogon in InitRepentogon)"
+    );
     parser.AddLongOption(Options::isaacWaitTime, "Max wait time (in milliseconds) after creating the Repentogon remote thread",
         wxCMD_LINE_VAL_NUMBER);
     parser.AddLongSwitch(Options::strictThreadCancel, "Crash the launcher if a cancelled thread does not enter its cancellable state");
@@ -59,22 +82,37 @@ int CLIParser::Parse(int argc, wxChar** argv) {
     int result = parser.Parse();
 
     if (result > 0)
-        return result;
+	return result;
 
-    _trapIsaacLaunch = parser.Found(Options::trapIsaacLaunch);
+    wxString trapIsaacLaunchValue;
+    if (parser.Found(Options::trapIsaacLaunch, &trapIsaacLaunchValue)) {
+	const char* trapStr = trapIsaacLaunchValue.ToUTF8();
+	const char* start = trapStr;
+	while (const char* delim = strchr(start, ',')) {
+	    size_t len = delim - start;
+	    if (uint32_t flag = ParseTrapOption(start, len)) {
+		_trapIsaacLaunchFlags |= flag;
+	    }
+	    start = delim + 1;
+	}
+
+	if (uint32_t flag = ParseTrapOption(start, strlen(start))) {
+	    _trapIsaacLaunchFlags |= flag;
+	}
+    }
 
     _forceWizard = parser.Found(Options::forceWizard);
     _skipWizard = parser.Found(Options::skipWizard);
 
     if (_forceWizard && _skipWizard) {
-        wxASSERT_MSG(false, "Cannot force and skip the wizard at the same time");
+	wxASSERT_MSG(false, "Cannot force and skip the wizard at the same time");
     }
 
     _forceRepentogonUpdate = parser.Found(Options::forceRepentogonUpdate);
     _skipRepentogonUpdate = parser.Found(Options::skipRepentogonUpdate);
 
     if (_forceRepentogonUpdate && _skipRepentogonUpdate) {
-        wxASSERT_MSG(false, "Cannot force and skip Repentogon update at the same time");
+	wxASSERT_MSG(false, "Cannot force and skip Repentogon update at the same time");
     }
 
     _repentogonInstallerWaitOnFinished = parser.Found(Options::repentogonInstallerWait);
