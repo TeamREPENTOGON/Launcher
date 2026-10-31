@@ -9,7 +9,7 @@ set (CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 option (LAUNCHER_UNSTABLE "Build unstable version instead of release version" OFF)
 
 # Stupid MSVC
-add_compile_definitions (_CRT_SECURE_NO_WARNINGS)
+add_compile_definitions (_CRT_SECURE_NO_WARNINGS _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
 
 include (cmake/deps/curl_pre.cmake)
 add_subdirectory (deps/curl)
