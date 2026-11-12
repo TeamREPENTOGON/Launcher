@@ -97,8 +97,8 @@ namespace Launcher {
 
 	static const char* GetCurrentDirectoryError = "unable to get current directory";
 
-	static constexpr const char* ComboBoxVanilla = "Vanilla";
-	static constexpr const char* ComboBoxRepentogon = "REPENTOGON";
+	static constexpr const char* ComboBoxVanilla = "Disabled";
+	static constexpr const char* ComboBoxRepentogon = "Enabled";
 
 	static const std::regex LuaHeapSizeRegex("^([0-9]+[KMG]{0,1})?$");
 
@@ -226,7 +226,7 @@ namespace Launcher {
 		wxStaticBoxSizer* launchModeBoxSizer = new wxStaticBoxSizer(launchModeBox, wxVERTICAL );
 
 		wxSizer* box = new wxBoxSizer(wxHORIZONTAL);
-		box->Add(new wxStaticText(launchModeBox, -1, "Launch mode: "), wxEXPAND | wxLEFT | wxRIGHT, 5);
+		box->Add(new wxStaticText(launchModeBox, -1, "REPENTOGON: "), wxEXPAND | wxLEFT | wxRIGHT, 5);
 
 		_launchMode = new wxComboBox(launchModeBox, WINDOW_COMBOBOX_LAUNCH_MODE, wxEmptyString, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxCB_READONLY);
 		_launchMode->Append(ComboBoxRepentogon);
