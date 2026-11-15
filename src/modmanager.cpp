@@ -380,44 +380,74 @@ size_t WriteCallback(void* contents, size_t size, size_t nmemb, std::string* s) 
     return newLength;
 }
 
+
+
 std::string GetThumbnailURL(const std::wstring& itemId) {
-    std::string url = "https://steamcommunity.com/sharedfiles/filedetails/?id=" + wxString(itemId).ToStdString();
-    std::string html;
+    wxCharBuffer idBuffer = wxString(itemId).ToUTF8();
+    if (!idBuffer || idBuffer.length() == 0) {
+        return "";
+    }
+    const std::string id(idBuffer.data(), idBuffer.length());
+
+    static const char* apiUrl =
+        "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/";
+    const std::string postData = "itemcount=1&publishedfileids%5B0%5D=" + id;
+    std::string responseBody;
 
     CURL* curl = curl_easy_init();
-    if (curl) {
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &html);
-        curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-        curl::SetupProxyForCurl(curl);
-
-        curl_easy_perform(curl);
-        curl_easy_cleanup(curl);
+    if (!curl) {
+        return "";
     }
 
-    std::regex imgRegex(
-        R"delim(<img\s+[^>]*id="previewImageMain"[^>]*src="([^"]+)")delim",
-        std::regex::icase
-    );
+    struct curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
+    headers = curl_slist_append(headers, "Accept: application/json");
 
-    std::smatch match;
-    if (std::regex_search(html, match, imgRegex)) {
-        return match[1];
+    curl_easy_setopt(curl, CURLOPT_URL, apiUrl);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postData.c_str());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, static_cast<long>(postData.size()));
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBody);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 20L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "REPENTOGON Launcher");
+
+    curl::SetupProxyForCurl(curl);
+
+    const CURLcode curlResult = curl_easy_perform(curl);
+    long responseCode = 0;
+    if (curlResult == CURLE_OK) {
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &responseCode);
     }
 
-    std::regex imgRegex2(
-        R"delim(<img\s+[^>]*id="previewImage"[^>]*src="([^"]+)")delim",
-        std::regex::icase
-    );
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
 
-    std::smatch match2;
-    if (std::regex_search(html, match2, imgRegex2)) {
-        return match2[1].str() + "&letterbox=false";
+    if (curlResult != CURLE_OK || responseCode == 403 || responseCode == 429 || responseCode >= 500 || responseCode != 200) {
+        return "";
     }
 
+    rapidjson::Document document;
+    document.Parse(responseBody.c_str());
+    if (document.HasParseError() || !document.IsObject() ||
+        !document.HasMember("response") || !document["response"].IsObject() ||
+        !document["response"].HasMember("publishedfiledetails") ||
+        !document["response"]["publishedfiledetails"].IsArray()) {
+        return "";
+    }
 
+    const auto& details = document["response"]["publishedfiledetails"];
+    if (details.Empty() || !details[0].IsObject()) {
+        return "";
+    }
+
+    const auto& item = details[0];
+    if (item.HasMember("preview_url") && item["preview_url"].IsString()) {
+        return item["preview_url"].GetString();
+    }
 
     return "";
 }
@@ -919,6 +949,8 @@ void ModManagerFrame::OnSelectMod(ModInfo mod) {
                 if ((mod.id.length() > 0) && (mod.id != mod.folderName)) { //check if the thing actually has a valid id
                     thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 102)));
                     std::thread([this, id = mod.id, imagePath]() {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(200)); //prevent stacking up requests to kill steam even with the delay (which still happened but when going more ham, now it should ACTUALLY be fixed
+                    if (selectedMod.id != id) { return; }
                     if (DownloadThumbFromID(id, imagePath.wstring())) {
                         try {
                         wxImage img;
