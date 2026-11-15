@@ -5,6 +5,9 @@
 #include <regex>
 #include <filesystem>
 #include <unordered_set>
+#include <mutex>
+#include <thread>
+#include <chrono>
 
 #include "steam_api.h"
 #include "curl/curl.h"
@@ -36,7 +39,7 @@ enum {
     WINDOW_BUTTON_MODMAN_WORKSHOP,
     WINDOW_BUTTON_MODMAN_MODFOLDER,
     WINDOW_BUTTON_MODMAN_SAVEFOLDER,
-	WINDOW_BUTTON_MODMAN_REINSTALL,
+    WINDOW_BUTTON_MODMAN_REINSTALL,
 };
 
 wxBEGIN_EVENT_TABLE(ModManagerFrame, wxFrame)
@@ -70,7 +73,7 @@ void OnRichTextUrlClick(wxTextUrlEvent& event)
 std::wstring to_wstring(const char* s)
 {
     if (!s) return {};
-	// Don't replace CP_ACP with CP_UTF8
+    // Don't replace CP_ACP with CP_UTF8
     int len = MultiByteToWideChar(CP_ACP, 0, s, -1, nullptr, 0);
     std::wstring out(len - 1, L'\0');
     MultiByteToWideChar(CP_ACP, 0, s, -1, out.data(), len);
@@ -150,7 +153,7 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
     thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_WORKSHOP, "Workshop Page"), 0, wxEXPAND | wxALL, 2);
     thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_MODFOLDER, "Mod Folder"), 0, wxEXPAND | wxALL, 2);
     thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_SAVEFOLDER, "Mod Save Data"), 0, wxEXPAND | wxALL, 2);
-	thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_REINSTALL, "Reinstall"), 0, wxEXPAND | wxALL, 2);
+    thumbnbuttons->Add(new wxButton(panel, WINDOW_BUTTON_MODMAN_REINSTALL, "Reinstall"), 0, wxEXPAND | wxALL, 2);
     leftPanel->Add(thumbnbuttons, 0, wxALL | wxALIGN_CENTER, 0);
 
 
@@ -234,23 +237,23 @@ ModManagerFrame::ModManagerFrame(wxWindow* parent, Launcher::Installation* Insta
 
     panel->SetSizer(topSizer);
 
-	try {
-		if (!fs::exists(_modspath)) {
-			fs::create_directories(_modspath);
-		}
-		LoadModsFromFolder();
-	} catch (fs::filesystem_error& err) {
-		const wxString errMessage = wxString::Format("Failed to initialize/read mods folder: %s", err.what());
-		wxMessageDialog(this, errMessage, "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
-		Destroy();
-		return;
-	}
+    try {
+        if (!fs::exists(_modspath)) {
+            fs::create_directories(_modspath);
+        }
+        LoadModsFromFolder();
+    }catch (fs::filesystem_error& err) {
+        const wxString errMessage = wxString::Format("Failed to initialize/read mods folder: %s", err.what());
+        wxMessageDialog(this, errMessage, "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
+        Destroy();
+        return;
+    }
 
     RefreshLists();
 
     Bind(wxEVT_THREAD, &ModManagerFrame::OnThreadUpdate, this);
 
-	SetIcon(wxICON(IDI_ICON1));
+    SetIcon(wxICON(IDI_ICON1));
 }
 
 void ModManagerFrame::LoadModsFromFolder() {
@@ -292,7 +295,7 @@ void ModManagerFrame::LoadModsFromFolder() {
                         info.islocal = info.folderName != (info.directory + L"_" + info.id);
                     }
                 }
-            } catch (...) {
+            }catch (...) {
                 //ignore broken xml
             }
             allMods.push_back(info);
@@ -303,7 +306,7 @@ void ModManagerFrame::LoadModsFromFolder() {
 
 void ModManagerFrame::RefreshLists() {
     int topdisabled = _disabledlist->GetTopItem();
-    int topenabled = _enabledlist->GetTopItem();    
+    int topenabled = _enabledlist->GetTopItem();
 
     wxString filter = _searchctrl->GetValue().Lower();
     _enabledlist->Clear();
@@ -314,8 +317,8 @@ void ModManagerFrame::RefreshLists() {
         if (mod.islocal) { name = "[[DEV/NoSteam]] " + name; }
         if (!filter.IsEmpty() && !name.Lower().Contains(filter)) continue;
         if (IsDisabled(mod.folderName)) {
-            _disabledlist->Append(name,new ModInfo(mod));
-        } else {
+            _disabledlist->Append(name, new ModInfo(mod));
+        }else {
             _enabledlist->Append(name, new ModInfo(mod));
         }
     }
@@ -422,6 +425,15 @@ std::string GetThumbnailURL(const std::wstring& itemId) {
 bool DownloadThumbFromID(const std::wstring& itemId, const std::wstring& filePath) {
 
     if (itemId.length() <= 0) { return false; }
+
+    static std::mutex throttleMutex;
+    static std::chrono::steady_clock::time_point nextAllowed;
+    {
+        std::lock_guard<std::mutex> lock(throttleMutex);
+        std::this_thread::sleep_until(nextAllowed); //lazy sleep to space out requests so steam doesnt cry
+        nextAllowed = std::chrono::steady_clock::now() + std::chrono::milliseconds(200); 
+    }
+
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
@@ -487,31 +499,31 @@ bool LoadImageQuietly(const std::wstring& path, wxImage& img) {
 
 bool HasChildNodesFromXML(fs::path xml, const std::string& daddy, const std::string& child = "") {
     try {
-    if (Filesystem::SafeExists(xml)) {
-        rapidxml::file<> xmlFile(xml.string().c_str());
-        rapidxml::xml_document<> doc;
-        doc.parse<0>(xmlFile.data());
+        if (Filesystem::SafeExists(xml)) {
+            rapidxml::file<> xmlFile(xml.string().c_str());
+            rapidxml::xml_document<> doc;
+            doc.parse<0>(xmlFile.data());
 
-        auto* root = doc.first_node(daddy.c_str());
-        if (root) {
-            if (child.length() > 0) {
-                for (rapidxml::xml_node<>* babee = root->first_node(child.c_str());
-                    babee;
-                    babee = babee->next_sibling(child.c_str()))
-                {
-                    return true; //++count;
+            auto* root = doc.first_node(daddy.c_str());
+            if (root) {
+                if (child.length() > 0) {
+                    for (rapidxml::xml_node<>* babee = root->first_node(child.c_str());
+                        babee;
+                        babee = babee->next_sibling(child.c_str()))
+                    {
+                        return true; //++count;
+                    }
                 }
-            }
-            else {
-                for (rapidxml::xml_node<>* babee = root->first_node();
-                    babee;
-                    babee = babee->next_sibling())
-                {
-                    return true; //++count;
+                else {
+                    for (rapidxml::xml_node<>* babee = root->first_node();
+                        babee;
+                        babee = babee->next_sibling())
+                    {
+                        return true; //++count;
+                    }
                 }
             }
         }
-    }
     }
     catch (...) {}
     return false; //return count;
@@ -557,16 +569,16 @@ void ModManagerFrame::LoadModExtraData() {
         }
 
         for (int i = 0; i <= checks; i++) {
-            selectedMod.extradata.Items        = selectedMod.extradata.Items      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "items.xml"), "items","active") || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / "content" / "items.xml"), "items", "passive");
-            selectedMod.extradata.Trinkets     = selectedMod.extradata.Trinkets   || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "items.xml"), "items","trinket");
-            selectedMod.extradata.Characters   = selectedMod.extradata.Characters || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "players.xml"), "players");
-            selectedMod.extradata.Music        = selectedMod.extradata.Music      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "music.xml"), "music","track");
-            selectedMod.extradata.Sounds       = selectedMod.extradata.Sounds     || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "sounds.xml"), "sounds","sound");
-            selectedMod.extradata.ItemPools    = selectedMod.extradata.ItemPools  || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "itempools.xml"), "itempools","pool");
-            selectedMod.extradata.Shaders      = selectedMod.extradata.Shaders    || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "shaders.xml"), "shaders","shader");
-            selectedMod.extradata.Challenges   = selectedMod.extradata.Challenges || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "challenges.xml"), "challenges");
-            selectedMod.extradata.Cards        = selectedMod.extradata.Cards      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems","card");
-            selectedMod.extradata.Pills        = selectedMod.extradata.Pills      || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems","pill");
+            selectedMod.extradata.Items = selectedMod.extradata.Items || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "items.xml"), "items", "active") || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / "content" / "items.xml"), "items", "passive");
+            selectedMod.extradata.Trinkets = selectedMod.extradata.Trinkets || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "items.xml"), "items", "trinket");
+            selectedMod.extradata.Characters = selectedMod.extradata.Characters || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "players.xml"), "players");
+            selectedMod.extradata.Music = selectedMod.extradata.Music || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "music.xml"), "music", "track");
+            selectedMod.extradata.Sounds = selectedMod.extradata.Sounds || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "sounds.xml"), "sounds", "sound");
+            selectedMod.extradata.ItemPools = selectedMod.extradata.ItemPools || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "itempools.xml"), "itempools", "pool");
+            selectedMod.extradata.Shaders = selectedMod.extradata.Shaders || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "shaders.xml"), "shaders", "shader");
+            selectedMod.extradata.Challenges = selectedMod.extradata.Challenges || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "challenges.xml"), "challenges");
+            selectedMod.extradata.Cards = selectedMod.extradata.Cards || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems", "card");
+            selectedMod.extradata.Pills = selectedMod.extradata.Pills || HasChildNodesFromXML(fs::path(_modspath / selectedMod.folderName / contents[i] / "pocketitems.xml"), "pocketitems", "pill");
         }
         selectedMod.extradata.lua = Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / "main.lua"));
 
@@ -575,21 +587,21 @@ void ModManagerFrame::LoadModExtraData() {
             checks++;
         }
         for (int i = 0; i <= checks; i++) {
-            selectedMod.extradata.resourceItems        = selectedMod.extradata.resourceItems      || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
-            selectedMod.extradata.resourceTrinkets     = selectedMod.extradata.resourceTrinkets   || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
-            selectedMod.extradata.resourceCharacters   = selectedMod.extradata.resourceCharacters || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "players.xml"));
-            selectedMod.extradata.resourceMusic        = selectedMod.extradata.resourceMusic      || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music.xml")) ;
-            selectedMod.extradata.resourceSounds       = selectedMod.extradata.resourceSounds     || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sounds.xml"));
-            selectedMod.extradata.resourceItemPools    = selectedMod.extradata.resourceItemPools  || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "itempools.xml"));
-            selectedMod.extradata.resourceShaders      = selectedMod.extradata.resourceShaders    || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "shaders.xml"));
-            selectedMod.extradata.resourceChallenges   = selectedMod.extradata.resourceChallenges || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "challenges.xml"));
-            selectedMod.extradata.resourceCards        = selectedMod.extradata.resourceCards      || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
-            selectedMod.extradata.resourcePills        = selectedMod.extradata.resourcePills      || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
-            selectedMod.extradata.anm2                 = selectedMod.extradata.anm2               || HasAnm2File(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"));
-            selectedMod.extradata.sprites              = selectedMod.extradata.sprites            || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"), ".png");
-            selectedMod.extradata.resourceMinor        = selectedMod.extradata.resourceMinor      || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i]), ".xml");
+            selectedMod.extradata.resourceItems = selectedMod.extradata.resourceItems || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
+            selectedMod.extradata.resourceTrinkets = selectedMod.extradata.resourceTrinkets || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "items.xml"));
+            selectedMod.extradata.resourceCharacters = selectedMod.extradata.resourceCharacters || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "players.xml"));
+            selectedMod.extradata.resourceMusic = selectedMod.extradata.resourceMusic || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music.xml"));
+            selectedMod.extradata.resourceSounds = selectedMod.extradata.resourceSounds || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sounds.xml"));
+            selectedMod.extradata.resourceItemPools = selectedMod.extradata.resourceItemPools || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "itempools.xml"));
+            selectedMod.extradata.resourceShaders = selectedMod.extradata.resourceShaders || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "shaders.xml"));
+            selectedMod.extradata.resourceChallenges = selectedMod.extradata.resourceChallenges || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "challenges.xml"));
+            selectedMod.extradata.resourceCards = selectedMod.extradata.resourceCards || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
+            selectedMod.extradata.resourcePills = selectedMod.extradata.resourcePills || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "pocketitems.xml"));
+            selectedMod.extradata.anm2 = selectedMod.extradata.anm2 || HasAnm2File(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"));
+            selectedMod.extradata.sprites = selectedMod.extradata.sprites || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx"), ".png");
+            selectedMod.extradata.resourceMinor = selectedMod.extradata.resourceMinor || HasFile(fs::path(_modspath / selectedMod.folderName / resources[i]), ".xml");
 
-            selectedMod.extradata.cutscenes        = selectedMod.extradata.cutscenes || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx" / "cutscenes"));
+            selectedMod.extradata.cutscenes = selectedMod.extradata.cutscenes || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "gfx" / "cutscenes"));
             selectedMod.extradata.Sounds = selectedMod.extradata.Sounds || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "sfx"));
             selectedMod.extradata.Music = selectedMod.extradata.Music || Filesystem::SafeExists(fs::path(_modspath / selectedMod.folderName / resources[i] / "music"));
         }
@@ -610,7 +622,7 @@ void ModManagerFrame::LoadModExtraData() {
         style.SetBackgroundColour(wxColor("White"));
         extraInfoCtrl->WriteText(wxString::FromUTF8(" "));
     }
-    else if (selectedMod.extradata.resourceMinor){
+    else if (selectedMod.extradata.resourceMinor) {
         style.SetBackgroundColour(wxColor("Grey"));
         extraInfoCtrl->BeginStyle(style);
         extraInfoCtrl->BeginURL("Not too bad on this case, but could still be bad for compat");
@@ -890,57 +902,57 @@ void ModManagerFrame::OnSelectModDisabled(wxCommandEvent& evt) {
 
 
 void ModManagerFrame::OnSelectMod(ModInfo mod) {
-            ParseBBCode(descriptionCtrl, mod.description.empty() ? "(No description)" : mod.description);
+    ParseBBCode(descriptionCtrl, mod.description.empty() ? "(No description)" : mod.description);
 
-            fs::path imagePath = _modspath / mod.folderName / "thumb.png";
-            if (Filesystem::SafeExists(imagePath) && fs::file_size(imagePath) > 0) {
-                wxImage img;
-                if (LoadImageQuietly(imagePath.wstring(), img)) {
-                    img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
-                    thumbnailCtrl->SetBitmap(wxBitmap(img));
-                }
-                else {
-                    thumbnailCtrl->SetBitmap(wxBitmap(200, 200));
-                }
-            }
-            else {
-                thumbnailCtrl->SetBitmap(wxBitmap(200, 200));
-                if ((mod.id.length() > 0) && (mod.id != mod.folderName)) { //check if the thing actually has a valid id
-                    thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 102)));
-                    std::thread([this, id = mod.id, imagePath]() {
-                    if (DownloadThumbFromID(id, imagePath.wstring())) {
-                        try {
+    fs::path imagePath = _modspath / mod.folderName / "thumb.png";
+    if (Filesystem::SafeExists(imagePath) && fs::file_size(imagePath) > 0) {
+        wxImage img;
+        if (LoadImageQuietly(imagePath.wstring(), img)) {
+            img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
+            thumbnailCtrl->SetBitmap(wxBitmap(img));
+        }
+        else {
+            thumbnailCtrl->SetBitmap(wxBitmap(200, 200));
+        }
+    }
+    else {
+        thumbnailCtrl->SetBitmap(wxBitmap(200, 200));
+        if ((mod.id.length() > 0) && (mod.id != mod.folderName)) { //check if the thing actually has a valid id
+            thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 102)));
+            std::thread([this, id = mod.id, imagePath]() {
+                if (DownloadThumbFromID(id, imagePath.wstring())) {
+                    try {
                         wxImage img;
                         if (LoadImageQuietly(imagePath.wstring(), img)) {
                             img.Rescale(200, 200, wxIMAGE_QUALITY_HIGH);
-                                if (selectedMod.id == id) { //so it doesnt get replaced if the mod changes while other thumbs are loading
-                                    wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
-                                    evt->SetPayload<wxBitmap>(wxBitmap(img));
-                                    if (!IsBeingDeleted()) {
-                                        wxQueueEvent(this, evt);
-                                    }
+                            if (selectedMod.id == id) { //so it doesnt get replaced if the mod changes while other thumbs are loading
+                                wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
+                                evt->SetPayload<wxBitmap>(wxBitmap(img));
+                                if (!IsBeingDeleted()) {
+                                    wxQueueEvent(this, evt);
                                 }
+                            }
 
                         }
-                        }
-                        catch (...) {} //dont give a shit, this is not critical at all
                     }
-                    else {
-                        wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
-                        evt->SetPayload<wxBitmap>(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
-                        if (!IsBeingDeleted()) {
-                            wxQueueEvent(this, evt);
-                        }
-                    }
-                    }).detach();
+                    catch (...) {} //dont give a shit, this is not critical at all
                 }
                 else {
-                    thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
+                    wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
+                    evt->SetPayload<wxBitmap>(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
+                    if (!IsBeingDeleted()) {
+                        wxQueueEvent(this, evt);
+                    }
                 }
-            }
-            selectedModTitle->SetLabel(mod.displayName);
-            selectedMod = mod;
-            LoadModExtraData();
+                }).detach();
+        }
+        else {
+            thumbnailCtrl->SetBitmap(wxBitmap(LoadPngFromResource(GetModuleHandle(NULL), 101)));
+        }
+    }
+    selectedModTitle->SetLabel(mod.displayName);
+    selectedMod = mod;
+    LoadModExtraData();
 }
 
 void ModManagerFrame::OnWorkshopPage(wxCommandEvent&) {
@@ -1016,7 +1028,7 @@ void ModManagerFrame::OnLoad(wxCommandEvent&) {
         for (const auto& mod : allMods) {
             if (enabledSet.count(mod.folderName)) {
                 EnableMod(mod.folderName);
-            } else {
+            }else {
                 DisableMod(mod.folderName);
             }
         }
@@ -1032,8 +1044,8 @@ void ModManagerFrame::OnLoad(wxCommandEvent&) {
                     if (!Filesystem::SafeExists(_modspath / modfolder)) {
                         uint64_t id = 0;
                         if (ExtractWorkshopId(modfolder, id)) {
-                          SteamUGC()->SubscribeItem(id);
-                          justsubbed.insert(id);
+                            SteamUGC()->SubscribeItem(id);
+                            justsubbed.insert(id);
                         }
                     }
                 }
@@ -1043,22 +1055,22 @@ void ModManagerFrame::OnLoad(wxCommandEvent&) {
 }
 
 void ModManagerFrame::OnReinstall(wxCommandEvent&) {
-	if (!selectedMod.id.empty()) {
-		int res = wxMessageDialog(this, wxString::Format("Would you like to reinstall \"%s?\"\n\nThis will delete the mod files and attempt to redownload the latest version from the Steam workshop.", selectedMod.displayName), "REPENTOGON Launcher", wxYES_NO).ShowModal();
-		
-		if (res != wxID_YES) {
-			return;
-		}
-		
-		uint64_t id;
-		if (!ExtractWorkshopId(selectedMod.id, id)) {
-			wxMessageDialog(this, wxString::Format("Cannot reinstall %s - not a workshop mod!", selectedMod.displayName), "REPENTOGON Launcher", wxOK).ShowModal();
-			return;
-		}
-		ModManagerReinstallDialog(this, id, selectedMod.displayName).ShowModal();
+    if (!selectedMod.id.empty()) {
+        int res = wxMessageDialog(this, wxString::Format("Would you like to reinstall \"%s?\"\n\nThis will delete the mod files and attempt to redownload the latest version from the Steam workshop.", selectedMod.displayName), "REPENTOGON Launcher", wxYES_NO).ShowModal();
+
+        if (res != wxID_YES) {
+            return;
+        }
+
+        uint64_t id;
+        if (!ExtractWorkshopId(selectedMod.id, id)) {
+            wxMessageDialog(this, wxString::Format("Cannot reinstall %s - not a workshop mod!", selectedMod.displayName), "REPENTOGON Launcher", wxOK).ShowModal();
+            return;
+        }
+        ModManagerReinstallDialog(this, id, selectedMod.displayName).ShowModal();
         std::ofstream(_modspath / selectedMod.folderName / "Update.it"); //label for forced updating later   
         ModUpdateDialog(nullptr, _modspath, nullptr, std::stoull(selectedMod.id)).ShowModal();
-	}
+    }
 }
 
 void ModManagerFrame::OnClose(wxCommandEvent&) {
@@ -1067,152 +1079,152 @@ void ModManagerFrame::OnClose(wxCommandEvent&) {
 
 // Reinstaller Dialog
 ModManagerReinstallDialog::ModManagerReinstallDialog(wxWindow* parent, const uint64_t workshopid, const std::wstring& modname)
-	: wxDialog(parent, wxID_ANY, L"Reinstalling " + modname + L"...",
-		wxDefaultPosition, wxDefaultSize), workshopid_(workshopid) {
-	Logger::Info("[ModManager] Reinstalling %ls...\n", modname.c_str());
+    : wxDialog(parent, wxID_ANY, L"Reinstalling " + modname + L"...",
+        wxDefaultPosition, wxDefaultSize), workshopid_(workshopid) {
+    Logger::Info("[ModManager] Reinstalling %ls...\n", modname.c_str());
 
-	wxBoxSizer* v = new wxBoxSizer(wxVERTICAL);
-	v->SetMinSize(wxSize(500, -1));
+    wxBoxSizer* v = new wxBoxSizer(wxVERTICAL);
+    v->SetMinSize(wxSize(500, -1));
 
-	statusLabel_ = new wxStaticText(this, wxID_ANY, "Deleting current steam cache...");
-	v->Add(statusLabel_, 0, wxEXPAND | wxALL, 8);
+    statusLabel_ = new wxStaticText(this, wxID_ANY, "Deleting current steam cache...");
+    v->Add(statusLabel_, 0, wxEXPAND | wxALL, 8);
 
-	progressBar_ = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(-1, 24));
-	v->Add(progressBar_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
+    progressBar_ = new wxGauge(this, wxID_ANY, 100, wxDefaultPosition, wxSize(-1, 24));
+    v->Add(progressBar_, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 8);
 
-	wxBoxSizer* h = new wxBoxSizer(wxHORIZONTAL);
-	cancelButton_ = new wxButton(this, wxID_CANCEL, "Cancel");
-	h->AddStretchSpacer();
-	h->Add(cancelButton_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxBOTTOM, 8);
-	v->Add(h, 0, wxEXPAND);
-	SetSizerAndFit(v);
-	Centre();
+    wxBoxSizer* h = new wxBoxSizer(wxHORIZONTAL);
+    cancelButton_ = new wxButton(this, wxID_CANCEL, "Cancel");
+    h->AddStretchSpacer();
+    h->Add(cancelButton_, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxBOTTOM, 8);
+    v->Add(h, 0, wxEXPAND);
+    SetSizerAndFit(v);
+    Centre();
 
-	timer_ = std::make_unique<wxTimer>(this, wxID_ANY);
-	timer_->Start(100);
+    timer_ = std::make_unique<wxTimer>(this, wxID_ANY);
+    timer_->Start(100);
 
-	Bind(wxEVT_BUTTON, &ModManagerReinstallDialog::OnCancel, this, cancelButton_->GetId());
-	Bind(wxEVT_THREAD, &ModManagerReinstallDialog::OnThreadUpdate, this);
-	Bind(wxEVT_TIMER, &ModManagerReinstallDialog::OnTimer, this);
+    Bind(wxEVT_BUTTON, &ModManagerReinstallDialog::OnCancel, this, cancelButton_->GetId());
+    Bind(wxEVT_THREAD, &ModManagerReinstallDialog::OnThreadUpdate, this);
+    Bind(wxEVT_TIMER, &ModManagerReinstallDialog::OnTimer, this);
 
-	if (!SteamAPI_Init() || !SteamAPI_IsSteamRunning() || !SteamUGC()) {
-		wxMessageDialog(this, "Cannot reinstall mod - Steam is not available!", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
-		EndModal(wxID_OK);
-	} else {
-		std::thread(&ModManagerReinstallDialog::MainProc, this).detach();
-	}
+    if (!SteamAPI_Init() || !SteamAPI_IsSteamRunning() || !SteamUGC()) {
+        wxMessageDialog(this, "Cannot reinstall mod - Steam is not available!", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
+        EndModal(wxID_OK);
+    }else {
+        std::thread(&ModManagerReinstallDialog::MainProc, this).detach();
+    }
 }
 
 void ModManagerReinstallDialog::OnCancel(wxCommandEvent&) {
-	cancelRequested_ = true;
-	cancelButton_->Disable();
+    cancelRequested_ = true;
+    cancelButton_->Disable();
 }
 
 void ModManagerReinstallDialog::OnTimer(wxTimerEvent&) {
-	if (progressBar_->GetValue() == 0 || progressBar_->GetValue() == 100) {
-		progressBar_->Pulse();
-	}
+    if (progressBar_->GetValue() == 0 || progressBar_->GetValue() == 100) {
+        progressBar_->Pulse();
+    }
 }
 
 void ModManagerReinstallDialog::OnThreadUpdate(wxThreadEvent& evt) {
-	int current = evt.GetInt();
+    int current = evt.GetInt();
 
-	if (current == -1) {
-		EndModal(wxID_OK);
-		return;
-	}
+    if (current == -1) {
+        EndModal(wxID_OK);
+        return;
+    }
 
-	if (current != progressBar_->GetValue()) {
-		progressBar_->SetValue(current);
-	}
+    if (current != progressBar_->GetValue()) {
+        progressBar_->SetValue(current);
+    }
 
-	if (current > 0 && current < 100) {
-		statusLabel_->SetLabel("Downloading mod...");
-	} else if (current >= 100) {
-		statusLabel_->SetLabel("Installing (check Steam for exact progress)...");
-	} else {
-		statusLabel_->SetLabel("Preparing to download...");
-	}
+    if (current > 0 && current < 100) {
+        statusLabel_->SetLabel("Downloading mod...");
+    }else if (current >= 100) {
+        statusLabel_->SetLabel("Installing (check Steam for exact progress)...");
+    }else {
+        statusLabel_->SetLabel("Preparing to download...");
+    }
 }
 
 void ModManagerReinstallDialog::TryReinstallMod() {
-	const uint32_t initialState = SteamUGC()->GetItemState(workshopid_);
+    const uint32_t initialState = SteamUGC()->GetItemState(workshopid_);
 
-	if (!(initialState & k_EItemStateSubscribed)) {
-		wxMessageDialog(this, "Cannot reinstall mod - you are not subscribed to it!", "REPENTOGON Launcher", wxOK | wxICON_WARNING).ShowModal();
-		return;
-	}
+    if (!(initialState & k_EItemStateSubscribed)) {
+        wxMessageDialog(this, "Cannot reinstall mod - you are not subscribed to it!", "REPENTOGON Launcher", wxOK | wxICON_WARNING).ShowModal();
+        return;
+    }
 
-	if ((initialState & k_EItemStateDownloading) || (initialState & k_EItemStateDownloadPending)) {
-		Logger::Info("[ModManager] Reinstall was requested, but Steam is already downloading the mod.\n");
-	} else {
-		char folderPath[1024];
-		uint64 sizeOnDisk = 0;
-		uint32 timeStamp = 0;
-		Logger::Info("[ModManager] Getting current cache info...\n");
-		if (SteamUGC()->GetItemInstallInfo(workshopid_, &sizeOnDisk, folderPath, sizeof(folderPath), &timeStamp)) {
-			Logger::Info("[ModManager] Deleting existing cache from `%s`...\n", folderPath);
-			// We CAN continue if this fails.
-			std::error_code err;
-			std::filesystem::remove_all(folderPath, err);
-			if (err) {
-				Logger::Error("[ModManager] Failed to delete mod cache files for reinstall: %s (%s:%d)\n", err.message().c_str(), err.category().name(), err.value());
-			}
-		} else {
-			Logger::Info("[ModManager] ...No current cache found.\n");
-		}
+    if ((initialState & k_EItemStateDownloading) || (initialState & k_EItemStateDownloadPending)) {
+        Logger::Info("[ModManager] Reinstall was requested, but Steam is already downloading the mod.\n");
+    }else {
+        char folderPath[1024];
+        uint64 sizeOnDisk = 0;
+        uint32 timeStamp = 0;
+        Logger::Info("[ModManager] Getting current cache info...\n");
+        if (SteamUGC()->GetItemInstallInfo(workshopid_, &sizeOnDisk, folderPath, sizeof(folderPath), &timeStamp)) {
+            Logger::Info("[ModManager] Deleting existing cache from `%s`...\n", folderPath);
+            // We CAN continue if this fails.
+            std::error_code err;
+            std::filesystem::remove_all(folderPath, err);
+            if (err) {
+                Logger::Error("[ModManager] Failed to delete mod cache files for reinstall: %s (%s:%d)\n", err.message().c_str(), err.category().name(), err.value());
+            }
+        }else {
+            Logger::Info("[ModManager] ...No current cache found.\n");
+        }
 
-		Logger::Info("[ModManager] Requesting download from Steam...\n");
-		if (!SteamUGC()->DownloadItem(workshopid_, false)) {
-			Logger::Info("[ModManager] ...Failed!\n");
-			wxMessageDialog(this, "Reinstall failed - could not request download from Steam.", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
-			return;
-		}
+        Logger::Info("[ModManager] Requesting download from Steam...\n");
+        if (!SteamUGC()->DownloadItem(workshopid_, false)) {
+            Logger::Info("[ModManager] ...Failed!\n");
+            wxMessageDialog(this, "Reinstall failed - could not request download from Steam.", "REPENTOGON Launcher", wxOK | wxICON_ERROR).ShowModal();
+            return;
+        }
 
-	}
+    }
 
-	do {
-		const uint32 state = SteamUGC()->GetItemState(workshopid_);
+    do {
+        const uint32 state = SteamUGC()->GetItemState(workshopid_);
 
-		if (state & k_EItemStateDownloading) {
-			uint64_t bytesDownloaded = 0;
-			uint64_t bytesTotal = 0;
+        if (state & k_EItemStateDownloading) {
+            uint64_t bytesDownloaded = 0;
+            uint64_t bytesTotal = 0;
 
-			if (SteamUGC()->GetItemDownloadInfo(workshopid_, &bytesDownloaded, &bytesTotal)) {
-				int pct = 0;
-				if (bytesTotal > 0) {
-					pct = static_cast<int>((bytesDownloaded * 100) / bytesTotal);
-				}
+            if (SteamUGC()->GetItemDownloadInfo(workshopid_, &bytesDownloaded, &bytesTotal)) {
+                int pct = 0;
+                if (bytesTotal > 0) {
+                    pct = static_cast<int>((bytesDownloaded * 100) / bytesTotal);
+                }
 
-				wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
-				evt->SetInt(pct);
-				if (!IsBeingDeleted()) {
-					wxQueueEvent(this, evt);
-				}
-			} else {
-				break;
-			}
-		} else if ((state & k_EItemStateDownloadPending) == 0) {
-			break;
-		}
+                wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
+                evt->SetInt(pct);
+                if (!IsBeingDeleted()) {
+                    wxQueueEvent(this, evt);
+                }
+            }else {
+                break;
+            }
+        }else if ((state & k_EItemStateDownloadPending) == 0) {
+            break;
+        }
 
-		std::this_thread::sleep_for(std::chrono::microseconds(1000));
-	} while (!cancelRequested_);
+        std::this_thread::sleep_for(std::chrono::microseconds(1000));
+    } while (!cancelRequested_);
 
-	if (cancelRequested_) {
-		Logger::Info("[ModManager] Dialog was dismissed by user.\n");
-	} else {     
-		Logger::Info("[ModManager] Cache deletion complete!, waiting for the modupdater...\n");
-	}
+    if (cancelRequested_) {
+        Logger::Info("[ModManager] Dialog was dismissed by user.\n");
+    }else {
+        Logger::Info("[ModManager] Cache deletion complete!, waiting for the modupdater...\n");
+    }
 }
 
 void ModManagerReinstallDialog::MainProc() {
-	TryReinstallMod();
+    TryReinstallMod();
 
-	// Send the signal that we're done.
-	wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
-	evt->SetInt(-1);
-	if (!IsBeingDeleted()) {
-		wxQueueEvent(this, evt);
-	}
+    // Send the signal that we're done.
+    wxThreadEvent* evt = new wxThreadEvent(wxEVT_THREAD);
+    evt->SetInt(-1);
+    if (!IsBeingDeleted()) {
+        wxQueueEvent(this, evt);
+    }
 }
