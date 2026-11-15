@@ -2,6 +2,9 @@
 
 #include "launcher/windows/advanced_options.h"
 #include "launcher/windows/launcher.h"
+#include <wx/clipbrd.h>
+#include <wx/statline.h>
+#include <wx/stdpaths.h>
 
 wxBEGIN_EVENT_TABLE(Launcher::AdvancedOptionsWindow, wxDialog)
 EVT_BUTTON(Launcher::AdvancedOptionsWindow::Controls::ADVANCED_CONTROLS_BUTTON_FORCE_UNSTABLE_UPDATE,
@@ -84,6 +87,24 @@ namespace Launcher {
 		
 		wxButton* reinstallButton = new wxButton(this, ADVANCED_CONTROLS_BUTTON_REINSTALL,"Re-install/Repair REPENTOGON");
 		mainSizer->Add(reinstallButton, 0, wxEXPAND | wxLEFT | wxTOP | wxRIGHT | wxBOTTOM, 10);
+
+		wxButton* copylaunchparam = new wxButton(this, wxID_ANY,"Copy Steam shortcut param to clipboard");
+		mainSizer->Add(copylaunchparam, 0, wxEXPAND | wxALL, 10);
+
+		mainSizer->Add(new wxStaticLine(this), 0, wxEXPAND | wxLEFT | wxRIGHT, 10);
+
+		copylaunchparam->Bind(wxEVT_BUTTON, [this](wxCommandEvent&) {
+			wxString exePath = wxStandardPaths::Get().GetExecutablePath(); //didnt even know this was a thing but it seems to work and its prettier than the other method we used in othr places, lol (most importantly, I wash my hands over it since its wxwidgets doing it)
+			wxString platform = "\"" + exePath + "\" --isaac=%command%";			
+
+			if (GetEnvironmentVariableW(L"STEAM_COMPAT_DATA_PATH", nullptr, 0) > 0) {
+				platform = "echo \"%command%\" | sed 's|isaac-ng.exe|REPENTOGONLauncher/REPENTOGONLauncher.exe|' | sh";
+			}
+			if (wxTheClipboard->Open()) {
+				wxTheClipboard->SetData(new wxTextDataObject(platform));
+				wxTheClipboard->Close();
+			}
+		});
 
 		Fit();
 	}
