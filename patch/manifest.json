@@ -6,6 +6,9 @@
   "patch": [
     "isaac-ng.exe",
     "resources\\packed\\afterbirthp.a",
+    "resources\\packed\\repentance_fr.a",
+    "resources\\packed\\repentance_kr.a",
+    "resources\\packed\\repentance_zh.a",
     "resources\\scripts\\enums.lua",
     "resources\\scripts\\json.lua",
     "resources\\scripts\\main.lua"
